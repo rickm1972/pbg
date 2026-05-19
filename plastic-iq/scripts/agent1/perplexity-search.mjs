@@ -28,7 +28,9 @@ function buildAmazonSearchQuery(product) {
   const name = product.product_name ?? ''
   const amazonUrl = product.amazon_url || product.affiliate_link
   const asin = extractAmazonAsin(amazonUrl)
-  const parts = [brand, name, 'Amazon'].filter(Boolean)
+  const parts = []
+  if (brand && !name.toLowerCase().startsWith(brand.toLowerCase())) parts.push(brand)
+  parts.push(name, 'Amazon')
   if (asin) parts.push(`ASIN ${asin}`)
   parts.push('materials specifications product details')
   return parts.join(' ').replace(/\s+/g, ' ').trim()
