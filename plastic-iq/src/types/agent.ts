@@ -72,6 +72,10 @@ export type Agent1ApiUsage = {
   output_tokens?: number
   web_search_requests?: number
   estimated_cost_usd?: number
+  total_estimated_cost_usd?: number
+  perplexity_search_requests?: number
+  perplexity_estimated_cost_usd?: number
+  claude_estimated_cost_usd?: number
   cache_read_input_tokens?: number
   cache_creation_input_tokens?: number
   anthropic_api_calls?: number

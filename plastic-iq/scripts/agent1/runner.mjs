@@ -147,8 +147,9 @@ export function formatPacketSummary(result) {
 
   const usage = packet.agent_metadata.api_usage
   if (usage) {
+    const total = usage.total_estimated_cost_usd ?? usage.estimated_cost_usd ?? 0
     lines.push(
-      `\nAPI usage: anthropic_api_calls=${usage.anthropic_api_calls ?? 1} input=${usage.input_tokens ?? 0} output=${usage.output_tokens ?? 0} web_searches=${usage.web_search_requests ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0} cache_write=${usage.cache_creation_input_tokens ?? 0} est_cost=$${(usage.estimated_cost_usd ?? 0).toFixed(4)}`,
+      `\nAPI usage: total=$${total.toFixed(4)} | Perplexity searches=${usage.perplexity_search_requests ?? 0} $${(usage.perplexity_estimated_cost_usd ?? 0).toFixed(4)} | Claude calls=${usage.anthropic_api_calls ?? 0} in=${usage.input_tokens ?? 0} out=${usage.output_tokens ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0} cache_write=${usage.cache_creation_input_tokens ?? 0} $${(usage.claude_estimated_cost_usd ?? usage.estimated_cost_usd ?? 0).toFixed(4)} | legacy_web_searches=${usage.web_search_requests ?? 0}`,
     )
   }
 

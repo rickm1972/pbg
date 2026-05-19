@@ -122,6 +122,10 @@ export type Agent1ApiUsage = {
   output_tokens?: number
   web_search_requests?: number
   estimated_cost_usd?: number
+  total_estimated_cost_usd?: number
+  perplexity_search_requests?: number
+  perplexity_estimated_cost_usd?: number
+  claude_estimated_cost_usd?: number
   cache_read_input_tokens?: number
   cache_creation_input_tokens?: number
   anthropic_api_calls?: number
@@ -139,20 +143,29 @@ export function formatAgent1ApiUsage(usage: Agent1ApiUsage | null | undefined): 
     usage.estimated_cost_usd != null
       ? `$${usage.estimated_cost_usd.toFixed(3)}`
       : null
+  const total = usage.total_estimated_cost_usd ?? usage.estimated_cost_usd
   const parts = [
+    usage.perplexity_search_requests != null && usage.perplexity_search_requests > 0
+      ? `${usage.perplexity_search_requests} Perplexity search${usage.perplexity_search_requests === 1 ? '' : 'es'}`
+      : null,
+    usage.perplexity_estimated_cost_usd != null && usage.perplexity_estimated_cost_usd > 0
+      ? `$${usage.perplexity_estimated_cost_usd.toFixed(3)} Perplexity`
+      : null,
     usage.anthropic_api_calls != null
-      ? `${usage.anthropic_api_calls} API call${usage.anthropic_api_calls === 1 ? '' : 's'}`
+      ? `${usage.anthropic_api_calls} Claude call${usage.anthropic_api_calls === 1 ? '' : 's'}`
       : null,
     usage.input_tokens != null ? `${usage.input_tokens.toLocaleString()} in` : null,
     usage.output_tokens != null ? `${usage.output_tokens.toLocaleString()} out` : null,
-    usage.web_search_requests != null ? `${usage.web_search_requests} searches` : null,
+    usage.web_search_requests != null && usage.web_search_requests > 0
+      ? `${usage.web_search_requests} Anthropic web searches`
+      : null,
     usage.cache_read_input_tokens != null && usage.cache_read_input_tokens > 0
       ? `${usage.cache_read_input_tokens.toLocaleString()} cache read`
       : null,
     usage.cache_creation_input_tokens != null && usage.cache_creation_input_tokens > 0
       ? `${usage.cache_creation_input_tokens.toLocaleString()} cache write`
       : null,
-    cost != null ? `${cost} est` : null,
+    total != null ? `$${total.toFixed(3)} total est` : cost != null ? `${cost} est` : null,
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(' · ') : null
 }

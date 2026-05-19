@@ -44,7 +44,7 @@ Usage:
   npm run agent1 -- <product_id>
   npm run agent1 -- --name "Lodge Cast Iron Skillet"
 
-Requires ANTHROPIC_API_KEY or PERPLEXITY_API_KEY in plastic-iq/.env
+Requires PERPLEXITY_API_KEY + ANTHROPIC_API_KEY in plastic-iq/.env (default: Perplexity Search + Claude synthesis)
 `)
     process.exit(1)
   }
