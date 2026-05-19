@@ -1,0 +1,22 @@
+---
+description: Commit to git before applying any code change — no exceptions
+alwaysApply: true
+---
+
+# Commit before every change
+
+This repository uses git at `/Users/richardmelnyck/PlasticIQ` (branch `main`).
+
+## Required workflow
+
+1. Before editing any project file, check `git status` and `git diff`.
+2. If there are uncommitted changes from a prior step, commit them first with a clear message.
+3. For the change you are about to make: stage and commit **before** applying the edit when the user requested a discrete change; for multi-file work, commit in logical chunks as you go — never leave a large uncommitted diff at the end without committing.
+4. Never commit `.env`, credentials, or `node_modules/` (see `.gitignore`).
+5. Do not amend, force-push, or change git config unless the user explicitly asks.
+
+## Baseline
+
+Initial baseline: `baseline commit May 19 2026 before Agent 1 cost investigation` (`d728fce`).
+
+No exceptions to committing tracked work before moving on.
