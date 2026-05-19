@@ -149,7 +149,7 @@ export function formatPacketSummary(result) {
   if (usage) {
     const total = usage.total_estimated_cost_usd ?? usage.estimated_cost_usd ?? 0
     lines.push(
-      `\nAPI usage: total=$${total.toFixed(4)} | Perplexity searches=${usage.perplexity_search_requests ?? 0} $${(usage.perplexity_estimated_cost_usd ?? 0).toFixed(4)} | Claude calls=${usage.anthropic_api_calls ?? 0} in=${usage.input_tokens ?? 0} out=${usage.output_tokens ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0} cache_write=${usage.cache_creation_input_tokens ?? 0} $${(usage.claude_estimated_cost_usd ?? usage.estimated_cost_usd ?? 0).toFixed(4)} | legacy_web_searches=${usage.web_search_requests ?? 0}`,
+      `\nAPI usage: total=$${total.toFixed(4)} | Amazon web_search=${usage.web_search_requests ?? 0} $${(usage.amazon_anthropic_estimated_cost_usd ?? 0).toFixed(4)} | Perplexity=${usage.perplexity_search_requests ?? 0} $${(usage.perplexity_estimated_cost_usd ?? 0).toFixed(4)} | synthesis $${(usage.claude_estimated_cost_usd ?? 0).toFixed(4)} (${usage.anthropic_api_calls ?? 0} Claude calls, in=${usage.input_tokens ?? 0} out=${usage.output_tokens ?? 0})`,
     )
   }
 

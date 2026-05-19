@@ -73,21 +73,42 @@ Set fetched_at on each source to current UTC ISO time.
 Include any research warnings in agent_metadata.warnings.`
 }
 
+/** Stage 1a — single Anthropic web_search call for the Amazon listing (ASIN / catalog URL). */
+export const AMAZON_WEB_SEARCH_SYSTEM_PROMPT = `You retrieve Amazon product listing information using the web_search tool.
+Use exactly one web search to find and read the Amazon product page for the ASIN or URL provided.
+Extract materials, contact surfaces, components, certifications, care instructions, and marketing claims from the Amazon listing only.
+Return plain text with clear sections: URL visited, Page title, Product details, Quotes/excerpts. Do not return JSON.`
+
+export function buildAmazonWebSearchUserPrompt(product) {
+  const url = product.amazon_url || product.affiliate_link
+  const asinMatch = url?.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})(?:[\/?#]|$)/i)
+  const asin = asinMatch?.[1]?.toUpperCase() ?? null
+
+  return `Retrieve the Amazon listing for this product using one web search.
+
+Product: ${product.product_name}
+Brand: ${product.brand ?? 'unknown'}
+ASIN: ${asin ?? 'unknown'}
+Amazon URL: ${url ?? 'none'}
+
+Open the Amazon product page (ASIN ${asin ?? 'from URL'}). Extract all material, safety, and specification information from that listing.`
+}
+
 /** Stage 2 — Claude synthesizes evidence from Perplexity Search snippets (no web search tool). */
 export const SYNTHESIS_SYSTEM_PROMPT = `You are Agent 1 (Product Evidence Agent) for PlasticBegone Algorithm ${ALGORITHM_VERSION}.
 Your ONLY job is to produce a structured evidence packet from pre-retrieved web search snippets.
 You do NOT browse the web, score, normalize, or recommend purchases.
 
 Rules:
-- Use ONLY the Amazon direct fetch, Perplexity search snippets, and product fields in the user message. Do not invent URLs or facts.
-- Amazon is the primary retailer: when amazon_direct_fetch.ok is true, you MUST include that URL in sources[] as the first source with source_type "amazon". Use excerpts from amazon_direct_fetch.excerpt for retailer-confirmed facts.
-- If amazon_direct_fetch failed, note it in warnings and information_gaps but still complete other sources from Perplexity.
+- Use ONLY the Amazon Anthropic web_search excerpt, Perplexity search snippets, and product fields in the user message. Do not invent URLs or facts.
+- Amazon is the primary retailer: when amazon_anthropic_web_search.ok is true, you MUST include the catalog Amazon URL in sources[] as the first source with source_type "amazon". Use excerpts from amazon_anthropic_web_search.excerpt for retailer-confirmed facts.
+- If Amazon retrieval failed, note it in warnings and information_gaps but still complete other sources from Perplexity.
 - Prefer official manufacturer pages when snippets support them.
 - Extract facts with exact supporting excerpts (quotes/snippets from the provided results).
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
-- Include up to ${MAX_SOURCES} distinct sources in sources[] (URLs from amazon_direct_fetch and/or Perplexity snippets).
+- Include up to ${MAX_SOURCES} distinct sources in sources[] (Amazon URL from amazon_anthropic_web_search and/or Perplexity snippets).
 
 Required fact coverage (use these fact_key values where applicable):
 - primary_material
@@ -125,11 +146,11 @@ export function buildSynthesisUserPrompt(product, retrieval) {
     ['other_retailer_url', product.other_retailer_url],
   ].filter(([, url]) => url)
 
-  const amazon = retrieval.amazon_direct_fetch
+  const amazon = retrieval.amazon_anthropic_web_search
   const amazonSection = amazon
-    ? `AMAZON DIRECT FETCH (primary retailer — required source when ok=true):
+    ? `AMAZON (Anthropic web_search — primary retailer, required source when ok=true):
 ${JSON.stringify(amazon, null, 2)}`
-    : 'AMAZON DIRECT FETCH: not available.'
+    : 'AMAZON Anthropic web_search: not available.'
 
   return `Synthesize the evidence packet JSON from the retrieval data below.
 
@@ -150,7 +171,7 @@ Perplexity retrieval (${retrieval.search_requests} search requests, retrieved ${
 ${JSON.stringify(retrieval.searches, null, 2)}
 
 Instructions:
-1. If amazon_direct_fetch.ok, sources[0] must be source_type "amazon" with that URL and title. Add other URLs from Perplexity (max ${MAX_SOURCES} total).
+1. If amazon_anthropic_web_search.ok, sources[0] must be source_type "amazon" with the catalog URL and title from that block. Add other URLs from Perplexity (max ${MAX_SOURCES} total).
 2. Extract all required facts with excerpts quoted from snippets.
 3. Include product_use_case (e.g. food contact cookware, food storage).
 4. Set fetched_at on each source to current UTC ISO time.

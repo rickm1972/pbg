@@ -17,7 +17,7 @@ import {
   finishAnthropicApiCallLog,
   recordAnthropicApiCall,
 } from './anthropic-usage.mjs'
-import { fetchAmazonProductPage } from './amazon-fetch.mjs'
+import { retrieveAmazonViaAnthropicWebSearch } from './amazon-anthropic-search.mjs'
 import { runPerplexityRetrieval } from './perplexity-search.mjs'
 
 const DEFAULT_MAX_WEB_SEARCH_USES = 12
@@ -103,23 +103,30 @@ function logClaudeUsage(body, callMeta) {
   return record
 }
 
-function combineApiUsage(perplexityUsage, claudeUsage) {
+function combineApiUsage(perplexityUsage, amazonUsage, synthUsage) {
   const perplexityCost = perplexityUsage?.estimated_cost_usd ?? 0
-  const claudeCost = claudeUsage?.estimated_cost_usd ?? 0
-  const total = perplexityCost + claudeCost
+  const amazonCost = amazonUsage?.usage?.estimated_cost_usd ?? 0
+  const synthCost = synthUsage?.estimated_cost_usd ?? 0
+  const total = perplexityCost + amazonCost + synthCost
+  const amazonWebSearches = amazonUsage?.web_search_requests ?? amazonUsage?.usage?.web_search_requests ?? 0
   return {
-    input_tokens: claudeUsage?.input_tokens ?? 0,
-    output_tokens: claudeUsage?.output_tokens ?? 0,
-    web_search_requests: 0,
+    input_tokens: (amazonUsage?.usage?.input_tokens ?? 0) + (synthUsage?.input_tokens ?? 0),
+    output_tokens: (amazonUsage?.usage?.output_tokens ?? 0) + (synthUsage?.output_tokens ?? 0),
+    web_search_requests: amazonWebSearches,
     estimated_cost_usd: total,
     total_estimated_cost_usd: total,
-    cache_read_input_tokens: claudeUsage?.cache_read_input_tokens ?? 0,
-    cache_creation_input_tokens: claudeUsage?.cache_creation_input_tokens ?? 0,
-    anthropic_api_calls: claudeUsage?.anthropic_api_calls ?? 0,
-    anthropic_api_call_log: claudeUsage?.anthropic_api_call_log ?? [],
+    cache_read_input_tokens: synthUsage?.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: synthUsage?.cache_creation_input_tokens ?? 0,
+    anthropic_api_calls:
+      (amazonUsage?.usage?.anthropic_api_calls ?? 0) + (synthUsage?.anthropic_api_calls ?? 0),
+    anthropic_api_call_log: [
+      ...(amazonUsage?.usage?.anthropic_api_call_log ?? []),
+      ...(synthUsage?.anthropic_api_call_log ?? []),
+    ],
     perplexity_search_requests: perplexityUsage?.search_requests ?? 0,
     perplexity_estimated_cost_usd: perplexityCost,
-    claude_estimated_cost_usd: claudeCost,
+    amazon_anthropic_estimated_cost_usd: amazonCost,
+    claude_estimated_cost_usd: synthCost,
   }
 }
 
@@ -192,21 +199,22 @@ async function synthesizeWithClaude(product, retrieval, env) {
   return { rawText: text, model, claudeUsage }
 }
 
-/** Default path: Amazon direct fetch + Perplexity Search + Claude synthesis. */
+/** Default: Anthropic web_search (Amazon) + Perplexity Search + Claude synthesis. */
 async function researchWithPerplexitySearchAndClaude(product, env) {
-  const amazonDirectFetch = await fetchAmazonProductPage(product, env)
+  const amazonAnthropic = await retrieveAmazonViaAnthropicWebSearch(product, env)
   const retrieval = await runPerplexityRetrieval(product, env)
-  retrieval.amazon_direct_fetch = amazonDirectFetch
+  retrieval.amazon_anthropic_web_search = amazonAnthropic
   const synth = await synthesizeWithClaude(product, retrieval, env)
   const apiUsage = combineApiUsage(
     {
       search_requests: retrieval.search_requests,
       estimated_cost_usd: retrieval.estimated_cost_usd,
     },
+    amazonAnthropic,
     synth.claudeUsage,
   )
   console.log(
-    `\n[agent1] Total est. cost: $${apiUsage.total_estimated_cost_usd.toFixed(4)} (Perplexity $${apiUsage.perplexity_estimated_cost_usd.toFixed(4)} + Claude $${apiUsage.claude_estimated_cost_usd.toFixed(4)})`,
+    `\n[agent1] Total est. cost: $${apiUsage.total_estimated_cost_usd.toFixed(4)} (Amazon web_search $${apiUsage.amazon_anthropic_estimated_cost_usd.toFixed(4)} + Perplexity $${apiUsage.perplexity_estimated_cost_usd.toFixed(4)} + synthesis $${apiUsage.claude_estimated_cost_usd.toFixed(4)})`,
   )
   return {
     rawText: synth.rawText,

@@ -125,6 +125,7 @@ export type Agent1ApiUsage = {
   total_estimated_cost_usd?: number
   perplexity_search_requests?: number
   perplexity_estimated_cost_usd?: number
+  amazon_anthropic_estimated_cost_usd?: number
   claude_estimated_cost_usd?: number
   cache_read_input_tokens?: number
   cache_creation_input_tokens?: number
@@ -147,6 +148,9 @@ export function formatAgent1ApiUsage(usage: Agent1ApiUsage | null | undefined): 
   const parts = [
     usage.perplexity_search_requests != null && usage.perplexity_search_requests > 0
       ? `${usage.perplexity_search_requests} Perplexity search${usage.perplexity_search_requests === 1 ? '' : 'es'}`
+      : null,
+    usage.amazon_anthropic_estimated_cost_usd != null && usage.amazon_anthropic_estimated_cost_usd > 0
+      ? `$${usage.amazon_anthropic_estimated_cost_usd.toFixed(3)} Amazon web_search`
       : null,
     usage.perplexity_estimated_cost_usd != null && usage.perplexity_estimated_cost_usd > 0
       ? `$${usage.perplexity_estimated_cost_usd.toFixed(3)} Perplexity`

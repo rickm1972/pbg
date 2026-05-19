@@ -64,6 +64,7 @@ export const AgentMetadataSchema = z.object({
     total_estimated_cost_usd: z.number().optional(),
     perplexity_search_requests: z.number().optional(),
     perplexity_estimated_cost_usd: z.number().optional(),
+    amazon_anthropic_estimated_cost_usd: z.number().optional(),
     claude_estimated_cost_usd: z.number().optional(),
     cache_read_input_tokens: z.number().optional(),
     cache_creation_input_tokens: z.number().optional(),

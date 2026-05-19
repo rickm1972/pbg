@@ -75,6 +75,7 @@ export type Agent1ApiUsage = {
   total_estimated_cost_usd?: number
   perplexity_search_requests?: number
   perplexity_estimated_cost_usd?: number
+  amazon_anthropic_estimated_cost_usd?: number
   claude_estimated_cost_usd?: number
   cache_read_input_tokens?: number
   cache_creation_input_tokens?: number
