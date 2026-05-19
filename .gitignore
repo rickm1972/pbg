@@ -1,0 +1,18 @@
+.DS_Store
+
+# plastic-iq app
+plastic-iq/node_modules/
+plastic-iq/dist/
+plastic-iq/dist-ssr/
+plastic-iq/.env
+plastic-iq/.env.local
+plastic-iq/.env.*.local
+plastic-iq/scripts/output/
+plastic-iq/*.local
+plastic-iq/logs/
+plastic-iq/*.log
+
+# Editor
+plastic-iq/.vscode/*
+!plastic-iq/.vscode/extensions.json
+plastic-iq/.idea/

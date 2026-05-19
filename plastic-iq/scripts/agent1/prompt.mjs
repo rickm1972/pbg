@@ -1,0 +1,74 @@
+import { ALGORITHM_VERSION, CONFIDENCE_LABELS } from './types.mjs'
+
+export const SYSTEM_PROMPT = `You are Agent 1 (Product Evidence Agent) for PlasticBegone Algorithm ${ALGORITHM_VERSION}.
+Your ONLY job is to research a product and produce a structured evidence packet.
+You do NOT score, normalize, or recommend purchases.
+
+Rules:
+- Visit the primary retailer URL provided (Amazon or equivalent) and the official manufacturer product page. Do not visit Target or Walmart unless the primary page lacks critical material information.
+- Find the official manufacturer product page when possible.
+- Search for spec sheets, SDS, ingredient pages, FAQ, certifications, SmartLabel (for formulations).
+- Extract facts with exact supporting excerpts (quotes/snippets from pages).
+- Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
+- Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
+- Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
+
+Required fact coverage (use these fact_key values where applicable):
+- primary_material
+- primary_contact_surface
+- secondary_components (lids, gaskets, seals, straws, handles, coatings, etc.)
+- finishing_treatments
+- certifications_found
+- marketing_claims_found
+- ingredient_list (formulation products; empty string if N/A)
+- care_and_use_instructions
+- product_use_case (required for scoring threshold)
+- information_gaps (list anything not found)
+
+source_type examples: manufacturer, retailer, amazon, target, walmart, other_retailer, spec_sheet, sds, ingredient_page, faq, certification, smartlabel, search_result, other.
+
+JSON schema:
+{
+  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string }],
+  "facts": [{
+    "fact_type": string,
+    "fact_key": string,
+    "fact_value": string | number | boolean | null,
+    "confidence": one of allowed confidence labels,
+    "source_index": number | null,
+    "excerpt": string
+  }],
+  "agent_metadata": {
+    "warnings": string[]
+  }
+}`
+
+export function buildUserPrompt(product) {
+  const urls = [
+    ['amazon_url', product.amazon_url || product.affiliate_link],
+    ['other_retailer_url', product.other_retailer_url],
+  ].filter(([, url]) => url)
+
+  return `Research this product and return the evidence JSON.
+
+Product:
+- product_id: ${product.product_id}
+- product_name: ${product.product_name}
+- brand: ${product.brand ?? 'unknown'}
+- category: ${product.category ?? 'unknown'}
+- subcategory: ${product.subcategory ?? 'unknown'}
+- image_url: ${product.image_url ?? 'none'}
+
+Primary retailer URL (visit — Amazon or equivalent; not Target/Walmart by default):
+${urls.map(([k, u]) => `- ${k}: ${u}`).join('\n') || '- none on file'}
+
+Steps:
+1. Open the primary retailer URL above.
+2. Find official ${product.brand ?? 'manufacturer'} page for "${product.product_name}".
+3. Find spec/SDS/ingredient/FAQ/certification pages as relevant.
+4. Extract all required facts with excerpts and confidence labels.
+5. Include product_use_case fact (e.g. food contact cookware, food storage, etc.).
+
+Set fetched_at on each source to current UTC ISO time.
+Include any research warnings in agent_metadata.warnings.`
+}
