@@ -23,20 +23,19 @@ export function extractAmazonAsin(url) {
   return match?.[1]?.toUpperCase() ?? null
 }
 
-function buildAmazonSearchQuery(product) {
+/** Plain web search: brand + product name + ASIN only (no domain filter, no extra keywords). */
+export function buildAmazonSearchQuery(product) {
   const brand = product.brand ?? ''
   const name = product.product_name ?? ''
-  const amazonUrl = product.amazon_url || product.affiliate_link
-  const asin = extractAmazonAsin(amazonUrl)
+  const asin = extractAmazonAsin(product.amazon_url || product.affiliate_link)
   const parts = []
   if (brand && !name.toLowerCase().startsWith(brand.toLowerCase())) parts.push(brand)
-  parts.push(name, 'Amazon')
-  if (asin) parts.push(`ASIN ${asin}`)
-  parts.push('materials specifications product details')
+  parts.push(name)
+  if (asin) parts.push(asin)
   return parts.join(' ').replace(/\s+/g, ' ').trim()
 }
 
-/** @returns {{ goal: string, query: string, domainFilter?: string[] }[]} */
+/** @returns {{ goal: string, query: string }[]} */
 export function planPerplexitySearches(product) {
   const brand = product.brand ?? 'manufacturer'
   const name = product.product_name
@@ -44,7 +43,6 @@ export function planPerplexitySearches(product) {
   const searches = [
     {
       goal: 'amazon_retailer',
-      // General web search — no domain filter; Amazon listings rank naturally.
       query: buildAmazonSearchQuery(product),
     },
     {
@@ -67,23 +65,18 @@ export function planPerplexitySearches(product) {
   return searches
 }
 
-async function perplexitySearchRequest({ apiKey, query, maxResults, maxTokensPerPage, domainFilter }) {
-  const payload = {
-    query,
-    max_results: maxResults,
-    max_tokens_per_page: maxTokensPerPage,
-  }
-  if (domainFilter?.length) {
-    payload.search_domain_filter = domainFilter.slice(0, 20)
-  }
-
+async function perplexitySearchRequest({ apiKey, query, maxResults, maxTokensPerPage }) {
   const response = await fetch('https://api.perplexity.ai/search', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      query,
+      max_results: maxResults,
+      max_tokens_per_page: maxTokensPerPage,
+    }),
   })
 
   const body = await response.json()
@@ -106,6 +99,10 @@ function compactResult(page) {
   }
 }
 
+function isAmazonUrl(url) {
+  return /amazon\.(com|ca|co\.uk|de|fr|es|it|co\.jp)/i.test(url ?? '')
+}
+
 /**
  * Stage 1: run planned Perplexity Search API queries and return compact snippets.
  */
@@ -124,23 +121,24 @@ export async function runPerplexityRetrieval(product, env) {
   console.log(`\n[perplexity-search] Stage 1: ${plan.length} search request(s) for ${product.product_name}`)
 
   for (const item of plan) {
-    console.log(`  → ${item.goal}: ${item.query.slice(0, 100)}${item.query.length > 100 ? '…' : ''}`)
+    console.log(`  → ${item.goal}: ${item.query}`)
     const body = await perplexitySearchRequest({
       apiKey,
       query: item.query,
       maxResults,
       maxTokensPerPage,
-      domainFilter: item.domainFilter,
     })
     const results = (body.results ?? []).map(compactResult)
+    const amazonHits =
+      item.goal === 'amazon_retailer' ? results.filter((r) => isAmazonUrl(r.url)).length : 0
     searches.push({
       goal: item.goal,
       query: item.query,
-      domain_filter: item.domainFilter ?? null,
       result_count: results.length,
+      amazon_result_count: item.goal === 'amazon_retailer' ? amazonHits : undefined,
       results,
     })
-    console.log(`    ${results.length} result(s)`)
+    console.log(`    ${results.length} result(s)${item.goal === 'amazon_retailer' ? `, ${amazonHits} amazon.com` : ''}`)
   }
 
   const searchRequests = searches.length

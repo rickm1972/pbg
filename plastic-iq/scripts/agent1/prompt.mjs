@@ -80,7 +80,8 @@ You do NOT browse the web, score, normalize, or recommend purchases.
 
 Rules:
 - Use ONLY the Perplexity search snippets and product fields in the user message. Do not invent URLs or facts.
-- Prefer official manufacturer and primary retailer sources when snippets support them.
+- Amazon is the primary retailer: if the amazon_retailer search block includes any amazon.com (or regional Amazon) URL, you MUST include at least one in sources[] with source_type "amazon". Prefer the listing that matches the catalog ASIN when present.
+- Prefer official manufacturer pages when snippets support them.
 - Extract facts with exact supporting excerpts (quotes/snippets from the provided results).
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
@@ -140,7 +141,7 @@ Perplexity retrieval (${retrieval.search_requests} search requests, retrieved ${
 ${JSON.stringify(retrieval.searches, null, 2)}
 
 Instructions:
-1. Build sources[] from distinct URLs in the snippets (max ${MAX_SOURCES}).
+1. Build sources[] from distinct URLs in the snippets (max ${MAX_SOURCES}). Include amazon.com from amazon_retailer results when present.
 2. Extract all required facts with excerpts quoted from snippets.
 3. Include product_use_case (e.g. food contact cookware, food storage).
 4. Set fetched_at on each source to current UTC ISO time.
