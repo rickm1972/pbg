@@ -10,8 +10,9 @@ import {
   recordAnthropicApiCall,
 } from './anthropic-usage.mjs'
 
-const DEFAULT_AMAZON_MAX_TOKENS = 4096
+const DEFAULT_AMAZON_MAX_TOKENS = 4000
 const DEFAULT_AMAZON_WEB_SEARCH_USES = 1
+const AMAZON_ALLOWED_DOMAIN = 'amazon.com'
 
 function collectAnthropicText(body) {
   const parts = []
@@ -50,7 +51,9 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const maxUses = Number(env.AGENT1_AMAZON_WEB_SEARCH_MAX_USES || DEFAULT_AMAZON_WEB_SEARCH_USES)
   const maxTokens = Number(env.AGENT1_AMAZON_MAX_TOKENS || DEFAULT_AMAZON_MAX_TOKENS)
 
-  console.log(`\n[amazon-anthropic] Stage 1a: Anthropic web_search (max_uses=${maxUses}) for ASIN ${asin ?? 'n/a'}`)
+  console.log(
+    `\n[amazon-anthropic] Stage 1a: Anthropic web_search (max_uses=${maxUses}, max_tokens=${maxTokens}, domain=${AMAZON_ALLOWED_DOMAIN}) ASIN ${asin ?? 'n/a'}`,
+  )
   console.log(`  URL: ${url}`)
 
   beginAnthropicApiCallLog({
@@ -62,7 +65,14 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
     model,
     max_tokens: maxTokens,
     system: AMAZON_WEB_SEARCH_SYSTEM_PROMPT,
-    tools: [{ type: webSearchType, name: 'web_search', max_uses: maxUses }],
+    tools: [
+      {
+        type: webSearchType,
+        name: 'web_search',
+        max_uses: maxUses,
+        allowed_domains: [AMAZON_ALLOWED_DOMAIN],
+      },
+    ],
     messages: [{ role: 'user', content: buildAmazonWebSearchUserPrompt(product) }],
   }
 
@@ -118,7 +128,7 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const ok = Boolean(text?.trim())
 
   console.log(
-    `[amazon-anthropic] web_searches=${webSearch} excerpt_chars=${text.length} est_cost=$${(usage?.estimated_cost_usd ?? 0).toFixed(4)}`,
+    `[amazon-anthropic] web_searches=${webSearch} in=${usage?.input_tokens ?? 0} out=${usage?.output_tokens ?? 0} excerpt_chars=${text.length} est_cost=$${(usage?.estimated_cost_usd ?? 0).toFixed(4)}`,
   )
 
   return {

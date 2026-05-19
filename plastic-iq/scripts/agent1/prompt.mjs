@@ -74,24 +74,24 @@ Include any research warnings in agent_metadata.warnings.`
 }
 
 /** Stage 1a — single Anthropic web_search call for the Amazon listing (ASIN / catalog URL). */
-export const AMAZON_WEB_SEARCH_SYSTEM_PROMPT = `You retrieve Amazon product listing information using the web_search tool.
-Use exactly one web search to find and read the Amazon product page for the ASIN or URL provided.
-Extract materials, contact surfaces, components, certifications, care instructions, and marketing claims from the Amazon listing only.
-Return plain text with clear sections: URL visited, Page title, Product details, Quotes/excerpts. Do not return JSON.`
+export const AMAZON_WEB_SEARCH_SYSTEM_PROMPT = `You retrieve ONE Amazon product page using web_search (max one search, amazon.com only).
+Open the exact catalog URL given. Do not search manufacturer sites, reviews, or other retailers.
+Extract only: title, materials, contact surfaces, components, certifications, care, and plastic-related claims.
+Reply in plain text under 1200 words: URL visited, Page title, Product details (bullets), Key quotes (short). No JSON.`
 
 export function buildAmazonWebSearchUserPrompt(product) {
   const url = product.amazon_url || product.affiliate_link
   const asinMatch = url?.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})(?:[\/?#]|$)/i)
   const asin = asinMatch?.[1]?.toUpperCase() ?? null
 
-  return `Retrieve the Amazon listing for this product using one web search.
+  return `One web search on amazon.com only. Open this exact product page (do not use other sites):
+${url ?? 'none'}
 
+ASIN: ${asin ?? 'unknown'}
 Product: ${product.product_name}
 Brand: ${product.brand ?? 'unknown'}
-ASIN: ${asin ?? 'unknown'}
-Amazon URL: ${url ?? 'none'}
 
-Open the Amazon product page (ASIN ${asin ?? 'from URL'}). Extract all material, safety, and specification information from that listing.`
+Return a concise excerpt from that Amazon page only.`
 }
 
 /** Stage 2 — Claude synthesizes evidence from Perplexity Search snippets (no web search tool). */
