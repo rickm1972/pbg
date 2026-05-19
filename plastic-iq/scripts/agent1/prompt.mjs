@@ -79,14 +79,15 @@ Your ONLY job is to produce a structured evidence packet from pre-retrieved web 
 You do NOT browse the web, score, normalize, or recommend purchases.
 
 Rules:
-- Use ONLY the Perplexity search snippets and product fields in the user message. Do not invent URLs or facts.
-- Amazon is the primary retailer: if the amazon_retailer search block includes any amazon.com (or regional Amazon) URL, you MUST include at least one in sources[] with source_type "amazon". Prefer the listing that matches the catalog ASIN when present.
+- Use ONLY the Amazon direct fetch, Perplexity search snippets, and product fields in the user message. Do not invent URLs or facts.
+- Amazon is the primary retailer: when amazon_direct_fetch.ok is true, you MUST include that URL in sources[] as the first source with source_type "amazon". Use excerpts from amazon_direct_fetch.excerpt for retailer-confirmed facts.
+- If amazon_direct_fetch failed, note it in warnings and information_gaps but still complete other sources from Perplexity.
 - Prefer official manufacturer pages when snippets support them.
 - Extract facts with exact supporting excerpts (quotes/snippets from the provided results).
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
-- Include up to ${MAX_SOURCES} distinct sources in sources[] (each must have a URL from the snippets).
+- Include up to ${MAX_SOURCES} distinct sources in sources[] (URLs from amazon_direct_fetch and/or Perplexity snippets).
 
 Required fact coverage (use these fact_key values where applicable):
 - primary_material
@@ -124,7 +125,13 @@ export function buildSynthesisUserPrompt(product, retrieval) {
     ['other_retailer_url', product.other_retailer_url],
   ].filter(([, url]) => url)
 
-  return `Synthesize the evidence packet JSON from the Perplexity Search API results below.
+  const amazon = retrieval.amazon_direct_fetch
+  const amazonSection = amazon
+    ? `AMAZON DIRECT FETCH (primary retailer — required source when ok=true):
+${JSON.stringify(amazon, null, 2)}`
+    : 'AMAZON DIRECT FETCH: not available.'
+
+  return `Synthesize the evidence packet JSON from the retrieval data below.
 
 Product:
 - product_id: ${product.product_id}
@@ -134,14 +141,16 @@ Product:
 - subcategory: ${product.subcategory ?? 'unknown'}
 - image_url: ${product.image_url ?? 'none'}
 
-Primary retailer URL (from catalog — prefer matching snippets):
+Catalog URLs:
 ${urls.map(([k, u]) => `- ${k}: ${u}`).join('\n') || '- none on file'}
+
+${amazonSection}
 
 Perplexity retrieval (${retrieval.search_requests} search requests, retrieved ${retrieval.retrieved_at}):
 ${JSON.stringify(retrieval.searches, null, 2)}
 
 Instructions:
-1. Build sources[] from distinct URLs in the snippets (max ${MAX_SOURCES}). Include amazon.com from amazon_retailer results when present.
+1. If amazon_direct_fetch.ok, sources[0] must be source_type "amazon" with that URL and title. Add other URLs from Perplexity (max ${MAX_SOURCES} total).
 2. Extract all required facts with excerpts quoted from snippets.
 3. Include product_use_case (e.g. food contact cookware, food storage).
 4. Set fetched_at on each source to current UTC ISO time.

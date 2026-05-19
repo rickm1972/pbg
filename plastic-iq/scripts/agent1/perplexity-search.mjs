@@ -40,11 +40,8 @@ export function planPerplexitySearches(product) {
   const brand = product.brand ?? 'manufacturer'
   const name = product.product_name
 
+  // Amazon: direct HTTP fetch (amazon-fetch.mjs), not Perplexity — search crawlers are blocked.
   const searches = [
-    {
-      goal: 'amazon_retailer',
-      query: buildAmazonSearchQuery(product),
-    },
     {
       goal: 'manufacturer',
       query: `${brand} ${name} official product page materials specifications certifications`,
@@ -99,12 +96,8 @@ function compactResult(page) {
   }
 }
 
-function isAmazonUrl(url) {
-  return /amazon\.(com|ca|co\.uk|de|fr|es|it|co\.jp)/i.test(url ?? '')
-}
-
 /**
- * Stage 1: run planned Perplexity Search API queries and return compact snippets.
+ * Stage 1b: Perplexity Search API (manufacturer, materials, SDS). Amazon uses direct fetch.
  */
 export async function runPerplexityRetrieval(product, env) {
   const apiKey = env.PERPLEXITY_API_KEY
@@ -129,16 +122,13 @@ export async function runPerplexityRetrieval(product, env) {
       maxTokensPerPage,
     })
     const results = (body.results ?? []).map(compactResult)
-    const amazonHits =
-      item.goal === 'amazon_retailer' ? results.filter((r) => isAmazonUrl(r.url)).length : 0
     searches.push({
       goal: item.goal,
       query: item.query,
       result_count: results.length,
-      amazon_result_count: item.goal === 'amazon_retailer' ? amazonHits : undefined,
       results,
     })
-    console.log(`    ${results.length} result(s)${item.goal === 'amazon_retailer' ? `, ${amazonHits} amazon.com` : ''}`)
+    console.log(`    ${results.length} result(s)`)
   }
 
   const searchRequests = searches.length

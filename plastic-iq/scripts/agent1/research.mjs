@@ -17,6 +17,7 @@ import {
   finishAnthropicApiCallLog,
   recordAnthropicApiCall,
 } from './anthropic-usage.mjs'
+import { fetchAmazonProductPage } from './amazon-fetch.mjs'
 import { runPerplexityRetrieval } from './perplexity-search.mjs'
 
 const DEFAULT_MAX_WEB_SEARCH_USES = 12
@@ -191,9 +192,11 @@ async function synthesizeWithClaude(product, retrieval, env) {
   return { rawText: text, model, claudeUsage }
 }
 
-/** Default path: Perplexity Search API retrieval + Claude synthesis. */
+/** Default path: Amazon direct fetch + Perplexity Search + Claude synthesis. */
 async function researchWithPerplexitySearchAndClaude(product, env) {
+  const amazonDirectFetch = await fetchAmazonProductPage(product, env)
   const retrieval = await runPerplexityRetrieval(product, env)
+  retrieval.amazon_direct_fetch = amazonDirectFetch
   const synth = await synthesizeWithClaude(product, retrieval, env)
   const apiUsage = combineApiUsage(
     {
