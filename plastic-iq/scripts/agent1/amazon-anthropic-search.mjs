@@ -25,13 +25,14 @@ function collectAnthropicText(body) {
 }
 
 /**
- * One Anthropic API call with web_search (max_uses=1) for the primary retailer PDP (amazon_url).
+ * One Anthropic API call with web_search (max_uses=1) for the primary retailer PDP.
+ * `amazon_url` is always set — Amazon, Blueland, Williams Sonoma, etc.
  */
 export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const apiKey = env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
 
-  const url = product.amazon_url?.trim() || product.affiliate_link?.trim() || null
+  const url = product.amazon_url?.trim() || null
   const asin = extractAmazonAsin(url)
   const fetchedAt = new Date().toISOString()
 
