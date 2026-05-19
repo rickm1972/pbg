@@ -16,27 +16,34 @@ export function isFormulationProduct(product) {
   )
 }
 
-function hostnameFromUrl(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return null
-  }
+/** Extract Amazon ASIN from /dp/ASIN or /gp/product/ASIN paths. */
+export function extractAmazonAsin(url) {
+  if (!url) return null
+  const match = String(url).match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})(?:[\/?#]|$)/i)
+  return match?.[1]?.toUpperCase() ?? null
+}
+
+function buildAmazonSearchQuery(product) {
+  const brand = product.brand ?? ''
+  const name = product.product_name ?? ''
+  const amazonUrl = product.amazon_url || product.affiliate_link
+  const asin = extractAmazonAsin(amazonUrl)
+  const parts = [brand, name, 'Amazon'].filter(Boolean)
+  if (asin) parts.push(`ASIN ${asin}`)
+  parts.push('materials specifications product details')
+  return parts.join(' ').replace(/\s+/g, ' ').trim()
 }
 
 /** @returns {{ goal: string, query: string, domainFilter?: string[] }[]} */
 export function planPerplexitySearches(product) {
   const brand = product.brand ?? 'manufacturer'
   const name = product.product_name
-  const amazonUrl = product.amazon_url || product.affiliate_link
 
   const searches = [
     {
       goal: 'amazon_retailer',
-      query: amazonUrl
-        ? `${name} product details materials specifications ${amazonUrl}`
-        : `${brand} ${name} amazon product materials specifications`,
-      domainFilter: amazonUrl ? [hostnameFromUrl(amazonUrl)].filter(Boolean) : ['amazon.com'],
+      // General web search — no domain filter; Amazon listings rank naturally.
+      query: buildAmazonSearchQuery(product),
     },
     {
       goal: 'manufacturer',
