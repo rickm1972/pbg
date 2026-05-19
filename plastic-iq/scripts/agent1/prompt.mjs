@@ -73,25 +73,26 @@ Set fetched_at on each source to current UTC ISO time.
 Include any research warnings in agent_metadata.warnings.`
 }
 
-/** Stage 1a — single Anthropic web_search call for the Amazon listing (ASIN / catalog URL). */
-export const AMAZON_WEB_SEARCH_SYSTEM_PROMPT = `You retrieve ONE Amazon product page using web_search (max one search, amazon.com only).
+/** Stage 1a — single Anthropic web_search call for the primary retailer PDP (stored in amazon_url). */
+export function buildAmazonWebSearchSystemPrompt(allowedDomain) {
+  return `You retrieve ONE primary retailer product page using web_search (max one search, ${allowedDomain} only).
 Open the exact catalog URL given. Do not search manufacturer sites, reviews, or other retailers.
 Extract only: title, materials, contact surfaces, components, certifications, care, and plastic-related claims.
 Reply in plain text under 1200 words: URL visited, Page title, Product details (bullets), Key quotes (short). No JSON.`
+}
 
-export function buildAmazonWebSearchUserPrompt(product) {
-  const url = product.amazon_url || product.affiliate_link
+export function buildAmazonWebSearchUserPrompt(product, { url, allowedDomain }) {
   const asinMatch = url?.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})(?:[\/?#]|$)/i)
   const asin = asinMatch?.[1]?.toUpperCase() ?? null
 
-  return `One web search on amazon.com only. Open this exact product page (do not use other sites):
+  return `One web search on ${allowedDomain} only. Open this exact product page (do not use other sites):
 ${url ?? 'none'}
 
-ASIN: ${asin ?? 'unknown'}
+ASIN: ${asin ?? 'n/a'}
 Product: ${product.product_name}
 Brand: ${product.brand ?? 'unknown'}
 
-Return a concise excerpt from that Amazon page only.`
+Return a concise excerpt from that retailer page only.`
 }
 
 /** Stage 2 — Claude synthesizes evidence from Perplexity Search snippets (no web search tool). */

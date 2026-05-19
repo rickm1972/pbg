@@ -1,7 +1,4 @@
-import {
-  AMAZON_WEB_SEARCH_SYSTEM_PROMPT,
-  buildAmazonWebSearchUserPrompt,
-} from './prompt.mjs'
+import { buildAmazonWebSearchSystemPrompt, buildAmazonWebSearchUserPrompt } from './prompt.mjs'
 import { extractAmazonAsin } from './perplexity-search.mjs'
 import {
   beginAnthropicApiCallLog,
@@ -12,7 +9,12 @@ import {
 
 const DEFAULT_AMAZON_MAX_TOKENS = 4000
 const DEFAULT_AMAZON_WEB_SEARCH_USES = 1
-const AMAZON_ALLOWED_DOMAIN = 'amazon.com'
+
+/** Hostname for Anthropic allowed_domains (no www), from primary retailer URL. */
+export function hostnameFromRetailerUrl(url) {
+  const parsed = new URL(url.startsWith('http') ? url : `https://${url}`)
+  return parsed.hostname.replace(/^www\./i, '')
+}
 
 function collectAnthropicText(body) {
   const parts = []
@@ -23,13 +25,13 @@ function collectAnthropicText(body) {
 }
 
 /**
- * One Anthropic API call with web_search (max_uses=1) to retrieve the Amazon listing by ASIN/URL.
+ * One Anthropic API call with web_search (max_uses=1) for the primary retailer PDP (amazon_url).
  */
 export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const apiKey = env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
 
-  const url = product.amazon_url || product.affiliate_link
+  const url = product.amazon_url?.trim() || product.affiliate_link?.trim() || null
   const asin = extractAmazonAsin(url)
   const fetchedAt = new Date().toISOString()
 
@@ -40,7 +42,23 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
       asin,
       excerpt: '',
       web_search_requests: 0,
-      error: 'No amazon_url on product record',
+      error: 'No primary retailer URL (amazon_url) on product record',
+      fetched_at: fetchedAt,
+      usage: null,
+    }
+  }
+
+  let allowedDomain
+  try {
+    allowedDomain = hostnameFromRetailerUrl(url)
+  } catch {
+    return {
+      ok: false,
+      url,
+      asin,
+      excerpt: '',
+      web_search_requests: 0,
+      error: 'Invalid primary retailer URL (amazon_url)',
       fetched_at: fetchedAt,
       usage: null,
     }
@@ -52,7 +70,7 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const maxTokens = Number(env.AGENT1_AMAZON_MAX_TOKENS || DEFAULT_AMAZON_MAX_TOKENS)
 
   console.log(
-    `\n[amazon-anthropic] Stage 1a: Anthropic web_search (max_uses=${maxUses}, max_tokens=${maxTokens}, domain=${AMAZON_ALLOWED_DOMAIN}) ASIN ${asin ?? 'n/a'}`,
+    `\n[amazon-anthropic] Stage 1a: Anthropic web_search (max_uses=${maxUses}, max_tokens=${maxTokens}, domain=${allowedDomain}) ASIN ${asin ?? 'n/a'}`,
   )
   console.log(`  URL: ${url}`)
 
@@ -64,16 +82,16 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const payload = {
     model,
     max_tokens: maxTokens,
-    system: AMAZON_WEB_SEARCH_SYSTEM_PROMPT,
+    system: buildAmazonWebSearchSystemPrompt(allowedDomain),
     tools: [
       {
         type: webSearchType,
         name: 'web_search',
         max_uses: maxUses,
-        allowed_domains: [AMAZON_ALLOWED_DOMAIN],
+        allowed_domains: [allowedDomain],
       },
     ],
-    messages: [{ role: 'user', content: buildAmazonWebSearchUserPrompt(product) }],
+    messages: [{ role: 'user', content: buildAmazonWebSearchUserPrompt(product, { url, allowedDomain }) }],
   }
 
   let body
@@ -105,7 +123,7 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
       continue
     }
     throw new Error(
-      `Anthropic Amazon web_search error (${response.status}): ${body.error?.message ?? JSON.stringify(body)}`,
+      `Anthropic primary retailer web_search error (${response.status}): ${body.error?.message ?? JSON.stringify(body)}`,
     )
   }
 
@@ -137,7 +155,7 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
     asin,
     excerpt: text,
     web_search_requests: webSearch,
-    error: ok ? null : 'Anthropic returned no text for Amazon retrieval',
+    error: ok ? null : 'Anthropic returned no text for primary retailer retrieval',
     fetched_at: fetchedAt,
     usage,
   }
