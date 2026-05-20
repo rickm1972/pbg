@@ -417,6 +417,38 @@ export function scoreNormalization(inputs, options = {}) {
   }
 }
 
+function parseDisplayedConfidenceRange(text) {
+  if (!text?.trim()) return [0, SCORE_MAX]
+  const m = String(text).match(/(\d+)\s*[–-]\s*(\d+)/)
+  if (m) return [Number(m[1]), Number(m[2])]
+  const n = Number.parseInt(String(text).trim(), 10)
+  return Number.isFinite(n) ? [n, n] : [0, SCORE_MAX]
+}
+
+/**
+ * Rebuild explanation_draft from approved score fields + scoring inputs (no NPR/score recalculation).
+ */
+export function regenerateExplanationDraft({
+  inputs,
+  componentResults,
+  pacScore,
+  tier,
+  displayedConfidenceRange,
+  brand,
+}) {
+  const displayedRange = parseDisplayedConfidenceRange(displayedConfidenceRange)
+  const confidenceInterval = num(inputs?.layer_4b?.confidence_interval, 12)
+  return buildExplanationDraft({
+    pacScore,
+    tier,
+    confidenceInterval,
+    displayedRange,
+    componentResults: componentResults ?? [],
+    inputs,
+    brand,
+  })
+}
+
 export function formatCalculationTrace(result) {
   const c = result.calculation
   const lines = [
