@@ -41,9 +41,13 @@ export function runLayer4aAudit(inputs) {
   const positiveByLabel = new Map(
     LAYER_4A_POSITIVE_LOOKUP.map((row) => [row.exact_label, row.points]),
   )
-  const negativeByReason = new Map(
-    LAYER_4A_NEGATIVE_LOOKUP.map((row) => [row.reason, row.value]),
-  )
+  function normalizeReasonText(s) {
+    return String(s ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/\u2013|\u2014|–|—/g, '-')
+      .replace(/\s+/g, ' ')
+  }
 
   for (const adj of positives) {
     const reason = adjustmentReason(adj)
@@ -83,21 +87,42 @@ export function runLayer4aAudit(inputs) {
     }
   }
 
+  function isNegativeMarkedNotApplied(reason, value) {
+    const text = String(reason ?? '')
+    if (/not applied|does not apply|not apply:/i.test(text)) return true
+    if (value === 0 && /not applied|does not apply/i.test(text)) return true
+    return false
+  }
+
+  /** Match negative reason to lookup row via pattern / normalized substring. */
   function lookupNegative(reason) {
-    if (negativeByReason.has(reason)) {
-      return { canonical: reason, value: negativeByReason.get(reason) }
-    }
-    for (const [canonical, value] of negativeByReason) {
-      if (reason.startsWith(canonical) || canonical.startsWith(reason)) {
-        return { canonical, value }
+    const norm = normalizeReasonText(reason)
+    if (!norm) return null
+
+    let best = null
+    for (const row of LAYER_4A_NEGATIVE_LOOKUP) {
+      const canonicalNorm = normalizeReasonText(row.reason)
+      if (!canonicalNorm) continue
+      const matches =
+        row.pattern?.test(norm) ||
+        norm === canonicalNorm ||
+        norm.includes(canonicalNorm) ||
+        canonicalNorm.includes(norm)
+      if (!matches) continue
+      if (!best || canonicalNorm.length > best.canonicalNorm.length) {
+        best = { canonical: row.reason, value: row.value, canonicalNorm }
       }
     }
-    return null
+    if (!best) return null
+    return { canonical: best.canonical, value: best.value }
   }
 
   for (const adj of negatives) {
     const reason = adjustmentReason(adj)
     const value = adjustmentValue(adj)
+    if (isNegativeMarkedNotApplied(reason, value)) {
+      continue
+    }
     const lookup = lookupNegative(reason)
     if (!lookup) {
       flags.push({

@@ -71,10 +71,18 @@ function materialExplainsOutlier(productFamilies, peerFamilySets, productScore, 
  * @param {object} params.score — audited product_scores row
  * @param {object[]} params.peerScores — other approved scores in same subcategory
  */
+function peerPacScore(peer) {
+  const raw = peer?.score?.pac_safety_score ?? peer?.pac_safety_score
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
 export function runScoreSanity({ product, inputs, score, peerScores }) {
   const subcategory = product.subcategory ?? null
   const productScore = Number(score.pac_safety_score)
-  const peerScoresOnly = (peerScores ?? []).map((p) => Number(p.pac_safety_score))
+  const peerScoresOnly = (peerScores ?? [])
+    .map((p) => peerPacScore(p))
+    .filter((n) => n != null)
 
   if (peerScoresOnly.length < 2) {
     return {
@@ -94,7 +102,7 @@ export function runScoreSanity({ product, inputs, score, peerScores }) {
   const productMaterial = primaryContactMaterial(inputs, score)
   const productFamilies = detectFamilies(productMaterial)
   const peerFamilySets = (peerScores ?? []).map((p) =>
-    detectFamilies(primaryContactMaterial(p.inputs, p.score)),
+    detectFamilies(primaryContactMaterial(p.inputs ?? p, p.score ?? p)),
   )
 
   if (delta <= SCORE_SANITY_DELTA_THRESHOLD) {

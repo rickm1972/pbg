@@ -139,6 +139,18 @@ export async function insertProductQa(supabase, row) {
   return data
 }
 
+export async function updateProductQa(supabase, qaId, row) {
+  const { data, error } = await supabase
+    .from('product_qa')
+    .update(row)
+    .eq('qa_id', qaId)
+    .select()
+    .single()
+
+  if (error) throw new Error(`Failed to update product_qa: ${error.message}`)
+  return data
+}
+
 export async function findExistingQaForScore(supabase, scoreId) {
   const { data, error } = await supabase
     .from('product_qa')

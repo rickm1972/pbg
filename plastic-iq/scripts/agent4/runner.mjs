@@ -13,6 +13,7 @@ import {
   fetchSubcategoryPeerScores,
   findExistingQaForScore,
   insertProductQa,
+  updateProductQa,
   updateAgentStatus,
 } from './supabase.mjs'
 
@@ -21,6 +22,7 @@ const CAN_RUN_STATUSES = new Set([
   'scoring_approved',
   'qa_pending',
   'qa_awaiting_review',
+  'qa_in_progress',
 ])
 
 export async function runAgent4({
@@ -93,15 +95,7 @@ export async function runAgent4({
     }
   }
 
-  if (existingQa && replaceExisting) {
-    await supabase
-      .from('product_qa')
-      .update({ review_status: 'superseded' })
-      .eq('qa_id', existingQa.qa_id)
-  }
-
-  const qaRow = await insertProductQa(supabase, {
-    product_id: id,
+  const qaPayload = {
     evidence_id: evidence.evidence_id,
     input_id: scoringInput.input_id,
     score_id: score.score_id,
@@ -113,7 +107,16 @@ export async function runAgent4({
     certifications_verified: report.certifications_verified,
     review_status: 'pending_review',
     warnings: report.warnings,
-  })
+    run_timestamp: new Date().toISOString(),
+  }
+
+  const qaRow =
+    existingQa && replaceExisting
+      ? await updateProductQa(supabase, existingQa.qa_id, qaPayload)
+      : await insertProductQa(supabase, {
+          product_id: id,
+          ...qaPayload,
+        })
 
   await updateAgentStatus(supabase, id, 'qa_awaiting_review')
   console.log(`\nSaved product_qa (${qaRow.qa_id}) → qa_awaiting_review`)
