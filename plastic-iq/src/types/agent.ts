@@ -228,6 +228,79 @@ export type ProductScoreRow = {
   review_notes: string | null
 }
 
+export type QaCheckStatus = 'pass' | 'flag' | 'skip' | 'error'
+
+export type QaFlag = {
+  code: string
+  message: string
+  severity?: 'info' | 'warning' | 'critical'
+  context?: Record<string, unknown>
+}
+
+export type ProductQaChecks = {
+  certification_audit: {
+    status: QaCheckStatus
+    flags: QaFlag[]
+    certifications_verified: CertificationVerifiedRow[]
+    audited_claim_count: number
+  }
+  layer_4a_audit: {
+    status: QaCheckStatus
+    flags: QaFlag[]
+    positives_audited: number
+    negatives_audited: number
+    net_adjustment_reported: number
+    net_adjustment_recomputed: number
+  }
+  score_sanity: {
+    status: QaCheckStatus
+    flags: QaFlag[]
+    subcategory: string | null
+    product_score: number
+    peer_median: number | null
+    peer_count: number
+    delta_from_median: number | null
+    skip_reason?: string
+  }
+  evidence_gaps: {
+    status: QaCheckStatus
+    flags: QaFlag[]
+    primary_contact_components: Array<{
+      component_name: string
+      contact_intimacy: number
+      material: string
+      material_confidence: string
+    }>
+  }
+  explanation_accuracy: {
+    status: QaCheckStatus
+    flags: QaFlag[]
+    issues: string[]
+  }
+}
+
+export type ProductQaRow = {
+  qa_id: string
+  product_id: string
+  evidence_id: string
+  input_id: string
+  score_id: string
+  algorithm_version: string
+  agent_version: string
+  run_timestamp: string
+  overall_status: 'pass' | 'flag' | 'error'
+  human_review_required: boolean
+  checks: ProductQaChecks
+  certifications_verified: Array<
+    CertificationVerifiedRow & { product_level?: boolean; source_index?: number }
+  >
+  review_status: string
+  reviewer: string | null
+  review_timestamp: string | null
+  review_notes: string | null
+  warnings: string[]
+}
+
 export type Agent3DashboardData = {
   products: ProductPipelineRow[]
   pendingReview: Array<{

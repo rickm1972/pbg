@@ -10,6 +10,7 @@ import { createServer } from 'node:http'
 import { runAgent1, formatPacketSummary } from './agent1/runner.mjs'
 import { runAgent2, formatNormalizationSummary } from './agent2/runner.mjs'
 import { runAgent3, formatScoringSummary } from './agent3/runner.mjs'
+import { runAgent4, formatQaSummary } from './agent4/runner.mjs'
 import { loadEnv } from './lib/env.mjs'
 
 const env = loadEnv()
@@ -62,16 +63,22 @@ const server = createServer(async (req, res) => {
     (pathname === '/health' ||
       pathname === '/agent1/health' ||
       pathname === '/agent2/health' ||
-      pathname === '/agent3/health')
+      pathname === '/agent3/health' ||
+      pathname === '/agent4/health')
   ) {
     res.writeHead(200)
-    res.end(JSON.stringify({ ok: true, service: 'agents', agent1: true, agent2: true, agent3: true }))
+    res.end(
+      JSON.stringify({ ok: true, service: 'agents', agent1: true, agent2: true, agent3: true, agent4: true }),
+    )
     return
   }
 
   if (
     req.method !== 'POST' ||
-    (pathname !== '/agent1/run' && pathname !== '/agent2/run' && pathname !== '/agent3/run')
+    (pathname !== '/agent1/run' &&
+      pathname !== '/agent2/run' &&
+      pathname !== '/agent3/run' &&
+      pathname !== '/agent4/run')
   ) {
     res.writeHead(404)
     res.end(JSON.stringify({ error: 'Not found' }))
@@ -138,7 +145,39 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    const result = await runAgent3({ productId: body.product_id })
+    if (pathname === '/agent3/run') {
+      const result = await runAgent3({ productId: body.product_id })
+      if (!result.ok) {
+        res.writeHead(422)
+        res.end(
+          JSON.stringify({
+            ok: false,
+            reason: result.reason,
+            product_id: result.product.product_id,
+            calculation: result.result?.calculation,
+          }),
+        )
+        return
+      }
+
+      res.writeHead(200)
+      res.end(
+        JSON.stringify({
+          ok: true,
+          summary: formatScoringSummary(result),
+          product_id: result.product.product_id,
+          score_id: result.scoreRow.score_id,
+          result: result.result,
+        }),
+      )
+      return
+    }
+
+    const result = await runAgent4({
+      productId: body.product_id,
+      scoreId: body.score_id,
+      replaceExisting: Boolean(body.replace_existing),
+    })
     if (!result.ok) {
       res.writeHead(422)
       res.end(
@@ -146,7 +185,6 @@ const server = createServer(async (req, res) => {
           ok: false,
           reason: result.reason,
           product_id: result.product.product_id,
-          calculation: result.result?.calculation,
         }),
       )
       return
@@ -156,10 +194,13 @@ const server = createServer(async (req, res) => {
     res.end(
       JSON.stringify({
         ok: true,
-        summary: formatScoringSummary(result),
+        summary: formatQaSummary(result),
         product_id: result.product.product_id,
-        score_id: result.scoreRow.score_id,
-        result: result.result,
+        qa_id: result.qaRow?.qa_id,
+        overall_status: result.report.overall_status,
+        human_review_required: result.report.human_review_required,
+        checks: result.report.checks,
+        certifications_verified: result.report.certifications_verified,
       }),
     )
   } catch (err) {
@@ -170,5 +211,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Agents API listening on http://localhost:${PORT}`)
-  console.log(`  POST /agent1/run  POST /agent2/run  POST /agent3/run`)
+  console.log(`  POST /agent1/run  POST /agent2/run  POST /agent3/run  POST /agent4/run`)
 })

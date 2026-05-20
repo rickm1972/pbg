@@ -152,7 +152,7 @@ function deriveCertNameFromAuxFact(fact) {
   return value.length <= 120 ? value : null
 }
 
-function collectCertificationClaims(facts) {
+export function collectCertificationClaims(facts) {
   /** @type {{ name: string, factIndex: number, sourceIndex: number|null, fromList: boolean, auxFact?: boolean }[]} */
   const claims = []
 

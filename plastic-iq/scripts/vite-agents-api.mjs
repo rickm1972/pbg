@@ -50,7 +50,8 @@ export function agentsApiPlugin() {
         if (
           !pathname.startsWith('/api/agent1') &&
           !pathname.startsWith('/api/agent2') &&
-          !pathname.startsWith('/api/agent3')
+          !pathname.startsWith('/api/agent3') &&
+          !pathname.startsWith('/api/agent4')
         ) {
           next()
           return
@@ -143,6 +144,34 @@ export function agentsApiPlugin() {
               product_id: result.product.product_id,
               score_id: result.scoreRow.score_id,
               result: result.result,
+            })
+            return
+          }
+
+          if (pathname === '/api/agent4/run') {
+            const { runAgent4, formatQaSummary } = await import('./agent4/runner.mjs')
+            const result = await runAgent4({
+              productId: body.product_id,
+              scoreId: body.score_id,
+              replaceExisting: Boolean(body.replace_existing),
+            })
+            if (!result.ok) {
+              sendJson(res, 422, {
+                ok: false,
+                reason: result.reason,
+                product_id: result.product.product_id,
+              })
+              return
+            }
+            sendJson(res, 200, {
+              ok: true,
+              summary: formatQaSummary(result),
+              product_id: result.product.product_id,
+              qa_id: result.qaRow?.qa_id,
+              overall_status: result.report.overall_status,
+              human_review_required: result.report.human_review_required,
+              checks: result.report.checks,
+              certifications_verified: result.report.certifications_verified,
             })
             return
           }
