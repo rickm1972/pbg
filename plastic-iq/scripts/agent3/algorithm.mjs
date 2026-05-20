@@ -1,3 +1,9 @@
+import { consumerComponentLabel, consumerPrimaryMaterialLabel } from './explanation-labels.mjs'
+import {
+  buildConcernHighRiskExplanation,
+  isConcernOrHighRiskTier,
+} from './explanation-risk-context.mjs'
+
 export const ALGORITHM_VERSION = '2.3.3'
 
 export function tierForScore(score) {
@@ -201,35 +207,27 @@ function pickDominantSafeComponent(componentResults) {
   }, null)
 }
 
-function materialLabelForExplanation(component) {
-  if (!component) return 'its primary materials'
-  const material = component.material?.trim()
-  if (material) {
-    const primary = material.split(/\s*[,(]/)[0].trim()
-    if (primary) return primary
-  }
-  return component.component_name ?? 'its primary materials'
+function capitalizeSentence(text) {
+  if (!text?.trim()) return text
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-function componentExplanationLabel(component) {
-  if (!component) return 'the primary contact component'
-  const name = component.component_name?.trim()
-  if (name) return name
-  return materialLabelForExplanation(component)
-}
+/** Plain-language note about the part that most affects the score (no NPR or algorithm terms). */
+function limitingPartNote(highest) {
+  if (!highest) {
+    return 'Other parts of the product add very little to overall exposure concern.'
+  }
+  const label = consumerComponentLabel(highest)
+  const lowConcern = Number(highest.final_npr) < 0.25
+  const limitedContact = Number(highest.contact_intimacy) < 0.5
 
-function highestNprNote(highest, highestNpr) {
-  if (!highest || !highestNpr) {
-    return 'The single highest-NPR component contributes minimally to overall exposure.'
+  if (lowConcern) {
+    return `${label} adds very little to overall exposure concern for typical use.`
   }
-  const npr = Number(highest.final_npr)
-  if (npr < 0.25) {
-    return `The single highest-NPR component is ${componentExplanationLabel(highest)} (NPR ${highestNpr}), which contributes minimal plastic-associated risk.`
+  if (limitedContact) {
+    return `${label} is worth noting, but it has limited direct contact with food or drink.`
   }
-  if (highest.contact_intimacy < 0.5) {
-    return `The single highest-NPR component is ${componentExplanationLabel(highest)} (NPR ${highestNpr}), but it has limited direct food contact.`
-  }
-  return `The single highest-NPR component is ${componentExplanationLabel(highest)} (NPR ${highestNpr}); safer materials still dominate direct food contact.`
+  return `${label} is the main part to be aware of; most food contact still involves safer materials.`
 }
 
 function buildExplanationDraft({
@@ -238,42 +236,53 @@ function buildExplanationDraft({
   confidenceInterval,
   displayedRange,
   componentResults,
+  inputs,
   brand,
 }) {
   const [low, high] = displayedRange
   const rangeText = low === high ? `${low}` : `${low}–${high}`
   const brandLabel = brand?.trim() || 'This product'
   const highest = pickHighestRiskComponent(componentResults)
-  const highestLabel = componentExplanationLabel(highest)
-  const highestNpr =
-    highest?.final_npr != null ? Number(highest.final_npr).toFixed(3) : null
-  const narrowNote =
-    confidenceInterval <= 6
-      ? ' More complete material disclosure or independent testing would narrow this range.'
-      : ' Confirming undisclosed materials or obtaining third-party verification would narrow this range.'
+  const highestLabel = consumerComponentLabel(highest)
 
   if (pacScore >= EXPLANATION_EXCELLENT_THRESHOLD) {
-    const safeMaterial = materialLabelForExplanation(pickDominantSafeComponent(componentResults))
+    const safeMaterial = consumerPrimaryMaterialLabel(pickDominantSafeComponent(componentResults))
     return (
-      `This product scores ${pacScore} ${tier} because its materials are exceptionally safe for food contact — primarily ${safeMaterial}. ` +
-      `${highestNprNote(highest, highestNpr)} ` +
-      `The confidence range of ${rangeText} reflects some unverified material details; the true score likely sits at the top of that range. ` +
-      `${brandLabel} could narrow the range further with third-party lab certification.`
+      `This product scores ${pacScore} (${tier}) because its materials are exceptionally safe for food contact — primarily ${safeMaterial}. ` +
+      `${capitalizeSentence(limitingPartNote(highest))} ` +
+      `The score could fall anywhere from ${rangeText} until every material detail is confirmed; it likely sits near the top of that range. ` +
+      `${brandLabel} could narrow the range further with independent lab testing.`
     )
   }
 
   if (pacScore >= EXPLANATION_GOOD_THRESHOLD) {
     return (
-      `This product scores ${pacScore} ${tier}. ` +
-      `What holds the score back is ${highestLabel}${highestNpr ? ` (NPR ${highestNpr}, the highest among all contact parts)` : ', the highest-NPR contact part'}. ` +
-      `The confidence range of ${rangeText} means the published score could fall anywhere in that window until more material detail is confirmed.`
+      `This product scores ${pacScore} (${tier}). ` +
+      `What holds the score back is ${highestLabel} — the part with the most exposure-related concern in normal use. ` +
+      `The published score could fall anywhere from ${rangeText} until more material detail is confirmed.`
     )
   }
 
+  if (isConcernOrHighRiskTier(tier, pacScore) && inputs) {
+    return buildConcernHighRiskExplanation({
+      pacScore,
+      tier,
+      displayedRange,
+      componentResults,
+      inputs,
+      brand,
+    })
+  }
+
+  const narrowNote =
+    confidenceInterval <= 6
+      ? ' More complete material disclosure or independent testing could narrow this range.'
+      : ' Confirming undisclosed materials or third-party verification could narrow this range.'
+
   return (
-    `This product scores ${pacScore} ${tier}. ` +
-    `The primary risk driver is ${highestLabel}${highestNpr ? ` (NPR ${highestNpr})` : ''}, the single highest-NPR component. ` +
-    `The confidence range of ${rangeText} reflects limited certainty about materials; the true score could fall anywhere in that window.${narrowNote}`
+    `This product scores ${pacScore} (${tier}). ` +
+    `The main concern is ${highestLabel}, which has the most direct food or drink contact among the materials in this product. ` +
+    `The published score could fall anywhere from ${rangeText} because material disclosure is limited or unverified.${narrowNote}`
   )
 }
 
@@ -372,6 +381,7 @@ export function scoreNormalization(inputs, options = {}) {
     confidenceInterval,
     displayedRange: [lower, upper],
     componentResults,
+    inputs,
     brand: options.brand,
   })
 
