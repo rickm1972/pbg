@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Agent1ReviewDashboard } from '../components/admin/Agent1ReviewDashboard'
 import { Agent2ReviewDashboard } from '../components/admin/Agent2ReviewDashboard'
 import { Agent3ReviewDashboard } from '../components/admin/Agent3ReviewDashboard'
+import { Agent4ReviewDashboard } from '../components/admin/Agent4ReviewDashboard'
 import { saveAdminProduct } from '../lib/adminProductSave'
 import { formatSupabaseUnknownError, supabase } from '../lib/supabaseClient'
 import {
@@ -11,7 +12,7 @@ import {
 } from '../lib/retailerLinksSidecar'
 import type { Product } from '../types'
 
-type AdminTab = 'products' | 'agent1' | 'agent2' | 'agent3'
+type AdminTab = 'products' | 'agent1' | 'agent2' | 'agent3' | 'agent4'
 
 export function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('products')
@@ -176,6 +177,17 @@ export function AdminPage() {
             >
               Agent 3 scoring
             </button>
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                tab === 'agent4'
+                  ? 'bg-white text-ink-900 shadow-sm'
+                  : 'text-slate-600 hover:text-ink-900'
+              }`}
+              onClick={() => setTab('agent4')}
+            >
+              Agent 4 QA
+            </button>
           </div>
           <button
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -328,6 +340,14 @@ export function AdminPage() {
 
       {tab === 'agent3' ? (
         <Agent3ReviewDashboard
+          authUserEmail={authUserEmail}
+          onNotice={setMessage}
+          onError={setError}
+        />
+      ) : null}
+
+      {tab === 'agent4' ? (
+        <Agent4ReviewDashboard
           authUserEmail={authUserEmail}
           onNotice={setMessage}
           onError={setError}

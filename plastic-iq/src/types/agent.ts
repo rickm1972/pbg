@@ -301,6 +301,23 @@ export type ProductQaRow = {
   warnings: string[]
 }
 
+export type Agent4DashboardData = {
+  products: ProductPipelineRow[]
+  pendingReview: Array<{
+    product: ProductPipelineRow
+    qa: ProductQaRow
+    score: ProductScoreRow
+  }>
+  runnable: ProductPipelineRow[]
+  withQaHistory: ProductPipelineRow[]
+  pendingQaByProductId: Record<string, ProductQaRow>
+  approvedQaByProductId: Record<string, ProductQaRow>
+  latestQaByProductId: Record<string, ProductQaRow>
+  approvedScoreByProductId: Record<string, ProductScoreRow>
+  scoreById: Record<string, ProductScoreRow>
+  statusCounts: Record<string, number>
+}
+
 export type Agent3DashboardData = {
   products: ProductPipelineRow[]
   pendingReview: Array<{
