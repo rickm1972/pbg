@@ -409,19 +409,11 @@ export function canRunAgent1(status: string): boolean {
 }
 
 /**
- * Run Agent 1 tab only. After a run, status becomes evidence_awaiting_review → Awaiting review tab only.
- * Lodge and the May 15 batch (27) may re-run from Run tab once not in progress / awaiting review.
+ * Run Agent 1 tab only — products that still need a first run or retry after reject/failure.
+ * Approved products stay off this tab so new catalog rows are easy to spot.
  */
-export function canShowOnAgent1RunTab(product: {
-  product_id: string
-  agent_status: string
-}): boolean {
-  if (canRunAgent1(product.agent_status)) return true
-  if (!canAdminRerunAgent1(product.product_id)) return false
-  return (
-    product.agent_status !== 'evidence_awaiting_review' &&
-    product.agent_status !== 'evidence_in_progress'
-  )
+export function canShowOnAgent1RunTab(product: { agent_status: string }): boolean {
+  return canRunAgent1(product.agent_status)
 }
 
 export function isAgent1Rerun(status: string): boolean {

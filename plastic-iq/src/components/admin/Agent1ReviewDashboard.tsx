@@ -448,7 +448,7 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   {listFilter === 'review'
                     ? 'Nothing awaiting review.'
                     : listFilter === 'run'
-                      ? 'Nothing to run. Products stuck after a failed run appear here for retry.'
+                      ? 'Nothing to run. New or reset products (unscored) and retries after reject or a failed run appear here.'
                       : 'No products found.'}
                 </li>
               ) : (
@@ -588,9 +588,8 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
       <p className="text-xs text-slate-500">
         Run products on the <strong>Run Agent 1</strong> tab. After a run they move to{' '}
-        <strong>Awaiting review</strong> only — not both. Lodge can be re-run from{' '}
-        <strong>Run Agent 1</strong> again once it has left the review queue (e.g. after reject or
-        further in the pipeline). Requires <code className="font-mono">npm run dev</code>.
+        <strong>Awaiting review</strong> only. Once approved they leave the run list; reject or
+        reset to run again. Requires <code className="font-mono">npm run dev</code>.
       </p>
     </div>
   )
