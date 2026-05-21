@@ -7,7 +7,7 @@
 export const PERPLEXITY_SEARCH_COST_PER_REQUEST_USD = 5 / 1_000
 
 const DEFAULT_MAX_RESULTS = 5
-const DEFAULT_MAX_TOKENS_PER_PAGE = 1000
+const DEFAULT_MAX_TOKENS_PER_PAGE = 600
 
 export function isFormulationProduct(product) {
   const hay = `${product.category ?? ''} ${product.subcategory ?? ''} ${product.product_name ?? ''}`.toLowerCase()

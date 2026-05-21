@@ -96,6 +96,16 @@ export const AgentMetadataSchema = z.object({
       failures: z.array(z.string()).optional(),
     })
     .optional(),
+  confidence_upgrades: z
+    .array(
+      z.object({
+        fact_key: z.string(),
+        from: z.string(),
+        to: z.string(),
+        source_type: z.string().optional(),
+      }),
+    )
+    .optional(),
 })
 
 export const EvidencePacketSchema = z.object({

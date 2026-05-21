@@ -8,8 +8,9 @@ Rules:
 - Visit the primary retailer URL provided (Amazon or equivalent) and the official manufacturer product page. Do not visit Target or Walmart unless the primary page lacks critical material information.
 - Find the official manufacturer product page when possible.
 - Search for spec sheets, SDS, ingredient pages, FAQ, certifications, SmartLabel (for formulations).
-- Extract facts with exact supporting excerpts (quotes/snippets from pages).
-- For each source, include page_excerpt: a substantive excerpt from that page (required). For certification, SDS, or manufacturer pages, page_excerpt MUST include verbatim certification badge or program text (e.g. "MADE SAFE Certified", "EPA Safer Choice") when present — server verification matches against this field.
+- Extract facts with exact supporting excerpts (max 200 chars each).
+- page_excerpt only when that source mentions certifications; include verbatim cert text (max 400 chars). Other sources: no page_excerpt.
+- Use highest applicable confidence per fact (manufacturer-tier source → manufacturer confirmed or fully disclosed by manufacturer; never retailer confirmed when manufacturer source_index applies).
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
@@ -30,7 +31,7 @@ source_type examples: manufacturer, retailer, amazon, target, walmart, other_ret
 
 JSON schema:
 {
-  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string }],
+  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string (optional — only when certifications appear on that page) }],
   "facts": [{
     "fact_type": string,
     "fact_key": string,
@@ -107,11 +108,16 @@ Rules:
 - If Amazon retrieval failed, note it in warnings and information_gaps but still complete other sources from Perplexity.
 - Prefer official manufacturer pages when snippets support them.
 - Extract facts with exact supporting excerpts (quotes/snippets from the provided results).
-- For each source in sources[], include page_excerpt with substantive text from that URL. Certification or manufacturer sources MUST include verbatim certification/program wording in page_excerpt when the page displays it (server verification requires this).
+- page_excerpt: ONLY on sources where a certification or third-party program is mentioned (MADE SAFE, NSF, Leaping Bunny, etc.). Include verbatim cert wording in that page_excerpt (max 400 chars). All other sources: omit page_excerpt entirely (do not include the field).
+- CONFIDENCE (use the highest label the source supports — never default down):
+  · Fact supported by official manufacturer / spec_sheet / SDS / ingredient_page source → "manufacturer confirmed" or "fully disclosed by manufacturer" when materials or ingredients are completely specified on that page (not inferred).
+  · Fact supported only by Amazon/retailer → "retailer confirmed".
+  · Never label a fact "retailer confirmed" if source_index points to a manufacturer-tier source.
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
-- JSON must be strictly valid: escape every double quote inside string values as \\"; no trailing commas; no unescaped newlines inside strings (use spaces); keep each page_excerpt under 600 characters.
+- JSON must be strictly valid: escape every double quote inside string values as \\"; no trailing commas; no unescaped newlines inside strings (use spaces).
+- Keep each fact excerpt under 200 characters. Minimize total JSON size.
 - Include up to ${MAX_SOURCES} distinct sources in sources[] (Amazon URL from amazon_anthropic_web_search and/or Perplexity snippets).
 
 Required fact coverage (use these fact_key values where applicable):
@@ -130,7 +136,7 @@ source_type examples: manufacturer, retailer, amazon, target, walmart, other_ret
 
 JSON schema:
 {
-  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string }],
+  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string (optional — only when certifications appear on that page) }],
   "facts": [{
     "fact_type": string,
     "fact_key": string,

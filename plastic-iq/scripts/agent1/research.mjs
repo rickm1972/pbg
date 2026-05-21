@@ -20,9 +20,17 @@ import {
 import { retrieveAmazonViaAnthropicWebSearch } from './amazon-anthropic-search.mjs'
 import { runPerplexityRetrieval } from './perplexity-search.mjs'
 import { extractJsonObject, isJsonParseError } from '../lib/parse-model-json.mjs'
+import {
+  applyConfidenceUpgrades,
+  applyFactExcerptCaps,
+  applySourceExcerptPolicy,
+  MAX_FACT_EXCERPT_CHARS,
+  MAX_PAGE_EXCERPT_CHARS,
+} from './confidence-enforce.mjs'
 
 const DEFAULT_MAX_WEB_SEARCH_USES = 12
-const DEFAULT_MAX_TOKENS = 12000
+/** Cap synthesis generation — smaller JSON target (~3k output tokens). */
+const DEFAULT_MAX_TOKENS = 8192
 
 function normalizeConfidence(raw) {
   const s = String(raw ?? '')
@@ -49,7 +57,6 @@ function normalizeFactValue(value) {
 }
 
 const MAX_SYNTHESIS_JSON_ATTEMPTS = 3
-const MAX_PAGE_EXCERPT_CHARS = 800
 
 function collectAnthropicText(body) {
   const parts = []
@@ -143,23 +150,24 @@ function buildEvidencePacketFromRawText(rawText, { model, provider, apiUsage }) 
   const parsed = extractJsonObject(rawText)
   const runTimestamp = new Date().toISOString()
 
-  const sources = (parsed.sources ?? []).map((source) => ({
-    ...source,
-    page_excerpt:
-      typeof source.page_excerpt === 'string'
-        ? source.page_excerpt.trim().slice(0, MAX_PAGE_EXCERPT_CHARS)
-        : undefined,
-  }))
-
-  const facts = (parsed.facts ?? []).map((fact) => ({
+  let sources = (parsed.sources ?? []).map((source) => ({ ...source }))
+  let facts = (parsed.facts ?? []).map((fact) => ({
     ...fact,
     fact_value: normalizeFactValue(fact.fact_value),
     confidence: normalizeConfidence(fact.confidence),
-    excerpt:
-      typeof fact.excerpt === 'string'
-        ? fact.excerpt.slice(0, MAX_PAGE_EXCERPT_CHARS)
-        : fact.excerpt,
   }))
+
+  const { facts: upgradedFacts, upgrades } = applyConfidenceUpgrades(sources, facts)
+  facts = upgradedFacts
+  sources = applySourceExcerptPolicy(sources, facts)
+  facts = applyFactExcerptCaps(facts)
+
+  const warnings = [...(parsed.agent_metadata?.warnings ?? [])]
+  if (upgrades.length) {
+    warnings.push(
+      `Server upgraded ${upgrades.length} fact confidence label(s) to match manufacturer-tier sources`,
+    )
+  }
 
   const packet = EvidencePacketSchema.parse({
     sources,
@@ -169,7 +177,8 @@ function buildEvidencePacketFromRawText(rawText, { model, provider, apiUsage }) 
       agent_version: AGENT_VERSION,
       run_timestamp: runTimestamp,
       provider,
-      warnings: parsed.agent_metadata?.warnings ?? [],
+      warnings,
+      confidence_upgrades: upgrades,
       api_usage: apiUsage,
     },
   })
@@ -292,7 +301,7 @@ async function researchWithPerplexitySearchAndClaude(product, env) {
       if (!retryable || attempt >= MAX_SYNTHESIS_JSON_ATTEMPTS - 1) {
         throw err
       }
-      repairNote = `Parse error: ${err.message}. Return ONE valid JSON object only. Escape all " inside strings as \\". No trailing commas. Shorter page_excerpt fields (max 500 chars each).`
+      repairNote = `Parse error: ${err.message}. Return ONE valid JSON object only. Escape all " inside strings as \\". No trailing commas. page_excerpt ONLY on sources with certifications (max ${MAX_PAGE_EXCERPT_CHARS} chars). Fact excerpts max ${MAX_FACT_EXCERPT_CHARS} chars.`
     }
   }
 
