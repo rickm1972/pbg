@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Wipe Agent 2–4 artifacts for the three validation products only.
- * Leaves approved evidence in place; sets agent_status → evidence_approved.
+ * Full wipe for three validation products — ALL four agents (1–4).
+ * Deletes evidence, scoring_inputs, scores, QA. Sets agent_status → unscored.
  *
  * Usage:
- *   node scripts/reset-validation-three.mjs           # dry-run (default)
+ *   node scripts/reset-validation-three.mjs           # dry-run
  *   node scripts/reset-validation-three.mjs --apply
  */
 import { createServiceClient } from './agent1/supabase.mjs'
@@ -27,7 +27,7 @@ async function main() {
   if (error) throw error
   if (!products?.length) throw new Error('No matching products found')
 
-  console.log(apply ? 'APPLYING reset…\n' : 'DRY RUN (pass --apply to execute)\n')
+  console.log(apply ? 'APPLYING full reset (agents 1–4)…\n' : 'DRY RUN (pass --apply to execute)\n')
 
   for (const p of products) {
     const id = p.product_id
@@ -39,17 +39,13 @@ async function main() {
       .from('product_evidence')
       .select('evidence_id, bundle_version, review_status')
       .eq('product_id', id)
-      .order('bundle_version', { ascending: false })
-
-    const approvedEv = evidence?.filter((e) => e.review_status === 'approved') ?? []
 
     console.log(`${p.product_name}`)
     console.log(`  current agent_status: ${p.agent_status}`)
-    console.log(`  will delete: ${qa?.length ?? 0} QA, ${scores?.length ?? 0} scores, ${inputs?.length ?? 0} scoring_inputs`)
     console.log(
-      `  keep evidence: ${approvedEv.map((e) => `v${e.bundle_version} approved`).join(', ') || '(none — run Agent 1 first)'}`,
+      `  will delete: ${evidence?.length ?? 0} evidence, ${inputs?.length ?? 0} inputs, ${scores?.length ?? 0} scores, ${qa?.length ?? 0} QA`,
     )
-    console.log(`  after reset: agent_status → evidence_approved\n`)
+    console.log(`  after reset: agent_status → unscored (run Agent 1 first in admin)\n`)
 
     if (!apply) continue
 
@@ -65,11 +61,15 @@ async function main() {
       const { error: iErr } = await sb.from('scoring_inputs').delete().eq('product_id', id)
       if (iErr) throw iErr
     }
+    if (evidence?.length) {
+      const { error: eErr } = await sb.from('product_evidence').delete().eq('product_id', id)
+      if (eErr) throw eErr
+    }
 
     const { error: pErr } = await sb
       .from('products')
       .update({
-        agent_status: 'evidence_approved',
+        agent_status: 'unscored',
         pac_safety_score: null,
         tier: null,
         score_basis: null,
@@ -78,7 +78,11 @@ async function main() {
     if (pErr) throw pErr
   }
 
-  console.log(apply ? 'Done. Run Agent 2 → approve → Agent 3 → Agent 4 in admin, or npm run pipeline:validate-three' : 'Re-run with --apply to wipe.')
+  console.log(
+    apply
+      ? 'Done. Admin: Agent 1 → approve → Agent 2 → approve → Agent 3 → approve → Agent 4'
+      : 'Re-run with --apply to wipe.',
+  )
 }
 
 main().catch((err) => {
