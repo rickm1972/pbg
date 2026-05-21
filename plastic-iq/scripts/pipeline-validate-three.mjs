@@ -61,7 +61,7 @@ async function approveLatestScoringInputs(supabase, productId) {
     .select('input_id')
     .eq('product_id', productId)
     .eq('review_status', 'submitted')
-    .order('created_at', { ascending: false })
+    .order('run_timestamp', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (fetchErr) throw fetchErr

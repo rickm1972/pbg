@@ -111,6 +111,7 @@ Rules:
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
+- JSON must be strictly valid: escape every double quote inside string values as \\"; no trailing commas; no unescaped newlines inside strings (use spaces); keep each page_excerpt under 600 characters.
 - Include up to ${MAX_SOURCES} distinct sources in sources[] (Amazon URL from amazon_anthropic_web_search and/or Perplexity snippets).
 
 Required fact coverage (use these fact_key values where applicable):

@@ -19,6 +19,7 @@ import {
 } from './anthropic-usage.mjs'
 import { retrieveAmazonViaAnthropicWebSearch } from './amazon-anthropic-search.mjs'
 import { runPerplexityRetrieval } from './perplexity-search.mjs'
+import { extractJsonObject, isJsonParseError } from '../lib/parse-model-json.mjs'
 
 const DEFAULT_MAX_WEB_SEARCH_USES = 12
 const DEFAULT_MAX_TOKENS = 12000
@@ -47,20 +48,8 @@ function normalizeFactValue(value) {
   return JSON.stringify(value)
 }
 
-function extractJsonObject(text) {
-  const trimmed = text.trim()
-  if (trimmed.startsWith('{')) {
-    return JSON.parse(trimmed)
-  }
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fence) return JSON.parse(fence[1].trim())
-  const start = trimmed.indexOf('{')
-  const end = trimmed.lastIndexOf('}')
-  if (start >= 0 && end > start) {
-    return JSON.parse(trimmed.slice(start, end + 1))
-  }
-  throw new Error('Model response did not contain JSON object')
-}
+const MAX_SYNTHESIS_JSON_ATTEMPTS = 3
+const MAX_PAGE_EXCERPT_CHARS = 800
 
 function collectAnthropicText(body) {
   const parts = []
@@ -103,6 +92,26 @@ function logClaudeUsage(body, callMeta) {
   return record
 }
 
+function mergeSynthUsageRecords(usages) {
+  return (usages ?? []).filter(Boolean).reduce(
+    (acc, u) => ({
+      input_tokens: (acc.input_tokens ?? 0) + (u.input_tokens ?? 0),
+      output_tokens: (acc.output_tokens ?? 0) + (u.output_tokens ?? 0),
+      estimated_cost_usd: (acc.estimated_cost_usd ?? 0) + (u.estimated_cost_usd ?? 0),
+      cache_read_input_tokens:
+        (acc.cache_read_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      cache_creation_input_tokens:
+        (acc.cache_creation_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
+      anthropic_api_calls: (acc.anthropic_api_calls ?? 0) + (u.anthropic_api_calls ?? 0),
+      anthropic_api_call_log: [
+        ...(acc.anthropic_api_call_log ?? []),
+        ...(u.anthropic_api_call_log ?? []),
+      ],
+    }),
+    {},
+  )
+}
+
 function combineApiUsage(perplexityUsage, amazonUsage, synthUsage) {
   const perplexityCost = perplexityUsage?.estimated_cost_usd ?? 0
   const amazonCost = amazonUsage?.usage?.estimated_cost_usd ?? 0
@@ -130,7 +139,46 @@ function combineApiUsage(perplexityUsage, amazonUsage, synthUsage) {
   }
 }
 
-async function synthesizeWithClaude(product, retrieval, env) {
+function buildEvidencePacketFromRawText(rawText, { model, provider, apiUsage }) {
+  const parsed = extractJsonObject(rawText)
+  const runTimestamp = new Date().toISOString()
+
+  const sources = (parsed.sources ?? []).map((source) => ({
+    ...source,
+    page_excerpt:
+      typeof source.page_excerpt === 'string'
+        ? source.page_excerpt.trim().slice(0, MAX_PAGE_EXCERPT_CHARS)
+        : undefined,
+  }))
+
+  const facts = (parsed.facts ?? []).map((fact) => ({
+    ...fact,
+    fact_value: normalizeFactValue(fact.fact_value),
+    confidence: normalizeConfidence(fact.confidence),
+    excerpt:
+      typeof fact.excerpt === 'string'
+        ? fact.excerpt.slice(0, MAX_PAGE_EXCERPT_CHARS)
+        : fact.excerpt,
+  }))
+
+  const packet = EvidencePacketSchema.parse({
+    sources,
+    facts,
+    agent_metadata: {
+      model,
+      agent_version: AGENT_VERSION,
+      run_timestamp: runTimestamp,
+      provider,
+      warnings: parsed.agent_metadata?.warnings ?? [],
+      api_usage: apiUsage,
+    },
+  })
+
+  AgentMetadataSchema.parse(packet.agent_metadata)
+  return packet
+}
+
+async function synthesizeWithClaude(product, retrieval, env, options = {}) {
   const apiKey = env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
 
@@ -144,6 +192,11 @@ async function synthesizeWithClaude(product, retrieval, env) {
 
   console.log('\n[agent1] Stage 2: Claude synthesis (no web search tool)…')
 
+  let userContent = buildSynthesisUserPrompt(product, retrieval)
+  if (options.repairNote) {
+    userContent += `\n\nREPAIR (previous response was invalid):\n${options.repairNote}`
+  }
+
   const payload = {
     model,
     max_tokens: maxTokens,
@@ -154,7 +207,7 @@ async function synthesizeWithClaude(product, retrieval, env) {
         cache_control: { type: 'ephemeral' },
       },
     ],
-    messages: [{ role: 'user', content: buildSynthesisUserPrompt(product, retrieval) }],
+    messages: [{ role: 'user', content: userContent }],
   }
 
   let body
@@ -204,14 +257,53 @@ async function researchWithPerplexitySearchAndClaude(product, env) {
   const amazonAnthropic = await retrieveAmazonViaAnthropicWebSearch(product, env)
   const retrieval = await runPerplexityRetrieval(product, env)
   retrieval.amazon_anthropic_web_search = amazonAnthropic
-  const synth = await synthesizeWithClaude(product, retrieval, env)
+
+  const synthUsageRecords = []
+  let lastErr
+  let repairNote = null
+  let synth
+
+  for (let attempt = 0; attempt < MAX_SYNTHESIS_JSON_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      console.log(`  Synthesis JSON invalid — retry ${attempt + 1}/${MAX_SYNTHESIS_JSON_ATTEMPTS}…`)
+    }
+    synth = await synthesizeWithClaude(product, retrieval, env, { repairNote })
+    if (synth.claudeUsage) synthUsageRecords.push(synth.claudeUsage)
+
+    try {
+      const mergedSynth = mergeSynthUsageRecords(synthUsageRecords)
+      const apiUsageDraft = combineApiUsage(
+        {
+          search_requests: retrieval.search_requests,
+          estimated_cost_usd: retrieval.estimated_cost_usd,
+        },
+        amazonAnthropic,
+        mergedSynth,
+      )
+      buildEvidencePacketFromRawText(synth.rawText, {
+        model: synth.model,
+        provider: 'perplexity_search',
+        apiUsage: apiUsageDraft,
+      })
+      break
+    } catch (err) {
+      lastErr = err
+      const retryable = isJsonParseError(err) || String(err?.name) === 'ZodError'
+      if (!retryable || attempt >= MAX_SYNTHESIS_JSON_ATTEMPTS - 1) {
+        throw err
+      }
+      repairNote = `Parse error: ${err.message}. Return ONE valid JSON object only. Escape all " inside strings as \\". No trailing commas. Shorter page_excerpt fields (max 500 chars each).`
+    }
+  }
+
+  const mergedSynth = mergeSynthUsageRecords(synthUsageRecords)
   const apiUsage = combineApiUsage(
     {
       search_requests: retrieval.search_requests,
       estimated_cost_usd: retrieval.estimated_cost_usd,
     },
     amazonAnthropic,
-    synth.claudeUsage,
+    mergedSynth,
   )
   console.log(
     `\n[agent1] Total est. cost: $${apiUsage.total_estimated_cost_usd.toFixed(4)} (Amazon web_search $${apiUsage.amazon_anthropic_estimated_cost_usd.toFixed(4)} + Perplexity $${apiUsage.perplexity_estimated_cost_usd.toFixed(4)} + synthesis $${apiUsage.claude_estimated_cost_usd.toFixed(4)})`,
@@ -340,21 +432,6 @@ export async function researchProduct(product) {
     throw err
   }
 
-  const parsed = extractJsonObject(result.rawText)
-  const runTimestamp = new Date().toISOString()
-
-  const sources = (parsed.sources ?? []).map((source) => ({
-    ...source,
-    page_excerpt:
-      typeof source.page_excerpt === 'string' ? source.page_excerpt.trim() : undefined,
-  }))
-
-  const facts = (parsed.facts ?? []).map((fact) => ({
-    ...fact,
-    fact_value: normalizeFactValue(fact.fact_value),
-    confidence: normalizeConfidence(fact.confidence),
-  }))
-
   const apiUsage = result.usage ?? {
     input_tokens: 0,
     output_tokens: 0,
@@ -366,19 +443,9 @@ export async function researchProduct(product) {
     claude_estimated_cost_usd: 0,
   }
 
-  const packet = EvidencePacketSchema.parse({
-    sources,
-    facts,
-    agent_metadata: {
-      model: result.model,
-      agent_version: AGENT_VERSION,
-      run_timestamp: runTimestamp,
-      provider: result.provider,
-      warnings: parsed.agent_metadata?.warnings ?? [],
-      api_usage: apiUsage,
-    },
+  return buildEvidencePacketFromRawText(result.rawText, {
+    model: result.model,
+    provider: result.provider,
+    apiUsage,
   })
-
-  AgentMetadataSchema.parse(packet.agent_metadata)
-  return packet
 }

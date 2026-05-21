@@ -8,21 +8,7 @@ import {
 } from './prompt.mjs'
 import { enforceLayer4a } from './layer4a-enforce.mjs'
 import { validateNormalizationOutput } from './validate.mjs'
-
-function extractJsonObject(text) {
-  const trimmed = text.trim()
-  if (trimmed.startsWith('{')) {
-    return JSON.parse(trimmed)
-  }
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fence) return JSON.parse(fence[1].trim())
-  const start = trimmed.indexOf('{')
-  const end = trimmed.lastIndexOf('}')
-  if (start >= 0 && end > start) {
-    return JSON.parse(trimmed.slice(start, end + 1))
-  }
-  throw new Error('Model response did not contain JSON object')
-}
+import { extractJsonObject } from '../lib/parse-model-json.mjs'
 
 function collectAnthropicText(body) {
   const parts = []
