@@ -6,7 +6,7 @@ import {
   ALGORITHM_VERSION,
   buildUserPrompt,
 } from './prompt.mjs'
-import { enforceLayer4aPositive } from './layer4a-positive.mjs'
+import { enforceLayer4a } from './layer4a-enforce.mjs'
 import { validateNormalizationOutput } from './validate.mjs'
 
 function extractJsonObject(text) {
@@ -100,7 +100,7 @@ export async function normalizeEvidence(product, evidence, options = {}) {
         product.product_id,
         evidence.evidence_id,
       )
-      return enforceLayer4aPositive(validated)
+      return enforceLayer4a(validated)
     } catch (err) {
       lastErr = err
       if (attempt === 0) {

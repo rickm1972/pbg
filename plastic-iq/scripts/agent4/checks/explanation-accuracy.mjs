@@ -21,23 +21,36 @@ const NPR_LEAK_PATTERNS = [
 const NPR_DECIMAL_IN_PARENS = /\(\s*NPR\s+[\d.]+\s*\)/i
 const SUSPICIOUS_DECIMAL = /\(\s*[\d.]{3,}\s*\)/
 
-function pickHighestRiskComponent(componentResults) {
+function findInputComponent(inputs, componentName) {
+  const needle = String(componentName ?? '').trim()
+  return (inputs?.components ?? []).find((c) => c.component_name === needle) ?? null
+}
+
+function pickHighestRiskComponent(componentResults, inputs) {
   if (!componentResults?.length) return null
   return componentResults.reduce((best, c) => {
     const contrib = Number(c.final_npr) * Number(c.contact_intimacy)
     const bestContrib = best ? Number(best.final_npr) * Number(best.contact_intimacy) : -1
-    return contrib > bestContrib ? c : best
+    if (contrib > bestContrib) {
+      const inputRow = findInputComponent(inputs, c.component_name)
+      return { ...c, material: inputRow?.material ?? c.material, material_hazard_table_entry: inputRow?.material_hazard_table_entry }
+    }
+    return best
   }, null)
 }
 
-function pickDominantSafeComponent(componentResults) {
+function pickDominantSafeComponent(componentResults, inputs) {
   if (!componentResults?.length) return null
   return componentResults.reduce((best, c) => {
     const safe = Number(c.final_npr) < 0.25
     if (!safe) return best
     const ci = Number(c.contact_intimacy)
     const bestCi = best ? Number(best.contact_intimacy) : -1
-    return ci > bestCi ? c : best
+    if (ci > bestCi) {
+      const inputRow = findInputComponent(inputs, c.component_name)
+      return { ...c, material: inputRow?.material ?? c.material, material_hazard_table_entry: inputRow?.material_hazard_table_entry }
+    }
+    return best
   }, null)
 }
 
@@ -140,7 +153,7 @@ export function runExplanationAccuracy(score, inputs) {
 
   const primarily = extractPrimarilyPhrase(draft)
   if (primarily && Number(score.pac_safety_score) >= 90) {
-    const safeComponent = pickDominantSafeComponent(componentResults)
+    const safeComponent = pickDominantSafeComponent(componentResults, inputs)
     const expectedMaterial = consumerPrimaryMaterialLabel(safeComponent)
     const primarilyFamilies = materialFamilyTokens(primarily)
     const expectedFamilies = materialFamilyTokens(expectedMaterial)

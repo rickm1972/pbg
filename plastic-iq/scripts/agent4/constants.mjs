@@ -1,5 +1,5 @@
 export const AGENT_VERSION = '4.0.0'
-export const ALGORITHM_VERSION = '2.3.3'
+export const ALGORITHM_VERSION = '2.3.4'
 
 export const LAYER_4A_NEGATIVE_LOOKUP = [
   {
@@ -29,6 +29,13 @@ export const INFERRED_MATERIAL_CONFIDENCES = new Set([
   'inferred from category pattern',
   'unknown',
   'proprietary or undisclosed',
+])
+
+export const TRUSTED_MATERIAL_CONFIDENCES = new Set([
+  'manufacturer confirmed',
+  'retailer confirmed',
+  'certification verified',
+  'fully disclosed by manufacturer',
 ])
 
 export const SCORE_SANITY_DELTA_THRESHOLD = 15

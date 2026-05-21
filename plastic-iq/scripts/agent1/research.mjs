@@ -343,7 +343,11 @@ export async function researchProduct(product) {
   const parsed = extractJsonObject(result.rawText)
   const runTimestamp = new Date().toISOString()
 
-  const sources = (parsed.sources ?? []).map(({ page_excerpt: _pe, ...source }) => source)
+  const sources = (parsed.sources ?? []).map((source) => ({
+    ...source,
+    page_excerpt:
+      typeof source.page_excerpt === 'string' ? source.page_excerpt.trim() : undefined,
+  }))
 
   const facts = (parsed.facts ?? []).map((fact) => ({
     ...fact,

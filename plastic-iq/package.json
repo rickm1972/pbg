@@ -16,6 +16,7 @@
     "db:migrate:agent4": "node scripts/apply-product-qa-migration.mjs",
     "agent3": "node scripts/agent3-run.mjs",
     "agent4": "node scripts/agent4-run.mjs",
+    "pipeline:validate-three": "node scripts/pipeline-validate-three.mjs",
     "agent1": "node scripts/agent1-run.mjs",
     "agent1:serve": "node scripts/agent1-server.mjs",
     "agent2": "node scripts/agent2-run.mjs",

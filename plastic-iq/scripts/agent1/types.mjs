@@ -10,6 +10,7 @@ export const CONFIDENCE_LABELS = /** @type {const} */ ([
   'manufacturer confirmed',
   'retailer confirmed',
   'certification verified',
+  'fully disclosed by manufacturer',
   'inferred from description',
   'inferred from category pattern',
   'proprietary or undisclosed',
@@ -21,6 +22,7 @@ const strongConfidence = new Set([
   'manufacturer confirmed',
   'retailer confirmed',
   'certification verified',
+  'fully disclosed by manufacturer',
 ])
 
 export function isStrongConfidence(label) {
@@ -32,6 +34,7 @@ export const SourceSchema = z.object({
   url: z.string().url(),
   title: z.string().min(1),
   fetched_at: z.string().min(1),
+  page_excerpt: z.string().optional(),
 })
 
 export const FactSchema = z.object({

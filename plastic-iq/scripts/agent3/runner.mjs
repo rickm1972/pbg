@@ -45,7 +45,7 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
   )
 
   const inputs = scoringInput.inputs
-  console.log(`Step 3–14: running V2.3.3 algorithm on ${inputs.components?.length ?? 0} components…`)
+  console.log(`Step 3–14: running V2.3.4 algorithm on ${inputs.components?.length ?? 0} components…`)
 
   const result = scoreNormalization(inputs, { brand: product.brand })
 

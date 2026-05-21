@@ -1,9 +1,9 @@
 /** Override with AGENT2_ANTHROPIC_MODEL in .env (20250514 id returns 404 on API) */
 export const AGENT2_MODEL_DEFAULT = 'claude-sonnet-4-6'
-export const ALGORITHM_VERSION = '2.3.3'
+export const ALGORITHM_VERSION = '2.3.4'
 export const AGENT_VERSION = '2.0'
 
-export const AGENT2_SYSTEM_PROMPT = `You are the Input Normalization Agent for PlasticBegone. You convert an approved product evidence packet into structured scoring inputs for Algorithm V2.3.3. You assign values from lookup tables. You do NOT calculate scores. You do NOT run math.
+export const AGENT2_SYSTEM_PROMPT = `You are the Input Normalization Agent for PlasticBegone. You convert an approved product evidence packet into structured scoring inputs for Algorithm V2.3.4. You assign values from lookup tables. You do NOT calculate scores. You do NOT run math.
 
 Respond with a single valid JSON object only. No text before or after the JSON.
 
@@ -212,17 +212,17 @@ Rinse-off products: maximum negative Layer 4A is -3.
 
 ---
 
-LAYER 4B — TRANSPARENCY BADGE AND CONFIDENCE INTERVAL:
+LAYER 4B — TRANSPARENCY BADGE (public; Agent 3 computes confidence interval server-side in V2.3.4):
 
-Full Verified ±3: independent lab testing confirms ALL materials. Green.
-Full Disclosed ±6: manufacturer discloses ALL materials, zero inferred components. Blue.
-Partial Disclosure ±12: some confirmed, some inferred or partially specified. Yellow.
-Limited Disclosure ±15: materials primarily inferred. Orange.
-Opaque ±22: unknown, proprietary, or unverifiable. Red.
+Full Disclosed: manufacturer discloses all materials; ZERO components with data_confidence in {inferred from description, inferred from category pattern, unknown, proprietary or undisclosed}. No negative Layer 4A adjustments (positive adjustments such as MADE SAFE are allowed). No confidence range on the product page.
 
-Also: confirmed from spec sheets ±8, inferred from description ±12, conflicting info ±20.
+Documentation Incomplete: minor documentation gaps only (e.g. stainless grade unspecified, teak finishing bare vs food-safe oil 0.06–0.08, non-contact resin type). No inferred primary food-contact materials. CI ±3.
 
-Full Disclosed requires ZERO inferred components. Any vague chemistry (natural binders, fragrance, proprietary coating, ceramic) drops badge to Partial Disclosure minimum.
+Material Uncertain: any inferred/unknown/proprietary component confidence, or primary food-contact hazard spans multiple tiers (e.g. brush bristles nylon vs silicone 0.25–0.68). CI ±12 or wider from re-score.
+
+Opaque: unknown proprietary food-contact coating (hard cap 72 + Layer 4A -3). CI from full score swing.
+
+Do NOT assign legacy badges (Partial Disclosure, Limited Disclosure, Full Verified). Set layer_4b.transparency_badge to your best estimate; Agent 3 overwrites with server-side V2.3.4 rules.
 
 ---
 
@@ -275,7 +275,7 @@ OUTPUT JSON SCHEMA:
   "evidence_id": "string",
   "normalization_metadata": {
     "agent_version": "2.0",
-    "algorithm_version": "2.3.3",
+    "algorithm_version": "2.3.4",
     "run_timestamp": "ISO string",
     "model": "claude-sonnet-4-6"
   },
@@ -366,7 +366,7 @@ ${rejectionNotes}
 `
     : ''
 
-  return `Normalize this approved evidence packet into scoring inputs for Algorithm V2.3.3.
+  return `Normalize this approved evidence packet into scoring inputs for Algorithm V2.3.4.
 
 Product:
 - product_id: ${product.product_id}

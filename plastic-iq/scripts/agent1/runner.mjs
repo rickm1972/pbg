@@ -9,6 +9,7 @@ import {
 } from './supabase.mjs'
 import { researchProduct } from './research.mjs'
 import { evaluateMinimumThreshold } from './threshold.mjs'
+import { enforceCertificationVerification } from './certification-verify.mjs'
 
 export async function runAgent1({ productId, productName, dryRun = false }) {
   const supabase = createServiceClient()
@@ -29,7 +30,21 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   let packet
   try {
     console.log('Steps 2–4: researching product (web search + extraction)…')
-    packet = await researchProduct(product)
+    const rawPacket = await researchProduct(product)
+    const verified = enforceCertificationVerification(rawPacket)
+    packet = {
+      sources: verified.sources,
+      facts: verified.facts,
+      agent_metadata: verified.agent_metadata,
+    }
+    if (verified.removed_count > 0) {
+      console.log(
+        `  Certification verification removed ${verified.removed_count} claim(s) not found in returned excerpts`,
+      )
+    }
+    console.log(
+      `  certifications_verified: ${verified.verified_count} kept, ${verified.removed_count} removed`,
+    )
   } catch (err) {
     if (!dryRun) await updateAgentStatus(supabase, id, 'evidence_pending')
     throw err

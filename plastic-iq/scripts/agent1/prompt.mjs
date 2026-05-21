@@ -9,6 +9,7 @@ Rules:
 - Find the official manufacturer product page when possible.
 - Search for spec sheets, SDS, ingredient pages, FAQ, certifications, SmartLabel (for formulations).
 - Extract facts with exact supporting excerpts (quotes/snippets from pages).
+- For each source, include page_excerpt: a substantive excerpt from that page (required). For certification, SDS, or manufacturer pages, page_excerpt MUST include verbatim certification badge or program text (e.g. "MADE SAFE Certified", "EPA Safer Choice") when present — server verification matches against this field.
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
@@ -29,7 +30,7 @@ source_type examples: manufacturer, retailer, amazon, target, walmart, other_ret
 
 JSON schema:
 {
-  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string }],
+  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string }],
   "facts": [{
     "fact_type": string,
     "fact_key": string,
@@ -106,6 +107,7 @@ Rules:
 - If Amazon retrieval failed, note it in warnings and information_gaps but still complete other sources from Perplexity.
 - Prefer official manufacturer pages when snippets support them.
 - Extract facts with exact supporting excerpts (quotes/snippets from the provided results).
+- For each source in sources[], include page_excerpt with substantive text from that URL. Certification or manufacturer sources MUST include verbatim certification/program wording in page_excerpt when the page displays it (server verification requires this).
 - Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
 - Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
 - Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
@@ -127,7 +129,7 @@ source_type examples: manufacturer, retailer, amazon, target, walmart, other_ret
 
 JSON schema:
 {
-  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string }],
+  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string }],
   "facts": [{
     "fact_type": string,
     "fact_key": string,

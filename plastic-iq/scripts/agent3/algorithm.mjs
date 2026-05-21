@@ -3,8 +3,9 @@ import {
   buildConcernHighRiskExplanation,
   isConcernOrHighRiskTier,
 } from './explanation-risk-context.mjs'
+import { deriveTransparencyBadgeAndCI } from './confidence-interval.mjs'
 
-export const ALGORITHM_VERSION = '2.3.3'
+export const ALGORITHM_VERSION = '2.3.4'
 
 export function tierForScore(score) {
   if (score >= 90) return 'Excellent'
@@ -241,26 +242,36 @@ function buildExplanationDraft({
 }) {
   const [low, high] = displayedRange
   const rangeText = low === high ? `${low}` : `${low}–${high}`
+  const showRange = confidenceInterval > 0
   const brandLabel = brand?.trim() || 'This product'
   const highest = pickHighestRiskComponent(componentResults)
   const highestLabel = consumerComponentLabel(highest)
 
   if (pacScore >= EXPLANATION_EXCELLENT_THRESHOLD) {
     const safeMaterial = consumerPrimaryMaterialLabel(pickDominantSafeComponent(componentResults))
+    const rangeClause = showRange
+      ? `The score could fall anywhere from ${rangeText} until every material detail is confirmed; it likely sits near the top of that range. `
+      : 'All major materials are fully disclosed by the manufacturer. '
+    const labClause = showRange
+      ? `${brandLabel} could narrow the range further with independent lab testing.`
+      : ''
     return (
       `This product scores ${pacScore} (${tier}) because its materials are exceptionally safe for food contact — primarily ${safeMaterial}. ` +
       `${capitalizeSentence(limitingPartNote(highest))} ` +
-      `The score could fall anywhere from ${rangeText} until every material detail is confirmed; it likely sits near the top of that range. ` +
-      `${brandLabel} could narrow the range further with independent lab testing.`
-    )
+      rangeClause +
+      labClause
+    ).trim()
   }
 
   if (pacScore >= EXPLANATION_GOOD_THRESHOLD) {
+    const rangeClause = showRange
+      ? `The published score could fall anywhere from ${rangeText} until more material detail is confirmed.`
+      : ''
     return (
       `This product scores ${pacScore} (${tier}). ` +
       `What holds the score back is ${highestLabel} — the part with the most exposure-related concern in normal use. ` +
-      `The published score could fall anywhere from ${rangeText} until more material detail is confirmed.`
-    )
+      rangeClause
+    ).trim()
   }
 
   if (isConcernOrHighRiskTier(tier, pacScore) && inputs) {
@@ -274,44 +285,55 @@ function buildExplanationDraft({
     })
   }
 
-  const narrowNote =
-    confidenceInterval <= 6
+  const narrowNote = showRange
+    ? confidenceInterval <= 6
       ? ' More complete material disclosure or independent testing could narrow this range.'
       : ' Confirming undisclosed materials or third-party verification could narrow this range.'
+    : ''
+
+  const rangeClause = showRange
+    ? `The published score could fall anywhere from ${rangeText} because material disclosure is limited or unverified.${narrowNote}`
+    : `Material disclosure is limited or unverified.${narrowNote}`
 
   return (
     `This product scores ${pacScore} (${tier}). ` +
     `The main concern is ${highestLabel}, which has the most direct food or drink contact among the materials in this product. ` +
-    `The published score could fall anywhere from ${rangeText} because material disclosure is limited or unverified.${narrowNote}`
+    rangeClause
   )
 }
 
 /**
- * Run V2.3.3 PAC Safety Scoring Algorithm on an approved normalization packet.
+ * Core PAC score from normalization inputs; optional per-component hazard overrides for CI bands.
+ * @param {object} inputs
+ * @param {Record<string, number>} [hazardOverrides] — component_name → material_hazard
  */
-export function scoreNormalization(inputs, options = {}) {
-  const steps = []
+export function scorePacCore(inputs, hazardOverrides = null) {
   const components = inputs.components ?? []
   const isFormulation = Boolean(inputs.is_formulation_product)
   const layer4a = inputs.layer_4a ?? {}
-  const layer4b = inputs.layer_4b ?? {}
-
   const componentResults = []
 
   for (const component of components) {
+    const overrideHazard = hazardOverrides?.[component.component_name]
+    const effectiveComponent =
+      overrideHazard != null && Number.isFinite(Number(overrideHazard))
+        ? { ...component, material_hazard: Number(overrideHazard) }
+        : component
+
     const baseMigration = num(
-      component.base_migration_potential ?? component.adjusted_migration_potential,
+      effectiveComponent.base_migration_potential ??
+        effectiveComponent.adjusted_migration_potential,
     )
-    let severity = num(component.exposure_severity)
-    let duration = num(component.exposure_duration)
-    let contactIntimacy = num(component.contact_intimacy)
+    let severity = num(effectiveComponent.exposure_severity)
+    let duration = num(effectiveComponent.exposure_duration)
+    let contactIntimacy = num(effectiveComponent.contact_intimacy)
 
     const inert = applyInertExposure(severity, duration, baseMigration)
     severity = inert.severity
     duration = inert.duration
 
     const afterCategory = applyCategoryModifiers({
-      component,
+      component: effectiveComponent,
       severity,
       duration,
       contactIntimacy,
@@ -323,16 +345,18 @@ export function scoreNormalization(inputs, options = {}) {
     duration = afterCategory.duration
     contactIntimacy = afterCategory.contactIntimacy
 
-    const escalator = pickEscalator(component)
+    const escalator = pickEscalator(effectiveComponent)
     let finalNpr = npr
     if (escalator) {
       finalNpr *= escalator.multiplier
     }
 
+    const materialHazard = num(effectiveComponent.material_hazard)
+
     componentResults.push({
-      component_name: component.component_name,
-      material: component.material,
-      material_hazard: num(component.material_hazard),
+      component_name: effectiveComponent.component_name,
+      material: effectiveComponent.material,
+      material_hazard: materialHazard,
       adjusted_migration_potential: num(component.adjusted_migration_potential),
       base_migration_potential: baseMigration,
       contact_intimacy: contactIntimacy,
@@ -340,10 +364,14 @@ export function scoreNormalization(inputs, options = {}) {
       exposure_duration: duration,
       inert_protection_applied: inert.inertApplied,
       base_npr: computeBaseNpr(
-        component,
-        inert.inertApplied ? num(component.exposure_severity) * INERT_EXPOSURE_MULTIPLIER : num(component.exposure_severity),
-        inert.inertApplied ? num(component.exposure_duration) * INERT_EXPOSURE_MULTIPLIER : num(component.exposure_duration),
-        num(component.contact_intimacy),
+        effectiveComponent,
+        inert.inertApplied
+          ? num(effectiveComponent.exposure_severity) * INERT_EXPOSURE_MULTIPLIER
+          : num(effectiveComponent.exposure_severity),
+        inert.inertApplied
+          ? num(effectiveComponent.exposure_duration) * INERT_EXPOSURE_MULTIPLIER
+          : num(effectiveComponent.exposure_duration),
+        num(effectiveComponent.contact_intimacy),
       ),
       npr_after_category: afterCategory.npr,
       category_modifiers: afterCategory.modifiers,
@@ -364,11 +392,34 @@ export function scoreNormalization(inputs, options = {}) {
 
   const pacSafetyScore = clamp(roundNearest(scoreAfter4a), 0, SCORE_MAX)
   const tier = tierForScore(pacSafetyScore)
-  const transparencyBadge = layer4b.transparency_badge ?? 'Partial Disclosure'
-  const confidenceInterval = num(layer4b.confidence_interval, 12)
-  const lower = Math.max(0, pacSafetyScore - confidenceInterval)
-  const upper = Math.min(SCORE_MAX, pacSafetyScore + confidenceInterval)
-  const displayedConfidenceRange = `${lower}–${upper}`
+
+  return {
+    pac_safety_score: pacSafetyScore,
+    tier,
+    weighted_npr: weightedNpr,
+    raw_score: rawScore,
+    layer_4a_net: layer4aNet,
+    score_after_4a: scoreAfter4a,
+    component_results: componentResults,
+  }
+}
+
+/**
+ * Run V2.3.4 PAC Safety Scoring Algorithm on an approved normalization packet.
+ */
+export function scoreNormalization(inputs, options = {}) {
+  const steps = []
+  const core = scorePacCore(inputs)
+  const pacSafetyScore = core.pac_safety_score
+  const tier = core.tier
+  const componentResults = core.component_results
+  const layer4bDerived = deriveTransparencyBadgeAndCI(inputs, pacSafetyScore)
+  const confidenceInterval = layer4bDerived.confidence_interval
+  const displayedConfidenceRange = layer4bDerived.displayed_confidence_range
+  const transparencyBadge = layer4bDerived.transparency_badge
+  const displayedRange = displayedConfidenceRange
+    ? parseDisplayedConfidenceRange(displayedConfidenceRange)
+    : [pacSafetyScore, pacSafetyScore]
 
   const escalatorsUsed = [
     ...new Set(componentResults.map((c) => c.escalator_applied).filter(Boolean)),
@@ -379,19 +430,20 @@ export function scoreNormalization(inputs, options = {}) {
     pacScore: pacSafetyScore,
     tier,
     confidenceInterval,
-    displayedRange: [lower, upper],
+    displayedRange,
     componentResults,
     inputs,
     brand: options.brand,
   })
 
   const calculation = {
-    weighted_npr: weightedNpr,
-    raw_score: rawScore,
-    layer_4a_net: layer4aNet,
-    score_after_4a: scoreAfter4a,
+    weighted_npr: core.weighted_npr,
+    raw_score: core.raw_score,
+    layer_4a_net: core.layer_4a_net,
+    score_after_4a: core.score_after_4a,
     pac_safety_score: pacSafetyScore,
     component_results: componentResults,
+    layer_4b: layer4bDerived,
   }
 
   if (options.debug) {
@@ -403,16 +455,18 @@ export function scoreNormalization(inputs, options = {}) {
     tier,
     displayed_confidence_range: displayedConfidenceRange,
     transparency_badge: transparencyBadge,
-    weighted_npr: Number(weightedNpr.toFixed(4)),
+    confidence_interval: confidenceInterval,
+    weighted_npr: Number(core.weighted_npr.toFixed(4)),
     component_nprs: {
       components: componentResults,
-      weighted_npr: Number(weightedNpr.toFixed(4)),
+      weighted_npr: Number(core.weighted_npr.toFixed(4)),
     },
     escalator_applied: escalatorsUsed.length ? escalatorsUsed.join(', ') : null,
-    layer_4a_net: layer4aNet,
+    layer_4a_net: core.layer_4a_net,
     ingredient_transparency_score: ingredientTransparencyScore,
     explanation_draft: explanationDraft,
     algorithm_version: ALGORITHM_VERSION,
+    layer_4b: layer4bDerived,
     calculation,
   }
 }
