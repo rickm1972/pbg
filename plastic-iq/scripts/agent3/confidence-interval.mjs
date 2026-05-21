@@ -181,6 +181,13 @@ function hasWidePrimaryBand(inputs) {
   })
 }
 
+function hasPcrUnspecifiedBand(inputs) {
+  return (inputs.components ?? []).some((c) => {
+    const band = getComponentHazardBand(c, inputs)
+    return band?.kind === 'pcr_unspecified'
+  })
+}
+
 function hasOnlyDocumentationBands(inputs) {
   const bands = (inputs.components ?? [])
     .map((c) => getComponentHazardBand(c, inputs))
@@ -200,6 +207,7 @@ export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
   const inferred = hasInferredComponent(inputs)
   const negative = hasNegativeLayer4a(inputs)
   const widePrimary = hasWidePrimaryBand(inputs)
+  const pcrUnspecified = hasPcrUnspecifiedBand(inputs)
   const onlyDoc = hasOnlyDocumentationBands(inputs)
 
   let transparency_badge
@@ -207,11 +215,11 @@ export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
 
   if (opaque) {
     transparency_badge = BADGES.OPAQUE
-    confidence_interval = Math.max(12, halfWidth)
+    confidence_interval = Math.max(22, halfWidth)
   } else if (!inferred && !negative) {
     transparency_badge = BADGES.FULL_DISCLOSED
     confidence_interval = 0
-  } else if (widePrimary || inferred) {
+  } else if (widePrimary || inferred || pcrUnspecified) {
     transparency_badge = BADGES.MATERIAL_UNCERTAIN
     confidence_interval = Math.max(12, halfWidth)
   } else if (onlyDoc) {
@@ -239,6 +247,7 @@ export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
       inferred,
       negative,
       widePrimary,
+      pcrUnspecified,
       halfWidth,
     }),
   }
@@ -250,6 +259,7 @@ function buildBadgeJustification(ctx) {
   if (ctx.inferred) parts.push('has inferred/unknown/proprietary component confidences')
   if (ctx.negative) parts.push('has negative Layer 4A adjustments')
   if (ctx.widePrimary) parts.push('wide primary food-contact hazard band')
+  if (ctx.pcrUnspecified) parts.push('recycled PCR resin unspecified')
   if (ctx.halfWidth > 0) parts.push(`re-score half-width: ${ctx.halfWidth}`)
   return parts.join('; ')
 }
