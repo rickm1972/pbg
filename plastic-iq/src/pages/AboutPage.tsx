@@ -179,7 +179,7 @@ export function AboutPage() {
             </p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="rounded-3xl border border-emerald-200/80 bg-gradient-to-b from-emerald-50/50 via-white to-white p-5 shadow-card ring-1 ring-emerald-100/60">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="max-w-xl">
                 <div className="flex items-center gap-2">
