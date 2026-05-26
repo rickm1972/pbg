@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, BadgeCheck, FlaskConical, Layers, Route, ShieldCheck, Users, Waves } from 'lucide-react'
 import aboutHero from '../assets/about-hero.png'
-import aboutScienceCard from '../assets/about-science-card.png'
 import aboutFtcCard from '../assets/about-ftc-card.png'
 import aboutCtaBanner from '../assets/about-cta-banner.png'
 import { PacTierAboutGrid } from '../components/PacTierLegend'
@@ -226,78 +225,39 @@ export function AboutPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 md:gap-5">
+          <div
+            id="ftc-disclosure"
+            className="relative isolate min-h-[240px] w-full overflow-hidden rounded-3xl border border-slate-200/90 shadow-card scroll-mt-28 sm:min-h-[260px] md:min-h-[280px]"
+          >
+            <img
+              src={aboutFtcCard}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center sm:object-right"
+              loading="lazy"
+            />
             <div
-              id="research"
-              className="relative isolate min-h-[280px] overflow-hidden rounded-3xl border border-slate-200/90 shadow-card scroll-mt-28 md:min-h-[300px]"
-            >
-              <img
-                src={aboutScienceCard}
-                alt=""
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right"
-                loading="lazy"
-              />
-              <div
-                className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-[90%] bg-gradient-to-r from-[#eef2ee]/98 via-[#eef2ee]/88 to-transparent sm:w-[82%] md:w-[68%] lg:w-[58%]"
-                aria-hidden
-              />
-              <div className="relative z-10 flex min-h-[280px] flex-col justify-center p-6 md:min-h-[300px] md:max-w-[min(26rem,72%)] md:p-8">
-                <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900 md:text-xl">
-                  Scientific foundation
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-700">
-                  PlasticBegone is built to translate emerging science into practical buying decisions. We
-                  track evolving evidence, including the PERTH Trial published in Nature Medicine (April
-                  2026), and incorporate validated findings into scoring where appropriate.
-                </p>
-                <Link
-                  to="/about#methodology"
-                  className="mt-5 inline-flex w-fit items-center gap-1 text-sm font-semibold text-forest underline decoration-forest/40 underline-offset-[6px] transition hover:decoration-forest"
-                >
-                  Learn more about our science
-                  <span aria-hidden className="translate-y-px">
-                    →
-                  </span>
-                </Link>
-              </div>
-            </div>
-
-            <div
-              id="ftc-disclosure"
-              className="relative isolate min-h-[280px] overflow-hidden rounded-3xl border border-slate-200/90 shadow-card md:min-h-[300px]"
-            >
-              <img
-                src={aboutFtcCard}
-                alt=""
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right"
-                loading="lazy"
-              />
-              <div
-                className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-[90%] bg-gradient-to-r from-[#faf7f0]/98 via-[#faf7f0]/88 to-transparent sm:w-[82%] md:w-[68%] lg:w-[58%]"
-                aria-hidden
-              />
-              <div className="relative z-10 flex min-h-[280px] flex-col justify-center p-6 md:min-h-[300px] md:max-w-[min(26rem,72%)] md:p-8">
-                <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900 md:text-xl">
-                  FTC affiliate disclosure
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-700">
-                  PlasticBegone may earn commissions on purchases made through affiliate links. This does
-                  not influence ratings. Scores are based entirely on independent scientific
-                  methodology.
-                </p>
-                <a
-                  href="#"
-                  className="mt-5 inline-flex w-fit items-center gap-1 text-sm font-semibold text-forest underline decoration-forest/40 underline-offset-[6px] transition hover:decoration-forest"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  Read full disclosure
-                  <span aria-hidden className="translate-y-px">
-                    →
-                  </span>
-                </a>
-              </div>
+              className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-full bg-gradient-to-r from-[#faf7f0]/98 via-[#faf7f0]/75 to-[#faf7f0]/20 sm:w-[85%] md:w-[70%] lg:w-[55%]"
+              aria-hidden
+            />
+            <div className="relative z-10 flex min-h-[240px] flex-col justify-center p-6 sm:min-h-[260px] md:min-h-[280px] md:max-w-2xl md:p-8 lg:max-w-3xl">
+              <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900 md:text-xl">
+                FTC affiliate disclosure
+              </h2>
+              <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-700 md:text-base">
+                PlasticBegone may earn commissions on purchases made through affiliate links. This does not
+                influence ratings. Scores are based entirely on independent scientific methodology.
+              </p>
+              <a
+                href="#"
+                className="mt-5 inline-flex w-fit items-center gap-1 text-sm font-semibold text-forest underline decoration-forest/40 underline-offset-[6px] transition hover:decoration-forest"
+                onClick={(e) => e.preventDefault()}
+              >
+                Read full disclosure
+                <span aria-hidden className="translate-y-px">
+                  →
+                </span>
+              </a>
             </div>
           </div>
 
