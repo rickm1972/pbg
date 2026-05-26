@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, FlaskConical, Layers, Route, ShieldCheck, Users, Waves } from 'lucide-react'
+import { ArrowRight, BadgeCheck, FlaskConical, Layers, Route, ShieldCheck, Users, Waves } from 'lucide-react'
 import aboutHero from '../assets/about-hero.png'
 import aboutScienceCard from '../assets/about-science-card.png'
 import aboutFtcCard from '../assets/about-ftc-card.png'
@@ -183,7 +183,12 @@ export function AboutPage() {
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="max-w-xl">
-                <h2 className="text-base font-semibold text-ink-900">Verified certifications</h2>
+                <div className="flex items-center gap-2">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-50 ring-1 ring-emerald-200">
+                    <BadgeCheck className="h-4 w-4 text-emerald-700" aria-hidden />
+                  </span>
+                  <h2 className="text-base font-semibold text-ink-900">Verified certifications</h2>
+                </div>
                 <p className="mt-2 text-sm leading-relaxed text-slate-700">
                   We only credit certifications we can verify in the certifying body&apos;s own registry. A
                   product page may claim &apos;MADE SAFE Certified&apos; on its label, but we check madesafe.org
@@ -193,28 +198,28 @@ export function AboutPage() {
               </div>
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-xs leading-relaxed text-emerald-900 ring-1 ring-emerald-200/70">
                 <div className="font-semibold uppercase tracking-wide">What “verified” means</div>
-                <p className="mt-1">
+                <p className="mt-1 text-[0.78rem]">
                   A certification only shows up on a product page after we match the brand and product in the
                   certifier&apos;s own public registry entry.
                 </p>
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-[0.78rem] font-semibold uppercase tracking-wide text-slate-500">
                 Certifications we recognize for PAC safety
               </p>
               <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {PAC_SAFETY_CERTIFICATIONS.map((cert) => (
                   <li
                     key={cert.name}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-700"
+                    className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-sm leading-relaxed text-slate-700"
                   >
-                    <div className="text-xs font-semibold text-ink-900">{cert.name}</div>
-                    <div className="mt-0.5">{cert.description}</div>
+                    <div className="text-sm font-semibold text-ink-900">{cert.name}</div>
+                    <div className="mt-0.5 text-[0.85rem]">{cert.description}</div>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              <p className="mt-3 text-[0.78rem] leading-relaxed text-slate-500">
                 On product pages, each certification links out to the certifying body&apos;s registry entry so
                 you can verify it yourself.
               </p>
