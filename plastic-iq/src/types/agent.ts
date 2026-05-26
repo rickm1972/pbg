@@ -52,6 +52,7 @@ export type EvidenceFact = {
   confidence: ConfidenceLabel | string
   source_index: number | null
   excerpt: string
+  source_url?: string | null
 }
 
 export type MinimumThreshold = {
@@ -82,6 +83,41 @@ export type Agent1ApiUsage = {
   anthropic_api_calls?: number
 }
 
+export type StructuredVerifiedCert = {
+  cert_name: string
+  /** Certifying-body registry URL (not manufacturer marketing page). */
+  source_url?: string | null
+  registry_url?: string | null
+  page_source_url?: string | null
+  retrieved_date?: string
+}
+
+export type StructuredUnverifiedCert = {
+  cert_name: string
+  registry_check_result: string
+  claim_source_url?: string | null
+}
+
+export type StructuredEvidencePayload = {
+  schema_version?: string
+  primary_contact_material?: {
+    material_identity?: string
+    undisclosed_code?: string | null
+    source_url?: string | null
+    confidence_label?: string
+  }
+  certifications?: {
+    claimed_certifications?: string[]
+    verified_certifications?: StructuredVerifiedCert[]
+    claimed_but_not_verified?: StructuredUnverifiedCert[]
+  }
+  safety_claims?: Record<string, { claimed?: boolean; source_url?: string | null; structural_guarantee?: boolean }>
+  ingredient_list?: { ingredients?: string[]; source_url?: string | null } | null
+  secondary_components?: Array<{ component_role: string; material_identity?: string | null; source_url?: string | null }>
+  coatings_and_finishes?: Array<{ coating_name: string; coating_type: string; source_url?: string | null }>
+  product_use_case?: string
+}
+
 export type AgentMetadata = {
   model?: string
   agent_version?: string
@@ -89,6 +125,7 @@ export type AgentMetadata = {
   provider?: string
   warnings?: string[]
   certifications_verified?: CertificationVerifiedRow[]
+  structured_evidence?: StructuredEvidencePayload
   minimum_threshold?: MinimumThreshold
   in_testing_queue?: boolean
   api_usage?: Agent1ApiUsage
@@ -123,19 +160,28 @@ export type ProductPipelineRow = {
   testing_queue_reason?: string | null
 }
 
+export type Agent1ReviewQueueItem = {
+  product: ProductPipelineRow
+  evidence: ProductEvidence | null
+}
+
 export type Agent1DashboardData = {
   products: ProductPipelineRow[]
-  pendingReview: Array<{
-    product: ProductPipelineRow
-    evidence: ProductEvidence
-  }>
+  pendingReview: Agent1ReviewQueueItem[]
+  /** Reserved; validation products use pendingReview when awaiting review. */
+  validationRunQueue: Agent1ReviewQueueItem[]
+  /** Last Agent 1 run failed or did not pass threshold (draft evidence if saved). */
+  heldRuns: Agent1ReviewQueueItem[]
   statusCounts: Record<string, number>
 }
 
 export type NormalizationComponent = {
   component_name: string
+  component_role?: string
+  role?: string
   material: string
   material_hazard: number
+  base_migration_potential?: number
   adjusted_migration_potential: number
   contact_intimacy: number
   exposure_severity: number
@@ -201,6 +247,12 @@ export type ScoringInputRow = {
   review_notes: string | null
   human_review_required: boolean
   human_review_reason: string | null
+  primary_material_options?: string[] | null
+  secondary_materials_options?: string[] | null
+  coatings_finishes_options?: string[] | null
+  use_conditions_options?: string[] | null
+  disclosure_quality_options?: string[] | null
+  certifications_options?: string[] | null
 }
 
 export type ProductScoreRow = {

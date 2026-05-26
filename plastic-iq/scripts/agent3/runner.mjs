@@ -1,7 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectRoot } from '../lib/env.mjs'
+import { enforceLayer4a } from '../agent2/layer4a-enforce.mjs'
+import { finalizeNormalization } from '../agent2/layer4b-enforce.mjs'
+import { enforceNormalizationDeterminism } from '../agent2/normalize-enforce.mjs'
 import { ALGORITHM_VERSION, formatCalculationTrace, scoreNormalization } from './algorithm.mjs'
+import { fetchApprovedEvidence } from '../agent2/supabase.mjs'
 import {
   createServiceClient,
   fetchApprovedScoringInputs,
@@ -44,10 +48,21 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
     `Step 2: loaded approved normalization (${scoringInput.input_id}, v${scoringInput.algorithm_version})`,
   )
 
-  const inputs = scoringInput.inputs
+  const inputs = finalizeNormalization(
+    enforceLayer4a(
+      enforceNormalizationDeterminism(structuredClone(scoringInput.inputs)),
+    ),
+  )
   console.log(`Step 3–14: running V2.3.4 algorithm on ${inputs.components?.length ?? 0} components…`)
 
-  const result = scoreNormalization(inputs, { brand: product.brand })
+  let evidence = null
+  try {
+    evidence = await fetchApprovedEvidence(supabase, id)
+  } catch {
+    console.log('Step 2b: (no approved evidence bundle — pathway from normalization fields only)')
+  }
+
+  const result = scoreNormalization(inputs, { brand: product.brand, evidence })
 
   if (result.pac_safety_score !== 99 && product.product_name.includes('Lodge') && product.product_name.includes('Cast Iron')) {
     console.log('\n*** CALIBRATION FAILED — Lodge must score exactly 99 ***\n')

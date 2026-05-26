@@ -3,6 +3,7 @@ import { formatSupabaseUnknownError } from '../../lib/supabaseClient'
 import {
   approveProductScore,
   canRunAgent3,
+  isAgent3ValidationRerunProduct,
   fetchAgent3Dashboard,
   humanizeAgentStatus,
   rejectProductScore,
@@ -428,6 +429,8 @@ export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               readOnly={selectedScoreView.readOnly}
               reviewLabel={selectedScoreView.reviewLabel ?? undefined}
               busy={busyId === selectedScoreView.product.product_id}
+              canRerun={canRunAgent3(selectedScoreView.product.agent_status)}
+              onRerun={() => handleRun(selectedScoreView.product.product_id)}
               rejecting={rejecting}
               rejectNotes={rejectNotes}
               onRejectNotesChange={setRejectNotes}
@@ -501,8 +504,11 @@ function Agent3RunTabPanel({
           <StatusPill status={selectedProduct.agent_status} />
         </div>
         <p className="mt-4 text-sm text-slate-700">
-          Runs V2.3.3 scoring on the approved normalization packet and saves to{' '}
+          Runs V2.3.4 scoring on the approved normalization packet and saves to{' '}
           <strong>product_scores</strong>. Review under <strong>Awaiting review</strong>.
+          {isAgent3ValidationRerunProduct(selectedProduct.product_id)
+            ? ' (Session 2 validation product — safe to re-run for explanation refresh.)'
+            : ''}
         </p>
         <button
           type="button"
@@ -554,6 +560,8 @@ function ScoreReviewPanel({
   readOnly = false,
   reviewLabel,
   busy,
+  canRerun = false,
+  onRerun,
   rejecting,
   rejectNotes,
   onRejectNotesChange,
@@ -568,6 +576,8 @@ function ScoreReviewPanel({
   readOnly?: boolean
   reviewLabel?: string
   busy: boolean
+  canRerun?: boolean
+  onRerun?: () => void
   rejecting: boolean
   rejectNotes: string
   onRejectNotesChange: (v: string) => void
@@ -714,6 +724,21 @@ function ScoreReviewPanel({
             className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800"
           >
             Reject
+          </button>
+        </footer>
+      ) : canRerun && onRerun ? (
+        <footer className="sticky bottom-0 mt-6 border-t border-slate-100 bg-white pt-4">
+          <p className="mb-2 text-xs text-slate-600">
+            Re-run Agent 3 to refresh the explanation draft (scores recalculated from the same approved
+            normalization).
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onRerun}
+            className="rounded-xl bg-ink-900 px-4 py-2 text-sm font-semibold text-white hover:bg-ink-700 disabled:opacity-60"
+          >
+            {busy ? 'Running Agent 3…' : 'Re-run Agent 3'}
           </button>
         </footer>
       ) : null}

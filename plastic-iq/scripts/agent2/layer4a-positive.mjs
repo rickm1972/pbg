@@ -132,11 +132,17 @@ export function enforceLayer4aPositive(inputs) {
     })
 
     if (matched && awarded > 0) {
+      const canonical = lookup.exact_label
+      if (positiveAdjustments.some((adj) => adj.reason === canonical)) {
+        enforcedReasoning[enforcedReasoning.length - 1].dedupe_note =
+          'skipped duplicate — same adjustment type already applied'
+        continue
+      }
       const remaining = LAYER_4A_POSITIVE_MAX - positiveSum
       const applied = Math.min(awarded, remaining)
       if (applied > 0) {
         positiveAdjustments.push({
-          reason: lookup.exact_label,
+          reason: canonical,
           value: applied,
         })
         positiveSum += applied

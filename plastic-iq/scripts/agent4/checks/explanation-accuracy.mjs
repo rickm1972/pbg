@@ -1,179 +1,63 @@
 /**
- * Check 5 — Explanation accuracy (no NPR leaks, correct primary material).
+ * Check 5 — Why This Score vocabulary options present and valid.
  */
-import {
-  consumerComponentLabel,
-  consumerPrimaryMaterialLabel,
-} from '../../agent3/explanation-labels.mjs'
 
-const NPR_LEAK_PATTERNS = [
-  /\bNPR\b/i,
-  /normalized plastic risk/i,
-  /\bLayer 4\b/i,
-  /contact intimacy/i,
-  /\bCI\s*[=:]/i,
-  /weighted\s*NPR/i,
-  /highest-NPR/i,
-  /final_npr/i,
-  /material_hazard/i,
+import { allowedOptionsForField } from '../../agent2/why-this-score-vocabulary.mjs'
+
+const FIELD_KEYS = [
+  'primary_material_options',
+  'secondary_materials_options',
+  'coatings_finishes_options',
+  'use_conditions_options',
+  'disclosure_quality_options',
+  'certifications_options',
 ]
-
-const NPR_DECIMAL_IN_PARENS = /\(\s*NPR\s+[\d.]+\s*\)/i
-const SUSPICIOUS_DECIMAL = /\(\s*[\d.]{3,}\s*\)/
-
-function findInputComponent(inputs, componentName) {
-  const needle = String(componentName ?? '').trim()
-  return (inputs?.components ?? []).find((c) => c.component_name === needle) ?? null
-}
-
-function pickHighestRiskComponent(componentResults, inputs) {
-  if (!componentResults?.length) return null
-  return componentResults.reduce((best, c) => {
-    const contrib = Number(c.final_npr) * Number(c.contact_intimacy)
-    const bestContrib = best ? Number(best.final_npr) * Number(best.contact_intimacy) : -1
-    if (contrib > bestContrib) {
-      const inputRow = findInputComponent(inputs, c.component_name)
-      return { ...c, material: inputRow?.material ?? c.material, material_hazard_table_entry: inputRow?.material_hazard_table_entry }
-    }
-    return best
-  }, null)
-}
-
-function pickDominantSafeComponent(componentResults, inputs) {
-  if (!componentResults?.length) return null
-  return componentResults.reduce((best, c) => {
-    const safe = Number(c.final_npr) < 0.25
-    if (!safe) return best
-    const ci = Number(c.contact_intimacy)
-    const bestCi = best ? Number(best.contact_intimacy) : -1
-    if (ci > bestCi) {
-      const inputRow = findInputComponent(inputs, c.component_name)
-      return { ...c, material: inputRow?.material ?? c.material, material_hazard_table_entry: inputRow?.material_hazard_table_entry }
-    }
-    return best
-  }, null)
-}
-
-function materialFamilyTokens(text) {
-  const t = String(text ?? '').toLowerCase()
-  const families = []
-  if (/cast iron/.test(t)) families.push('cast iron')
-  if (/glass/.test(t)) families.push('glass')
-  if (/stainless/.test(t)) families.push('stainless')
-  if (/soap|saponified|coconut oil.*soap/.test(t)) families.push('soap')
-  if (/nylon/.test(t)) families.push('nylon')
-  if (/ptfe|teflon/.test(t)) families.push('ptfe')
-  if (/tritan|plastic/.test(t)) families.push('plastic')
-  if (/ceramic|terrabond|thermolon/.test(t)) families.push('ceramic')
-  if (/silicone/.test(t)) families.push('silicone')
-  return families
-}
-
-function familiesOverlap(a, b) {
-  return a.some((f) => b.includes(f))
-}
-
-function extractPrimarilyPhrase(draft) {
-  const m = draft.match(/primarily\s+([^.;]+)/i)
-  return m?.[1]?.trim() ?? null
-}
 
 /**
  * @param {object} score — product_scores row
- * @param {object} inputs
+ * @param {object} inputs — scoring_inputs.inputs jsonb
+ * @param {object} [scoringInputRow] — full scoring_inputs row
  */
-export function runExplanationAccuracy(score, inputs) {
-  const draft = String(score.explanation_draft ?? '')
+export function runExplanationAccuracy(score, inputs, scoringInputRow = null) {
   const flags = []
   const issues = []
+  const row = scoringInputRow ?? {}
 
-  if (!draft.trim()) {
-    return {
-      status: 'flag',
-      flags: [{ code: 'EXPLANATION_MISSING', message: 'explanation_draft is empty' }],
-      issues: ['missing draft'],
+  for (const key of FIELD_KEYS) {
+    const value = row[key]
+    if (!Array.isArray(value) || value.length === 0) {
+      flags.push({ code: 'WHY_FIELD_MISSING', message: `${key} is empty` })
+      issues.push(`missing ${key}`)
+      continue
     }
-  }
 
-  for (const pattern of NPR_LEAK_PATTERNS) {
-    if (pattern.test(draft)) {
-      flags.push({
-        code: 'EXPLANATION_NPR_LEAK',
-        message: `Explanation contains internal algorithm term matching ${pattern}`,
-      })
-      issues.push('npr or internal term')
-      break
-    }
-  }
-
-  if (NPR_DECIMAL_IN_PARENS.test(draft) || (/\bNPR\b/i.test(draft) && SUSPICIOUS_DECIMAL.test(draft))) {
-    if (!flags.some((f) => f.code === 'EXPLANATION_NPR_LEAK')) {
-      flags.push({
-        code: 'EXPLANATION_NPR_LEAK',
-        message: 'Explanation contains NPR numeric values in parentheses',
-      })
-      issues.push('npr numeric')
-    }
-  }
-
-  const componentResults = score.component_nprs?.components ?? []
-  const highest = pickHighestRiskComponent(componentResults)
-  const highestLabel = consumerComponentLabel(highest)
-
-  if (/highest-NPR|single highest/i.test(draft)) {
-    flags.push({
-      code: 'EXPLANATION_HIGHEST_NPR_COMPONENT',
-      message: 'Explanation references highest-NPR component wording',
-    })
-    issues.push('highest-npr wording')
-  }
-
-  const mainConcernMatch = draft.match(/main concern is ([^,]+),/i)
-  if (mainConcernMatch && highestLabel) {
-    const mentioned = mainConcernMatch[1].trim().toLowerCase()
-    const expected = highestLabel.toLowerCase()
-    if (
-      mentioned &&
-      expected &&
-      !mentioned.includes(expected.slice(4, 40)) &&
-      !expected.includes(mentioned.slice(0, 20))
-    ) {
-      const mentionedFamilies = materialFamilyTokens(mentioned)
-      const expectedFamilies = materialFamilyTokens(expected)
-      if (!familiesOverlap(mentionedFamilies, expectedFamilies)) {
+    const allowed = new Set(allowedOptionsForField(key))
+    for (const item of value) {
+      if (!allowed.has(item)) {
         flags.push({
-          code: 'EXPLANATION_WRONG_PRIMARY_MATERIAL',
-          message: `Main concern text "${mainConcernMatch[1].trim()}" does not match dominant risk component (${highestLabel})`,
-          context: { expected: highestLabel, mentioned: mainConcernMatch[1].trim() },
+          code: 'WHY_OPTION_NOT_IN_VOCABULARY',
+          message: `${key} contains non-vocabulary option: ${item}`,
         })
-        issues.push('wrong main concern')
+        issues.push(`invalid option ${item}`)
       }
     }
   }
 
-  const primarily = extractPrimarilyPhrase(draft)
-  if (primarily && Number(score.pac_safety_score) >= 90) {
-    const safeComponent = pickDominantSafeComponent(componentResults, inputs)
-    const expectedMaterial = consumerPrimaryMaterialLabel(safeComponent)
-    const primarilyFamilies = materialFamilyTokens(primarily)
-    const expectedFamilies = materialFamilyTokens(expectedMaterial)
-    if (
-      primarilyFamilies.length &&
-      expectedFamilies.length &&
-      !familiesOverlap(primarilyFamilies, expectedFamilies)
-    ) {
-      flags.push({
-        code: 'EXPLANATION_WRONG_PRIMARY_MATERIAL',
-        message: `"primarily ${primarily}" does not align with dominant safe material (${expectedMaterial})`,
-        context: { primarily, expectedMaterial },
-      })
-      issues.push('wrong primarily')
-    }
+  const disclosure = Array.isArray(row.disclosure_quality_options)
+    ? row.disclosure_quality_options[0]
+    : null
+  const badge = String(inputs?.layer_4b?.transparency_badge ?? '').trim()
+  if (disclosure && badge && disclosure !== badge) {
+    flags.push({
+      code: 'DISCLOSURE_BADGE_MISMATCH',
+      message: `disclosure_quality_options (${disclosure}) does not match layer_4b badge (${badge})`,
+    })
+    issues.push('disclosure badge mismatch')
   }
 
-  return {
-    status: flags.length ? 'flag' : 'pass',
-    flags,
-    issues,
+  if (flags.length) {
+    return { status: 'flag', flags, issues }
   }
+
+  return { status: 'pass', flags: [], issues: [] }
 }

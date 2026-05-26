@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatSupabaseUnknownError } from '../../lib/supabaseClient'
 import {
   approveNormalization,
-  canRunAgent2,
+  AGENT2_VALIDATION_RERUN_PRODUCT_IDS,
+  canRerunAgent2FromReviewCard,
+  isAgent2ValidationRerunProduct,
+  showOnAgent2ReviewTab,
+  showOnAgent2RunTab,
   fetchAgent2Dashboard,
   hasNormalizationRun,
   humanizeAgentStatus,
@@ -19,6 +23,8 @@ import type {
   ProductPipelineRow,
   ScoringInputRow,
 } from '../../types/agent'
+import { WhyThisScore } from '../WhyThisScore'
+import type { WhyThisScoreFields } from '../../lib/whyThisScoreApi'
 
 type Props = {
   authUserEmail: string | null
@@ -33,13 +39,17 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
-  const [listFilter, setListFilter] = useState<'review' | 'run' | 'testing' | 'all'>('review')
+  const [listFilter, setListFilter] = useState<'review' | 'run' | 'testing' | 'all'>('run')
   const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(() => new Set())
   const [batchProgress, setBatchProgress] = useState<{
     current: number
     total: number
     name: string
   } | null>(null)
+  /** Validation products moved to Awaiting review after a successful run this session. */
+  const [readyForReviewAfterRunIds, setReadyForReviewAfterRunIds] = useState<Set<string>>(
+    () => new Set(),
+  )
   const initialTabSet = useRef(false)
 
   const load = useCallback(async () => {
@@ -75,8 +85,10 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   const reviewQueue = useMemo(() => {
     if (!data) return []
-    return data.pendingReview.map((x) => x.product)
-  }, [data])
+    return data.pendingReview
+      .filter((x) => showOnAgent2ReviewTab(x.product, readyForReviewAfterRunIds))
+      .map((x) => x.product)
+  }, [data, readyForReviewAfterRunIds])
 
   const testingQueueProducts = useMemo(() => {
     if (!data) return []
@@ -85,7 +97,14 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   const runnableProducts = useMemo(() => {
     if (!data) return []
-    return data.products.filter((p) => canRunAgent2(p.agent_status))
+    return data.products
+      .filter((p) => showOnAgent2RunTab(p, readyForReviewAfterRunIds))
+      .sort((a, b) => {
+        const aVal = isAgent2ValidationRerunProduct(a.product_id) ? 0 : 1
+        const bVal = isAgent2ValidationRerunProduct(b.product_id) ? 0 : 1
+        if (aVal !== bVal) return aVal - bVal
+        return a.product_name.localeCompare(b.product_name)
+      })
   }, [data])
 
   const listProducts = useMemo(() => {
@@ -99,7 +118,7 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   const selectedRunnable = useMemo(() => {
     if (!data) return []
     return runnableProducts.filter((p) => selectedRunIds.has(p.product_id))
-  }, [data, runnableProducts, selectedRunIds])
+  }, [data, runnableProducts, selectedRunIds, readyForReviewAfterRunIds])
 
   const batchBusy = batchProgress !== null
 
@@ -165,6 +184,11 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     try {
       await approveNormalization(inputId, productId, authUserEmail)
       onNotice('Normalization approved.')
+      setReadyForReviewAfterRunIds((prev) => {
+        const next = new Set(prev)
+        next.delete(productId)
+        return next
+      })
       await load()
       setSelectedId(null)
       setRejecting(false)
@@ -201,10 +225,16 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
           : outcome.message ?? 'Agent 2 finished with issues.',
       )
       await load()
-      setSelectedId(productId)
-      setListFilter('review')
+      if (outcome.ok) {
+        setReadyForReviewAfterRunIds((prev) => new Set(prev).add(productId))
+        setListFilter('review')
+        setSelectedId(productId)
+      } else {
+        setListFilter('run')
+      }
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Agent 2 run failed')
+      setListFilter('run')
     } finally {
       setBusyId(null)
     }
@@ -221,6 +251,14 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   function selectAllRunnable() {
     setSelectedRunIds(new Set(runnableProducts.map((p) => p.product_id)))
+  }
+
+  function selectValidationBatch() {
+    const ids = AGENT2_VALIDATION_RERUN_PRODUCT_IDS.filter((id) =>
+      runnableProducts.some((p) => p.product_id === id),
+    )
+    setSelectedRunIds(new Set(ids))
+    if (listFilter !== 'run') switchListFilter('run')
   }
 
   function clearRunSelection() {
@@ -262,10 +300,19 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
         `Batch complete: ${succeeded} submitted for review, ${failed} failed or skipped.`,
       )
       setSelectedRunIds(new Set())
-      setListFilter('review')
       await load()
-      const firstOk = results.find((r) => r.ok)
-      if (firstOk) setSelectedId(firstOk.productId)
+      const okIds = results.filter((r) => r.ok).map((r) => r.productId)
+      if (okIds.length > 0) {
+        setReadyForReviewAfterRunIds((prev) => {
+          const next = new Set(prev)
+          for (const id of okIds) next.add(id)
+          return next
+        })
+        setListFilter('review')
+        setSelectedId(okIds[0])
+      } else {
+        setListFilter('run')
+      }
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Batch run failed')
     } finally {
@@ -418,8 +465,10 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    Evidence must be approved first. Select products, then run in sequence (~1–2
-                    min each). Rejected normalizations can be re-run from here.
+                    Evidence must be approved first. Lodge / Branch Basics / HexClad awaiting review
+                    with old output stay on <strong>Run</strong> until you re-run; after success they
+                    move to <strong>Awaiting review</strong> only. Use{' '}
+                    <strong>Select validation (3)</strong>.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -429,6 +478,14 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
                       Select all
+                    </button>
+                    <button
+                      type="button"
+                      disabled={batchBusy}
+                      onClick={selectValidationBatch}
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                    >
+                      Select validation (3)
                     </button>
                     <button
                       type="button"
@@ -469,7 +526,7 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                 listProducts.map((p) => {
                   const isSelected = p.product_id === selectedId
                   const scoringInput = scoringInputByProductId.get(p.product_id)
-                  const runnable = canRunAgent2(p.agent_status)
+                  const runnable = showOnAgent2RunTab(p, readyForReviewAfterRunIds)
                   const checked = selectedRunIds.has(p.product_id)
                   return (
                     <li key={p.product_id}>
@@ -510,6 +567,10 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                               <span className="text-[10px] font-semibold text-violet-700">
                                 Ready to review
                               </span>
+                            ) : isAgent2ValidationRerunProduct(p.product_id) && runnable ? (
+                              <span className="text-[10px] font-semibold text-emerald-800">
+                                Session 2 validation · ready to run
+                              </span>
                             ) : runnable ? (
                               <span className="text-[10px] font-semibold text-emerald-800">
                                 Ready to run
@@ -546,7 +607,7 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
           {listFilter === 'run' ? (
             <Agent2RunTabPanel
               selectedProduct={
-                selectedProduct && canRunAgent2(selectedProduct.agent_status)
+                selectedProduct && showOnAgent2RunTab(selectedProduct, readyForReviewAfterRunIds)
                   ? selectedProduct
                   : null
               }
@@ -586,6 +647,15 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   selectedItem.product.product_id,
                 )
               }
+              onRerun={
+                canRerunAgent2FromReviewCard(
+                  selectedItem.product.agent_status,
+                  selectedItem.product.product_id,
+                  readyForReviewAfterRunIds,
+                )
+                  ? () => handleRunAgent2(selectedItem.product.product_id)
+                  : undefined
+              }
             />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -611,7 +681,7 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                         ? 'Submitted normalization could not be loaded. Refresh the page.'
                         : 'No submitted normalization packet for this product yet.'}
               </p>
-              {canRunAgent2(selectedProduct.agent_status) ? (
+              {showOnAgent2RunTab(selectedProduct, readyForReviewAfterRunIds) ? (
                 <button
                   type="button"
                   disabled={busyId === selectedProduct.product_id}
@@ -627,12 +697,25 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       </div>
 
       <p className="text-xs text-slate-500">
-        Use <strong>Run Agent 2</strong> to batch-run products with approved evidence. Review under{' '}
-        <strong>Awaiting review</strong>. Tier-change holds appear under <strong>Testing queue</strong>{' '}
-        (not approved for Agent 3 until resolved).
+        Re-run validation products from <strong>Run Agent 2</strong> (not Awaiting review) until a
+        successful run moves them to <strong>Awaiting review</strong>. Tier-change holds are under{' '}
+        <strong>Testing queue</strong>.
       </p>
     </div>
   )
+}
+
+function whyFieldsFromScoringInput(row: ScoringInputRow): WhyThisScoreFields | null {
+  const primary = row.primary_material_options ?? []
+  if (!Array.isArray(primary) || primary.length === 0) return null
+  return {
+    primary_material_options: primary,
+    secondary_materials_options: row.secondary_materials_options ?? ['None'],
+    coatings_finishes_options: row.coatings_finishes_options ?? ['None'],
+    use_conditions_options: row.use_conditions_options ?? ['None'],
+    disclosure_quality_options: row.disclosure_quality_options ?? ['None'],
+    certifications_options: row.certifications_options ?? ['Third-party verification absent'],
+  }
 }
 
 function TestingQueueDetailPanel({
@@ -725,6 +808,10 @@ function TestingQueueDetailPanel({
                 <p className="mt-2 text-sm text-slate-700">{inputs.layer_4b.badge_justification}</p>
               ) : null}
             </Section>
+          ) : null}
+
+          {scoringInput && whyFieldsFromScoringInput(scoringInput) ? (
+            <WhyThisScore fields={whyFieldsFromScoringInput(scoringInput)!} className="border-0 p-0 shadow-none" />
           ) : null}
 
           {inputs?.layer_4a ? <Layer4aSection layer4a={inputs.layer_4a} /> : null}
@@ -840,6 +927,7 @@ function NormalizationReviewCard({
   onRejectOpen,
   onRejectCancel,
   onRejectConfirm,
+  onRerun,
 }: {
   product: ProductPipelineRow
   scoringInput: ScoringInputRow
@@ -851,6 +939,7 @@ function NormalizationReviewCard({
   onRejectOpen: () => void
   onRejectCancel: () => void
   onRejectConfirm: () => void
+  onRerun?: () => void
 }) {
   const inputs = scoringInput.inputs
 
@@ -913,6 +1002,12 @@ function NormalizationReviewCard({
           {inputs.layer_4b.badge_justification ? (
             <p className="mt-2 text-sm text-slate-700">{inputs.layer_4b.badge_justification}</p>
           ) : null}
+        </Section>
+      ) : null}
+
+      {whyFieldsFromScoringInput(scoringInput) ? (
+        <Section title="Why this score (structured)">
+          <WhyThisScore fields={whyFieldsFromScoringInput(scoringInput)!} className="mt-2 border-0 p-0 shadow-none" />
         </Section>
       ) : null}
 
@@ -979,6 +1074,16 @@ function NormalizationReviewCard({
         >
           {showRejectNotes ? 'Add notes above…' : 'Reject'}
         </button>
+        {onRerun ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onRerun}
+            className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-60"
+          >
+            Re-run Agent 2
+          </button>
+        ) : null}
       </footer>
     </article>
   )

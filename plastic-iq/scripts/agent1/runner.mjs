@@ -1,3 +1,4 @@
+import { bridgeLegacyFacts, bridgeCertificationsVerified } from './bridge-legacy.mjs'
 import { ALGORITHM_VERSION } from './types.mjs'
 import {
   createServiceClient,
@@ -8,8 +9,9 @@ import {
   updateAgentStatus,
 } from './supabase.mjs'
 import { researchProduct } from './research.mjs'
-import { evaluateMinimumThreshold } from './threshold.mjs'
-import { enforceCertificationVerification } from './certification-verify.mjs'
+import { partitionCertificationsAndSafetyClaims } from './certification-classify.mjs'
+import { enforceStructuredCertificationVerification } from './certification-verify-structured.mjs'
+import { evaluateStructuredThreshold } from './threshold-structured.mjs'
 
 export async function runAgent1({ productId, productName, dryRun = false }) {
   const supabase = createServiceClient()
@@ -31,11 +33,29 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   try {
     console.log('Steps 2–4: researching product (web search + extraction)…')
     const rawPacket = await researchProduct(product)
-    const verified = enforceCertificationVerification(rawPacket)
+    const structured =
+      rawPacket.structured_evidence ?? rawPacket.agent_metadata?.structured_evidence
+    const partition = partitionCertificationsAndSafetyClaims(structured, rawPacket.sources)
+    if (partition.routed_marketing.length) {
+      console.log(
+        `  Routed ${partition.routed_marketing.length} marketing claim(s) from certifications → safety_claims`,
+      )
+    }
+    const verified = await enforceStructuredCertificationVerification({
+      structured_evidence: structured,
+      sources: rawPacket.sources,
+      agent_metadata: rawPacket.agent_metadata,
+      product,
+    })
+    const facts = bridgeLegacyFacts(verified.structured_evidence, verified.sources)
     packet = {
       sources: verified.sources,
-      facts: verified.facts,
-      agent_metadata: verified.agent_metadata,
+      facts,
+      agent_metadata: {
+        ...verified.agent_metadata,
+        structured_evidence: verified.structured_evidence,
+        certifications_verified: bridgeCertificationsVerified(verified.structured_evidence),
+      },
     }
     if (verified.removed_count > 0) {
       console.log(
@@ -51,7 +71,10 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   }
 
   if (dryRun) {
-    const threshold = evaluateMinimumThreshold(packet.sources, packet.facts)
+    const threshold = evaluateStructuredThreshold(
+      packet.agent_metadata.structured_evidence,
+      packet.sources,
+    )
     packet.agent_metadata.minimum_threshold = threshold
     return {
       ok: threshold.met,
@@ -63,7 +86,10 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
     }
   }
 
-  const threshold = evaluateMinimumThreshold(packet.sources, packet.facts)
+  const threshold = evaluateStructuredThreshold(
+    packet.agent_metadata.structured_evidence,
+    packet.sources,
+  )
   packet.agent_metadata.minimum_threshold = threshold
 
   console.log('Step 5: minimum threshold', threshold.met ? 'PASSED' : 'FAILED')

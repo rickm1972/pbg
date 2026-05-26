@@ -144,11 +144,87 @@ function agent2Secret(): string {
   return import.meta.env.VITE_ADMIN_PASSWORD ?? ''
 }
 
-export function canRunAgent2(status: string): boolean {
+/** Lodge, Branch Basics, HexClad — Session 2 structured Why This Score validation. */
+export const AGENT2_VALIDATION_RERUN_PRODUCT_IDS: readonly string[] = [
+  '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8', // Lodge cast iron skillet
+  'a0c72167-f0f6-491e-90f7-bbb622fa5123', // Branch Basics concentrate
+  'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5', // HexClad frying pan
+] as const
+
+export function isAgent2ValidationRerunProduct(productId: string): boolean {
+  return (AGENT2_VALIDATION_RERUN_PRODUCT_IDS as readonly string[]).includes(productId)
+}
+
+export function isAgent2OnAwaitingReviewTab(status: string): boolean {
+  return status === 'normalization_awaiting_review'
+}
+
+/**
+ * Validation trio with old normalization awaiting review — Run tab only until a successful
+ * re-run moves them to Awaiting review (dashboard tracks via pendingReviewOverride Set).
+ */
+export function isAgent2ValidationAwaitingRerunOnRunTab(
+  status: string,
+  productId: string,
+): boolean {
+  return (
+    isAgent2OnAwaitingReviewTab(status) && isAgent2ValidationRerunProduct(productId)
+  )
+}
+
+/** Run tab — pipeline states that allow a new normalization run (not awaiting review). */
+export function canRunAgent2(status: string, _productId?: string): boolean {
+  if (isAgent2OnAwaitingReviewTab(status)) return false
   return (
     status === 'evidence_approved' ||
     status === 'normalization_rejected' ||
-    status === 'normalization_in_progress'
+    status === 'normalization_in_progress' ||
+    status === 'normalization_approved' ||
+    status === 'scoring_review_pending' ||
+    status === 'scoring_approved'
+  )
+}
+
+/** Show on Run tab (includes validation awaiting review until post-run override). */
+export function showOnAgent2RunTab(
+  product: { agent_status: string; product_id: string },
+  readyForReviewAfterRunIds: ReadonlySet<string>,
+): boolean {
+  if (canRunAgent2(product.agent_status, product.product_id)) return true
+  if (
+    isAgent2ValidationAwaitingRerunOnRunTab(product.agent_status, product.product_id) &&
+    !readyForReviewAfterRunIds.has(product.product_id)
+  ) {
+    return true
+  }
+  return false
+}
+
+/** Show on Awaiting review tab (excludes validation still queued for Run-tab re-run). */
+export function showOnAgent2ReviewTab(
+  product: { agent_status: string; product_id: string },
+  readyForReviewAfterRunIds: ReadonlySet<string>,
+): boolean {
+  if (!isAgent2OnAwaitingReviewTab(product.agent_status)) return false
+  if (
+    isAgent2ValidationAwaitingRerunOnRunTab(product.agent_status, product.product_id) &&
+    !readyForReviewAfterRunIds.has(product.product_id)
+  ) {
+    return false
+  }
+  return true
+}
+
+/** Re-run from review card after a successful run placed the product on Awaiting review. */
+export function canRerunAgent2FromReviewCard(
+  status: string,
+  productId: string,
+  readyForReviewAfterRunIds: ReadonlySet<string>,
+): boolean {
+  return (
+    isAgent2OnAwaitingReviewTab(status) &&
+    isAgent2ValidationRerunProduct(productId) &&
+    readyForReviewAfterRunIds.has(productId)
   )
 }
 

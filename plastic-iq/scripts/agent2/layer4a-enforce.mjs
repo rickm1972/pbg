@@ -128,14 +128,61 @@ export function enforceLayer4aNegatives(inputs) {
   }, 0)
   const negativeSum = enforcedNegatives.reduce((sum, adj) => sum + adj.value, 0)
 
+  const unknownCoatingCap = shouldApplyUnknownCoatingCap(enforcedNegatives)
+
   inputs.layer_4a = {
     ...layer4a,
     negative_adjustments: enforcedNegatives,
     net_adjustment: Math.max(-5, Math.min(5, positiveSum + negativeSum)),
-    unknown_coating_cap_applies: shouldApplyUnknownCoatingCap(enforcedNegatives),
+    unknown_coating_cap_applies: unknownCoatingCap,
   }
 
   return { inputs, layer_4a_verified }
+}
+
+const MARKETING_LANGUAGE_NEGATIVE = {
+  reason: 'Marketing language only, no verifiable claims',
+  value: -2,
+}
+
+/**
+ * When unknown food-contact coating cap applies, PFAS-free / non-toxic marketing on
+ * undisclosed chemistry is not independently verifiable — require marketing -2.
+ */
+export function enforceMarketingLanguageForUnknownCoating(inputs) {
+  if (!inputs.layer_4a?.unknown_coating_cap_applies) {
+    return { inputs, added: false }
+  }
+
+  const layer4a = inputs.layer_4a ?? {}
+  const negatives = [...(layer4a.negative_adjustments ?? [])]
+  const hasMarketing = negatives.some((adj) =>
+    /marketing language only,\s*no verifiable/i.test(adjustmentReason(adj)),
+  )
+
+  if (hasMarketing) {
+    return { inputs, added: false }
+  }
+
+  negatives.push({
+    reason: MARKETING_LANGUAGE_NEGATIVE.reason,
+    value: MARKETING_LANGUAGE_NEGATIVE.value,
+  })
+
+  const positiveSum = (layer4a.positive_adjustments ?? []).reduce((sum, adj) => {
+    const v = adjustmentValue(adj)
+    return sum + (Number.isFinite(v) ? v : 0)
+  }, 0)
+  const negativeSum = negatives.reduce((sum, adj) => sum + adjustmentValue(adj), 0)
+
+  inputs.layer_4a = {
+    ...layer4a,
+    negative_adjustments: negatives,
+    net_adjustment: Math.max(-5, Math.min(5, positiveSum + negativeSum)),
+    unknown_coating_cap_applies: true,
+  }
+
+  return { inputs, added: true }
 }
 
 /**
@@ -145,8 +192,18 @@ export function enforceLayer4a(inputs) {
   enforceLayer4aPositive(inputs)
   const { inputs: withNegatives, layer_4a_verified: negativeVerified } =
     enforceLayer4aNegatives(inputs)
+  const { inputs: withMarketing, added: marketingAdded } =
+    enforceMarketingLanguageForUnknownCoating(withNegatives)
+  if (marketingAdded) {
+    withMarketing.normalization_notes = [
+      withMarketing.normalization_notes,
+      'Server added Marketing language only Layer 4A (-2) — PFAS-free/non-toxic claims on unknown proprietary food-contact coating are not independently verifiable.',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  }
 
-  const positiveVerified = (withNegatives.layer_4a_positive_reasoning ?? []).map((row) => {
+  const positiveVerified = (withMarketing.layer_4a_positive_reasoning ?? []).map((row) => {
     const lookup = lookupLayer4aPositive(row.exact_list_match ?? '')
     return {
       adjustment: row.certification_found ?? row.certification ?? '(none)',
@@ -158,8 +215,19 @@ export function enforceLayer4a(inputs) {
     }
   })
 
-  withNegatives.layer_4a_verified = [...positiveVerified, ...negativeVerified]
-  return withNegatives
+  const verified = [...positiveVerified, ...negativeVerified]
+  if (marketingAdded) {
+    verified.push({
+      adjustment: MARKETING_LANGUAGE_NEGATIVE.reason,
+      matched: true,
+      canonical_label: MARKETING_LANGUAGE_NEGATIVE.reason,
+      value: MARKETING_LANGUAGE_NEGATIVE.value,
+      action_taken:
+        'added — manufacturer safety claims on unknown proprietary food-contact coating are not independently verifiable (server-enforced V2.3.4)',
+    })
+  }
+  withMarketing.layer_4a_verified = verified
+  return withMarketing
 }
 
 export { formatLayer4aPositiveReasoning, lookupLayer4aPositive }

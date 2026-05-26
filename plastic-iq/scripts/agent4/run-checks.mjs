@@ -29,7 +29,7 @@ export function runAllQaChecks(ctx) {
     peerScores,
   })
   const evidence_gaps = runEvidenceGaps(inputs, evidence)
-  const explanation_accuracy = runExplanationAccuracy(score, inputs)
+  const explanation_accuracy = runExplanationAccuracy(score, inputs, scoringInput)
 
   const checks = {
     certification_audit,

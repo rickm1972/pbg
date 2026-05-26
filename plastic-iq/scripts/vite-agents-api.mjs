@@ -70,14 +70,26 @@ export function agentsApiPlugin() {
           return
         }
 
-        if (req.method !== 'POST' || !pathname.endsWith('/run')) {
-          sendJson(res, 404, { error: 'Not found' })
+        const provided = req.headers['x-agent-secret']
+        const needsSecret =
+          pathname === '/api/agent1/dashboard' ||
+          (req.method === 'POST' && pathname.endsWith('/run'))
+        if (needsSecret) {
+          if (!secret || provided !== secret) {
+            sendJson(res, 401, { error: 'Unauthorized' })
+            return
+          }
+        }
+
+        if (req.method === 'GET' && pathname === '/api/agent1/dashboard') {
+          const { fetchAgent1DashboardData } = await import('./agent1/dashboard-fetch.mjs')
+          const dashboard = await fetchAgent1DashboardData()
+          sendJson(res, 200, dashboard)
           return
         }
 
-        const provided = req.headers['x-agent-secret']
-        if (!secret || provided !== secret) {
-          sendJson(res, 401, { error: 'Unauthorized' })
+        if (req.method !== 'POST' || !pathname.endsWith('/run')) {
+          sendJson(res, 404, { error: 'Not found' })
           return
         }
 
@@ -178,7 +190,15 @@ export function agentsApiPlugin() {
 
           sendJson(res, 404, { error: 'Not found' })
         } catch (err) {
-          sendJson(res, 500, { error: err.message })
+          let message = err instanceof Error ? err.message : String(err)
+          if (Array.isArray(err?.issues)) {
+            message = err.issues
+              .slice(0, 5)
+              .map((i) => `${i.path?.join('.') ?? '?'}: ${i.message}`)
+              .join('; ')
+          }
+          console.error(`[agents-api] ${pathname}:`, message)
+          sendJson(res, 500, { ok: false, error: message })
         }
       })
     },

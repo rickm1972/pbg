@@ -97,93 +97,10 @@ Brand: ${product.brand ?? 'unknown'}
 Return a concise excerpt from that retailer page only.`
 }
 
-/** Stage 2 — Claude synthesizes evidence from Perplexity Search snippets (no web search tool). */
-export const SYNTHESIS_SYSTEM_PROMPT = `You are Agent 1 (Product Evidence Agent) for PlasticBegone Algorithm ${ALGORITHM_VERSION}.
-Your ONLY job is to produce a structured evidence packet from pre-retrieved web search snippets.
-You do NOT browse the web, score, normalize, or recommend purchases.
+/** @deprecated Use prompt-structured.mjs STRUCTURED_SYNTHESIS_SYSTEM_PROMPT */
+export const SYNTHESIS_SYSTEM_PROMPT = `DEPRECATED — Agent 1 v2 uses structured schema synthesis (prompt-structured.mjs).`
 
-Rules:
-- Use ONLY the Amazon Anthropic web_search excerpt, Perplexity search snippets, and product fields in the user message. Do not invent URLs or facts.
-- Amazon is the primary retailer: when amazon_anthropic_web_search.ok is true, you MUST include the catalog Amazon URL in sources[] as the first source with source_type "amazon". Use excerpts from amazon_anthropic_web_search.excerpt for retailer-confirmed facts.
-- If Amazon retrieval failed, note it in warnings and information_gaps but still complete other sources from Perplexity.
-- Prefer official manufacturer pages when snippets support them.
-- Extract facts with exact supporting excerpts (quotes/snippets from the provided results).
-- page_excerpt: ONLY on sources where a certification or third-party program is mentioned (MADE SAFE, NSF, Leaping Bunny, etc.). Include verbatim cert wording in that page_excerpt (max 400 chars). All other sources: omit page_excerpt entirely (do not include the field).
-- CONFIDENCE (use the highest label the source supports — never default down):
-  · Fact supported by official manufacturer / spec_sheet / SDS / ingredient_page source → "manufacturer confirmed" or "fully disclosed by manufacturer" when materials or ingredients are completely specified on that page (not inferred).
-  · Fact supported only by Amazon/retailer → "retailer confirmed".
-  · Never label a fact "retailer confirmed" if source_index points to a manufacturer-tier source.
-- Assign confidence from ONLY this list: ${CONFIDENCE_LABELS.join('; ')}.
-- Record gaps explicitly as facts with fact_type "gap" or fact_key describing the unknown.
-- Output ONLY valid JSON matching the schema below — no markdown outside the JSON object.
-- JSON must be strictly valid: escape every double quote inside string values as \\"; no trailing commas; no unescaped newlines inside strings (use spaces).
-- Keep each fact excerpt under 200 characters. Minimize total JSON size.
-- Include up to ${MAX_SOURCES} distinct sources in sources[] (Amazon URL from amazon_anthropic_web_search and/or Perplexity snippets).
-
-Required fact coverage (use these fact_key values where applicable):
-- primary_material
-- primary_contact_surface
-- secondary_components (lids, gaskets, seals, straws, handles, coatings, etc.)
-- finishing_treatments
-- certifications_found
-- marketing_claims_found
-- ingredient_list (formulation products; empty string if N/A)
-- care_and_use_instructions
-- product_use_case (required for scoring threshold)
-- information_gaps (list anything not found)
-
-source_type examples: manufacturer, retailer, amazon, target, walmart, other_retailer, spec_sheet, sds, ingredient_page, faq, certification, smartlabel, search_result, other.
-
-JSON schema:
-{
-  "sources": [{ "source_type": string, "url": string, "title": string, "fetched_at": ISO-8601 string, "page_excerpt": string (optional — only when certifications appear on that page) }],
-  "facts": [{
-    "fact_type": string,
-    "fact_key": string,
-    "fact_value": string | number | boolean | null,
-    "confidence": one of allowed confidence labels,
-    "source_index": number | null,
-    "excerpt": string
-  }],
-  "agent_metadata": {
-    "warnings": string[]
-  }
-}`
-
-export function buildSynthesisUserPrompt(product, retrieval) {
-  const urls = [
-    ['amazon_url', product.amazon_url || product.affiliate_link],
-    ['other_retailer_url', product.other_retailer_url],
-  ].filter(([, url]) => url)
-
-  const amazon = retrieval.amazon_anthropic_web_search
-  const amazonSection = amazon
-    ? `AMAZON (Anthropic web_search — primary retailer, required source when ok=true):
-${JSON.stringify(amazon, null, 2)}`
-    : 'AMAZON Anthropic web_search: not available.'
-
-  return `Synthesize the evidence packet JSON from the retrieval data below.
-
-Product:
-- product_id: ${product.product_id}
-- product_name: ${product.product_name}
-- brand: ${product.brand ?? 'unknown'}
-- category: ${product.category ?? 'unknown'}
-- subcategory: ${product.subcategory ?? 'unknown'}
-- image_url: ${product.image_url ?? 'none'}
-
-Catalog URLs:
-${urls.map(([k, u]) => `- ${k}: ${u}`).join('\n') || '- none on file'}
-
-${amazonSection}
-
-Perplexity retrieval (${retrieval.search_requests} search requests, retrieved ${retrieval.retrieved_at}):
-${JSON.stringify(retrieval.searches, null, 2)}
-
-Instructions:
-1. If amazon_anthropic_web_search.ok, sources[0] must be source_type "amazon" with the catalog URL and title from that block. Add other URLs from Perplexity (max ${MAX_SOURCES} total).
-2. Extract all required facts with excerpts quoted from snippets.
-3. Include product_use_case (e.g. food contact cookware, food storage).
-4. Set fetched_at on each source to current UTC ISO time.
-5. List gaps and research limitations in agent_metadata.warnings and information_gaps.`
+/** @deprecated */
+export function buildSynthesisUserPrompt() {
+  throw new Error('Legacy synthesis prompt deprecated. Use buildStructuredSynthesisUserPrompt.')
 }

@@ -1,8 +1,3 @@
-import { consumerComponentLabel, consumerPrimaryMaterialLabel } from './explanation-labels.mjs'
-import {
-  buildConcernHighRiskExplanation,
-  isConcernOrHighRiskTier,
-} from './explanation-risk-context.mjs'
 import { deriveTransparencyBadgeAndCI } from './confidence-interval.mjs'
 
 export const ALGORITHM_VERSION = '2.3.4'
@@ -178,130 +173,6 @@ function computeIngredientTransparencyScore(inputs) {
   return clamp(roundNearest(raw), 0, SCORE_MAX)
 }
 
-const EXPLANATION_EXCELLENT_THRESHOLD = 90
-const EXPLANATION_GOOD_THRESHOLD = 75
-
-function componentRiskContribution(c) {
-  return c.final_npr * c.contact_intimacy
-}
-
-function pickHighestRiskComponent(componentResults) {
-  return componentResults.reduce((best, c) => {
-    const contribution = componentRiskContribution(c)
-    if (!best || contribution > best.contribution) {
-      return { ...c, contribution }
-    }
-    return best
-  }, null)
-}
-
-/** Lowest hazard material with highest food-contact weight — not highest NPR. */
-function pickDominantSafeComponent(componentResults) {
-  if (!componentResults.length) return null
-  return componentResults.reduce((best, c) => {
-    if (!best) return c
-    if (c.material_hazard < best.material_hazard) return c
-    if (c.material_hazard > best.material_hazard) return best
-    if (c.contact_intimacy > best.contact_intimacy) return c
-    if (c.contact_intimacy < best.contact_intimacy) return best
-    return c.final_npr < best.final_npr ? c : best
-  }, null)
-}
-
-function capitalizeSentence(text) {
-  if (!text?.trim()) return text
-  return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
-/** Plain-language note about the part that most affects the score (no NPR or algorithm terms). */
-function limitingPartNote(highest) {
-  if (!highest) {
-    return 'Other parts of the product add very little to overall exposure concern.'
-  }
-  const label = consumerComponentLabel(highest)
-  const lowConcern = Number(highest.final_npr) < 0.25
-  const limitedContact = Number(highest.contact_intimacy) < 0.5
-
-  if (lowConcern) {
-    return `${label} adds very little to overall exposure concern for typical use.`
-  }
-  if (limitedContact) {
-    return `${label} is worth noting, but it has limited direct contact with food or drink.`
-  }
-  return `${label} is the main part to be aware of; most food contact still involves safer materials.`
-}
-
-function buildExplanationDraft({
-  pacScore,
-  tier,
-  confidenceInterval,
-  displayedRange,
-  componentResults,
-  inputs,
-  brand,
-}) {
-  const [low, high] = displayedRange
-  const rangeText = low === high ? `${low}` : `${low}–${high}`
-  const showRange = confidenceInterval > 0
-  const brandLabel = brand?.trim() || 'This product'
-  const highest = pickHighestRiskComponent(componentResults)
-  const highestLabel = consumerComponentLabel(highest)
-
-  if (pacScore >= EXPLANATION_EXCELLENT_THRESHOLD) {
-    const safeMaterial = consumerPrimaryMaterialLabel(pickDominantSafeComponent(componentResults))
-    const rangeClause = showRange
-      ? `The score could fall anywhere from ${rangeText} until every material detail is confirmed; it likely sits near the top of that range. `
-      : 'All major materials are fully disclosed by the manufacturer. '
-    const labClause = showRange
-      ? `${brandLabel} could narrow the range further with independent lab testing.`
-      : ''
-    return (
-      `This product scores ${pacScore} (${tier}) because its materials are exceptionally safe for food contact — primarily ${safeMaterial}. ` +
-      `${capitalizeSentence(limitingPartNote(highest))} ` +
-      rangeClause +
-      labClause
-    ).trim()
-  }
-
-  if (pacScore >= EXPLANATION_GOOD_THRESHOLD) {
-    const rangeClause = showRange
-      ? `The published score could fall anywhere from ${rangeText} until more material detail is confirmed.`
-      : ''
-    return (
-      `This product scores ${pacScore} (${tier}). ` +
-      `What holds the score back is ${highestLabel} — the part with the most exposure-related concern in normal use. ` +
-      rangeClause
-    ).trim()
-  }
-
-  if (isConcernOrHighRiskTier(tier, pacScore) && inputs) {
-    return buildConcernHighRiskExplanation({
-      pacScore,
-      tier,
-      displayedRange,
-      componentResults,
-      inputs,
-      brand,
-    })
-  }
-
-  const narrowNote = showRange
-    ? confidenceInterval <= 6
-      ? ' More complete material disclosure or independent testing could narrow this range.'
-      : ' Confirming undisclosed materials or third-party verification could narrow this range.'
-    : ''
-
-  const rangeClause = showRange
-    ? `The published score could fall anywhere from ${rangeText} because material disclosure is limited or unverified.${narrowNote}`
-    : `Material disclosure is limited or unverified.${narrowNote}`
-
-  return (
-    `This product scores ${pacScore} (${tier}). ` +
-    `The main concern is ${highestLabel}, which has the most direct food or drink contact among the materials in this product. ` +
-    rangeClause
-  )
-}
-
 /**
  * Core PAC score from normalization inputs; optional per-component hazard overrides for CI bands.
  * @param {object} inputs
@@ -426,16 +297,6 @@ export function scoreNormalization(inputs, options = {}) {
   ]
   const ingredientTransparencyScore = computeIngredientTransparencyScore(inputs)
 
-  const explanationDraft = buildExplanationDraft({
-    pacScore: pacSafetyScore,
-    tier,
-    confidenceInterval,
-    displayedRange,
-    componentResults,
-    inputs,
-    brand: options.brand,
-  })
-
   const calculation = {
     weighted_npr: core.weighted_npr,
     raw_score: core.raw_score,
@@ -464,7 +325,7 @@ export function scoreNormalization(inputs, options = {}) {
     escalator_applied: escalatorsUsed.length ? escalatorsUsed.join(', ') : null,
     layer_4a_net: core.layer_4a_net,
     ingredient_transparency_score: ingredientTransparencyScore,
-    explanation_draft: explanationDraft,
+    explanation_draft: null,
     algorithm_version: ALGORITHM_VERSION,
     layer_4b: layer4bDerived,
     calculation,
@@ -479,28 +340,9 @@ function parseDisplayedConfidenceRange(text) {
   return Number.isFinite(n) ? [n, n] : [0, SCORE_MAX]
 }
 
-/**
- * Rebuild explanation_draft from approved score fields + scoring inputs (no NPR/score recalculation).
- */
-export function regenerateExplanationDraft({
-  inputs,
-  componentResults,
-  pacScore,
-  tier,
-  displayedConfidenceRange,
-  brand,
-}) {
-  const displayedRange = parseDisplayedConfidenceRange(displayedConfidenceRange)
-  const confidenceInterval = num(inputs?.layer_4b?.confidence_interval, 12)
-  return buildExplanationDraft({
-    pacScore,
-    tier,
-    confidenceInterval,
-    displayedRange,
-    componentResults: componentResults ?? [],
-    inputs,
-    brand,
-  })
+/** @deprecated Why This Score is structured data on scoring_inputs (Agent 2). */
+export function regenerateExplanationDraft() {
+  return null
 }
 
 export function formatCalculationTrace(result) {

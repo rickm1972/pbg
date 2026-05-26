@@ -6,11 +6,14 @@ import {
   EvidencePacketSchema,
 } from './types.mjs'
 import {
-  SYSTEM_PROMPT,
-  SYNTHESIS_SYSTEM_PROMPT,
-  buildSynthesisUserPrompt,
-  buildUserPrompt,
-} from './prompt.mjs'
+  STRUCTURED_SYNTHESIS_SYSTEM_PROMPT,
+  buildStructuredSynthesisUserPrompt,
+} from './prompt-structured.mjs'
+import { SYSTEM_PROMPT, buildUserPrompt } from './prompt.mjs'
+import { AGENT_VERSION as SCHEMA_AGENT_VERSION } from './schema.mjs'
+import { normalizeStructuredPacket } from './structured-normalize.mjs'
+import { bridgeLegacyFacts, bridgeCertificationsVerified } from './bridge-legacy.mjs'
+import { StructuredPacketSchema } from './schema.mjs'
 import {
   beginAnthropicApiCallLog,
   estimateAnthropicCostUsd,
@@ -187,6 +190,54 @@ function buildEvidencePacketFromRawText(rawText, { model, provider, apiUsage }) 
   return packet
 }
 
+/** Structured schema v1 packet for runner + threshold (replaces legacy-only builder). */
+function buildStructuredEvidencePacketFromRawText(
+  rawText,
+  { model, provider, apiUsage },
+  product,
+) {
+  const parsed = extractJsonObject(rawText)
+  const runTimestamp = new Date().toISOString()
+
+  const normalized = normalizeStructuredPacket(parsed, product)
+  const structured = normalized.structured_evidence
+
+  let sources = (normalized.sources ?? []).map((source) => ({ ...source }))
+  let facts = bridgeLegacyFacts(structured, sources)
+
+  const { facts: upgradedFacts, upgrades } = applyConfidenceUpgrades(sources, facts)
+  facts = upgradedFacts
+  sources = applySourceExcerptPolicy(sources, facts)
+  facts = applyFactExcerptCaps(facts)
+
+  const warnings = [...(normalized.agent_metadata?.warnings ?? [])]
+  if (upgrades.length) {
+    warnings.push(
+      `Server upgraded ${upgrades.length} fact confidence label(s) to match manufacturer-tier sources`,
+    )
+  }
+
+  const agent_metadata = {
+    model,
+    agent_version: AGENT_VERSION,
+    run_timestamp: runTimestamp,
+    provider,
+    warnings,
+    confidence_upgrades: upgrades,
+    api_usage: apiUsage,
+    structured_evidence: structured,
+  }
+
+  AgentMetadataSchema.parse(agent_metadata)
+
+  return {
+    sources,
+    facts,
+    structured_evidence: structured,
+    agent_metadata,
+  }
+}
+
 async function synthesizeWithClaude(product, retrieval, env, options = {}) {
   const apiKey = env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
@@ -201,7 +252,7 @@ async function synthesizeWithClaude(product, retrieval, env, options = {}) {
 
   console.log('\n[agent1] Stage 2: Claude synthesis (no web search tool)…')
 
-  let userContent = buildSynthesisUserPrompt(product, retrieval)
+  let userContent = buildStructuredSynthesisUserPrompt(product, retrieval)
   if (options.repairNote) {
     userContent += `\n\nREPAIR (previous response was invalid):\n${options.repairNote}`
   }
@@ -212,7 +263,7 @@ async function synthesizeWithClaude(product, retrieval, env, options = {}) {
     system: [
       {
         type: 'text',
-        text: SYNTHESIS_SYSTEM_PROMPT,
+        text: STRUCTURED_SYNTHESIS_SYSTEM_PROMPT,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -289,15 +340,23 @@ async function researchWithPerplexitySearchAndClaude(product, env) {
         amazonAnthropic,
         mergedSynth,
       )
-      buildEvidencePacketFromRawText(synth.rawText, {
-        model: synth.model,
-        provider: 'perplexity_search',
-        apiUsage: apiUsageDraft,
-      })
+      buildStructuredEvidencePacketFromRawText(
+        synth.rawText,
+        {
+          model: synth.model,
+          provider: 'perplexity_search',
+          apiUsage: apiUsageDraft,
+        },
+        product,
+      )
       break
     } catch (err) {
       lastErr = err
-      const retryable = isJsonParseError(err) || String(err?.name) === 'ZodError'
+      const retryable =
+        isJsonParseError(err) ||
+        String(err?.name) === 'ZodError' ||
+        (Array.isArray(err?.issues) && err.issues.length > 0) ||
+        /is not a function/.test(String(err?.message ?? ''))
       if (!retryable || attempt >= MAX_SYNTHESIS_JSON_ATTEMPTS - 1) {
         throw err
       }
@@ -452,9 +511,13 @@ export async function researchProduct(product) {
     claude_estimated_cost_usd: 0,
   }
 
-  return buildEvidencePacketFromRawText(result.rawText, {
-    model: result.model,
-    provider: result.provider,
-    apiUsage,
-  })
+  return buildStructuredEvidencePacketFromRawText(
+    result.rawText,
+    {
+      model: result.model,
+      provider: result.provider,
+      apiUsage,
+    },
+    product,
+  )
 }

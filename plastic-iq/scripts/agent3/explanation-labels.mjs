@@ -3,6 +3,18 @@
  * Never emit raw component_name strings in product explanations.
  */
 
+export function isRinseOffFormulationProduct(inputs) {
+  if (!inputs?.is_formulation_product) return false
+  const cat = String(inputs.product_category_default ?? '').toLowerCase()
+  if (/rinse|dish|laundry|cleaner|soap|detergent/.test(cat)) return true
+  return (inputs.components ?? []).some((c) => {
+    const text = `${c.component_name ?? ''} ${c.material ?? ''}`.toLowerCase()
+    return /pathway\s*2|dish soap|dishwashing|laundry|rinse.off|multi.purpose concentrate|cleaning formulation/.test(
+      text,
+    )
+  })
+}
+
 function componentText(component) {
   const name = (component?.component_name ?? '').trim()
   const material = (component?.material ?? '').trim()
@@ -121,7 +133,14 @@ function inferRole(text) {
     return { kind: 'cap', material: detectMaterialFamilies(text)[0] ?? null }
   }
 
-  if (/handle/i.test(text)) {
+  if (/bristle|brush head|brush bristle|basting brush/i.test(text)) {
+    return { kind: 'bristles', material: /nylon|silicone|natural fiber/i.test(text) ? null : null }
+  }
+
+  if (/handle|grip/i.test(text)) {
+    if (/\btpr\b|thermoplastic rubber|soft.grip|comfort grip/i.test(text)) {
+      return { kind: 'handle', material: 'soft-grip' }
+    }
     if (/silicone/.test(text)) return { kind: 'handle', material: 'silicone-coated' }
     if (/cast iron/.test(text)) return { kind: 'handle', material: 'cast iron' }
     if (/stainless/.test(text)) return { kind: 'handle', material: 'stainless steel' }
@@ -150,7 +169,13 @@ function inferRole(text) {
     return { kind: 'exterior_finish', material: null }
   }
 
-  if (/packaging|refill pouch|pouch/i.test(text)) return { kind: 'packaging', material: null }
+  if (
+    /packaging|refill pouch|pouch|refill bottle|bottle \(container\)|plastic container.*resin/i.test(
+      text,
+    )
+  ) {
+    return { kind: 'packaging', material: /plastic|hdpe|pp|pet/.test(text) ? 'plastic' : null }
+  }
 
   if (/carry loop|storage stand|utensil holder|thermo.spot/i.test(text)) {
     return { kind: 'minor_part', material: null }
@@ -185,7 +210,10 @@ function phraseForRole(role) {
       return m ? `the ${m} lid` : 'the lid'
     case 'seal':
       return m ? `the ${m} seal` : 'the seal around the lid'
+    case 'bristles':
+      return 'the basting brush bristle material'
     case 'handle':
+      if (m === 'soft-grip') return 'the soft grip handle'
       return m ? `the ${m} handle` : 'the handle'
     case 'pan_body':
       return m ? `the ${m} pan body` : 'the pan body'
@@ -200,11 +228,11 @@ function phraseForRole(role) {
     case 'exterior_finish':
       return 'the exterior finish'
     case 'packaging':
-      return 'the packaging'
+      return m === 'plastic' ? 'the refill bottle (packaging only)' : 'the packaging'
     case 'minor_part':
       return 'a minor structural part'
     default:
-      return m ? `the ${m} contact surface` : 'a food-contact part'
+      return m ? `the ${m} contact surface` : 'a contact surface'
   }
 }
 
@@ -212,8 +240,15 @@ function phraseForRole(role) {
  * Consumer phrase for a scored component (e.g. "the cast iron cooking surface").
  * @param {object|null} component — scored component result with component_name, material
  */
-export function consumerComponentLabel(component) {
-  if (!component) return 'the main food-contact part'
+export function consumerComponentLabel(component, inputs = null, pathway = null) {
+  if (!component) {
+    if (pathway === 'rinse_off' || pathway === 'RINSE_OFF' || isRinseOffFormulationProduct(inputs)) {
+      return 'the main product-contact part'
+    }
+    if (pathway === 'oral_direct' || pathway === 'ORAL_DIRECT') return 'the main drinking-contact part'
+    if (pathway === 'hand_only') return 'the main hand-contact part'
+    return 'the main contact part in normal use'
+  }
   const text = componentText(component)
   const role = inferRole(text)
   if (!role.material) {
@@ -231,10 +266,17 @@ export function consumerComponentLabel(component) {
  * Short material phrase for "primarily …" in excellent-tier explanations.
  * @param {object|null} component
  */
-export function consumerPrimaryMaterialLabel(component) {
+export function consumerPrimaryMaterialLabel(component, inputs = null, _pathway = null) {
   if (!component) return 'safe, well-understood materials'
   const text = componentText(component)
   const families = detectMaterialFamilies(text)
+
+  if (isRinseOffFormulationProduct(inputs) || families.includes('soap')) {
+    if (/plant|mineral|decyl glucoside|coco-glucoside|surfactant|aqueous/i.test(text)) {
+      return 'a plant- and mineral-based dish soap concentrate with fully disclosed ingredients'
+    }
+    return 'a plant-based cleaning concentrate with fully disclosed ingredients'
+  }
 
   if (families.includes('cast iron')) return 'cast iron'
   if (families.includes('glass')) return 'glass'

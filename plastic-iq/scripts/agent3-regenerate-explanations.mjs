@@ -6,6 +6,7 @@
  *   node scripts/agent3-regenerate-explanations.mjs
  */
 import { regenerateExplanationDraft } from './agent3/algorithm.mjs'
+import { fetchApprovedEvidence } from './agent2/supabase.mjs'
 import { createServiceClient } from './agent1/supabase.mjs'
 
 async function main() {
@@ -82,6 +83,12 @@ async function main() {
     }
 
     const componentResults = score.component_nprs?.components ?? []
+    let evidence = null
+    try {
+      evidence = await fetchApprovedEvidence(supabase, score.product_id)
+    } catch {
+      /* pathway falls back to normalization use-case fields */
+    }
     const explanationDraft = regenerateExplanationDraft({
       inputs,
       componentResults,
@@ -89,6 +96,8 @@ async function main() {
       tier: score.tier,
       displayedConfidenceRange: score.displayed_confidence_range,
       brand: product.brand,
+      evidence,
+      ingredientTransparencyScore: score.ingredient_transparency_score,
     })
 
     if (explanationDraft === score.explanation_draft) {

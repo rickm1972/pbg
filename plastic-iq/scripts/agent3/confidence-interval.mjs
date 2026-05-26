@@ -37,10 +37,45 @@ function componentBlob(component) {
     .toLowerCase()
 }
 
+function contactIntimacy(component) {
+  return Number(component.contact_intimacy) || 0
+}
+
+/** Inferred confidence on a primary food-/use-contact part (CI ≥ 0.7). */
+export function hasPrimaryInferredComponent(inputs) {
+  return (inputs.components ?? []).some(
+    (c) =>
+      INFERRED_CONFIDENCES.has(normalizeConfidence(c.data_confidence)) &&
+      contactIntimacy(c) >= PRIMARY_CONTACT_CI_THRESHOLD,
+  )
+}
+
 function hasInferredComponent(inputs) {
   return (inputs.components ?? []).some((c) =>
     INFERRED_CONFIDENCES.has(normalizeConfidence(c.data_confidence)),
   )
+}
+
+export function hasPackagingOnlyInference(inputs) {
+  const inferred = (inputs.components ?? []).filter((c) =>
+    INFERRED_CONFIDENCES.has(normalizeConfidence(c.data_confidence)),
+  )
+  return (
+    inferred.length > 0 &&
+    inferred.every((c) => contactIntimacy(c) < PRIMARY_CONTACT_CI_THRESHOLD)
+  )
+}
+
+/** Trust Agent 2 Full Disclosed when primary contact materials are fully disclosed. */
+function shouldHonorAgent2FullDisclosed(inputs) {
+  const agent2Badge = inputs.layer_4b?.transparency_badge
+  if (agent2Badge !== BADGES.FULL_DISCLOSED) return false
+  if (Boolean(inputs.layer_4a?.unknown_coating_cap_applies)) return false
+  if (hasNegativeLayer4a(inputs)) return false
+  if (hasPrimaryInferredComponent(inputs)) return false
+  if (hasWidePrimaryBand(inputs)) return false
+  if (hasPcrUnspecifiedBand(inputs)) return false
+  return true
 }
 
 function hasNegativeLayer4a(inputs) {
@@ -108,6 +143,7 @@ export function getComponentHazardBand(component, inputs) {
   }
 
   if (
+    ci >= PRIMARY_CONTACT_CI_THRESHOLD &&
     /resin type unspecified|resin unspecified|plastic bottle.*not disclosed|highest plausible.*pp5|hdpe.*ldpe.*pp5/i.test(
       text,
     ) &&
@@ -204,11 +240,34 @@ function hasOnlyDocumentationBands(inputs) {
 export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
   const halfWidth = Math.ceil(scoreHalfWidth(inputs, pacScore))
   const opaque = Boolean(inputs.layer_4a?.unknown_coating_cap_applies)
-  const inferred = hasInferredComponent(inputs)
+  const primaryInferred = hasPrimaryInferredComponent(inputs)
+  const packagingOnlyInferred = hasPackagingOnlyInference(inputs)
   const negative = hasNegativeLayer4a(inputs)
   const widePrimary = hasWidePrimaryBand(inputs)
   const pcrUnspecified = hasPcrUnspecifiedBand(inputs)
   const onlyDoc = hasOnlyDocumentationBands(inputs)
+
+  if (shouldHonorAgent2FullDisclosed(inputs)) {
+    return {
+      transparency_badge: BADGES.FULL_DISCLOSED,
+      confidence_interval: 0,
+      displayed_confidence_range: null,
+      score_swing_half_width: halfWidth,
+      badge_justification: buildBadgeJustification({
+        transparency_badge: BADGES.FULL_DISCLOSED,
+        confidence_interval: 0,
+        opaque: false,
+        inferred: false,
+        primaryInferred: false,
+        packagingOnlyInferred,
+        negative: false,
+        widePrimary: false,
+        pcrUnspecified: false,
+        halfWidth,
+        honoredAgent2: true,
+      }),
+    }
+  }
 
   let transparency_badge
   let confidence_interval
@@ -216,15 +275,23 @@ export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
   if (opaque) {
     transparency_badge = BADGES.OPAQUE
     confidence_interval = Math.max(22, halfWidth)
-  } else if (!inferred && !negative) {
-    transparency_badge = BADGES.FULL_DISCLOSED
-    confidence_interval = 0
-  } else if (widePrimary || inferred || pcrUnspecified) {
+  } else if (!primaryInferred && !negative && (packagingOnlyInferred || !hasInferredComponent(inputs))) {
+    if (packagingOnlyInferred && (onlyDoc || halfWidth > 0)) {
+      transparency_badge = BADGES.DOCUMENTATION_INCOMPLETE
+      confidence_interval = Math.max(3, halfWidth > 0 ? Math.min(3, halfWidth) : 3)
+    } else if (!hasInferredComponent(inputs)) {
+      transparency_badge = BADGES.FULL_DISCLOSED
+      confidence_interval = 0
+    } else {
+      transparency_badge = BADGES.FULL_DISCLOSED
+      confidence_interval = 0
+    }
+  } else if (widePrimary || primaryInferred || pcrUnspecified) {
     transparency_badge = BADGES.MATERIAL_UNCERTAIN
     confidence_interval = Math.max(12, halfWidth)
-  } else if (onlyDoc) {
+  } else if (onlyDoc || packagingOnlyInferred) {
     transparency_badge = BADGES.DOCUMENTATION_INCOMPLETE
-    confidence_interval = 3
+    confidence_interval = Math.max(3, halfWidth > 0 ? Math.min(3, halfWidth) : 3)
   } else {
     transparency_badge = BADGES.MATERIAL_UNCERTAIN
     confidence_interval = Math.max(12, halfWidth)
@@ -244,7 +311,9 @@ export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
       transparency_badge,
       confidence_interval,
       opaque,
-      inferred,
+      inferred: hasInferredComponent(inputs),
+      primaryInferred,
+      packagingOnlyInferred,
       negative,
       widePrimary,
       pcrUnspecified,
@@ -255,8 +324,11 @@ export function deriveTransparencyBadgeAndCI(inputs, pacScore) {
 
 function buildBadgeJustification(ctx) {
   const parts = [`Badge: ${ctx.transparency_badge}`, `CI: ±${ctx.confidence_interval}`]
+  if (ctx.honoredAgent2) parts.push('Agent 2 Full Disclosed honored — primary contact fully disclosed')
   if (ctx.opaque) parts.push('unknown food-contact coating cap applies')
-  if (ctx.inferred) parts.push('has inferred/unknown/proprietary component confidences')
+  if (ctx.primaryInferred) parts.push('has inferred/unknown/proprietary primary contact components')
+  else if (ctx.packagingOnlyInferred) parts.push('packaging-only inference (non-primary contact)')
+  else if (ctx.inferred) parts.push('has inferred/unknown/proprietary component confidences')
   if (ctx.negative) parts.push('has negative Layer 4A adjustments')
   if (ctx.widePrimary) parts.push('wide primary food-contact hazard band')
   if (ctx.pcrUnspecified) parts.push('recycled PCR resin unspecified')

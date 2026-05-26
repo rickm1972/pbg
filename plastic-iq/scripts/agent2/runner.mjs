@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectRoot } from '../lib/env.mjs'
-import { ALGORITHM_VERSION, AGENT_VERSION } from './prompt.mjs'
+import { ALGORITHM_VERSION, AGENT_VERSION } from './version.mjs'
 import { normalizeEvidence } from './normalize.mjs'
+import { buildWhyThisScoreOptions } from './why-this-score-map.mjs'
 import {
   createServiceClient,
   fetchProductById,
@@ -81,7 +82,7 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
 
   let inputs
   try {
-    console.log('Step 4: calling Claude for normalization…')
+    console.log('Step 4: deterministic normalization (V3.0, no LLM)…')
     inputs = await normalizeEvidence(product, evidence, {
       rejectionNotes: rejectionNotes ?? undefined,
     })
@@ -95,6 +96,10 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
   }
 
   console.log('Step 5: JSON parsed and validated')
+
+  const whyThisScore = buildWhyThisScoreOptions(evidence, inputs)
+  console.log('Step 5b: Why This Score vocabulary options mapped')
+
   if (inputs.human_review_required) {
     console.log('  human_review_required: true')
     console.log(`  reason: ${inputs.human_review_reason ?? '(none)'}`)
@@ -102,7 +107,7 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
 
   if (dryRun) {
     console.log('Step 6: (dry run) skip database write')
-    return { ok: true, product, evidence, inputs, dryRun: true }
+    return { ok: true, product, evidence, inputs, whyThisScore, dryRun: true }
   }
 
   const row = await insertScoringInputs(supabase, {
@@ -114,6 +119,7 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     review_status: 'submitted',
     human_review_required: Boolean(inputs.human_review_required),
     human_review_reason: inputs.human_review_reason ?? null,
+    ...whyThisScore,
   })
   console.log(`Step 6: saved scoring_inputs (${row.input_id})`)
 
@@ -132,8 +138,15 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     evidence,
     inputs,
     scoringInput: row,
+    whyThisScore,
     outFile,
   }
+}
+
+function previewOptions(options) {
+  const list = Array.isArray(options) ? options : []
+  const text = list.join(', ')
+  return text.length > 72 ? `${text.slice(0, 69)}…` : text || '—'
 }
 
 export function formatNormalizationSummary(result) {
@@ -148,6 +161,10 @@ export function formatNormalizationSummary(result) {
     `Transparency: ${inputs.layer_4b?.transparency_badge} (±${inputs.layer_4b?.confidence_interval})`,
     `Layer 4A net: ${inputs.layer_4a?.net_adjustment ?? 0}`,
     `Human review: ${inputs.human_review_required ? 'YES' : 'no'}`,
+    'Why This Score options:',
+    `  primary: ${previewOptions(result.whyThisScore?.primary_material_options ?? result.scoringInput?.primary_material_options)}`,
+    `  disclosure: ${previewOptions(result.whyThisScore?.disclosure_quality_options ?? result.scoringInput?.disclosure_quality_options)}`,
+    `  certifications: ${previewOptions(result.whyThisScore?.certifications_options ?? result.scoringInput?.certifications_options)}`,
   ]
   if (inputs.human_review_required && inputs.human_review_reason) {
     lines.push(`  Reason: ${inputs.human_review_reason}`)

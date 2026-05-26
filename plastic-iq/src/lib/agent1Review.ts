@@ -19,6 +19,22 @@ export function agent1Secret(): string | undefined {
 }
 
 export async function fetchAgent1Dashboard(): Promise<Agent1DashboardData> {
+  const secret = agent1Secret()
+  if (secret) {
+    const res = await fetch(`${agent1ApiBase()}/dashboard`, {
+      headers: { 'X-Agent-Secret': secret },
+    })
+    const body = (await res.json().catch(() => ({}))) as Agent1DashboardData & {
+      error?: string
+    }
+    if (res.ok) return body
+    throw new Error(body.error || `Agent 1 dashboard failed (${res.status})`)
+  }
+
+  return fetchAgent1DashboardViaSupabase()
+}
+
+async function fetchAgent1DashboardViaSupabase(): Promise<Agent1DashboardData> {
   const { data: products, error: productsError } = await supabase
     .from('products')
     .select(PRODUCT_PIPELINE_SELECT)
@@ -29,29 +45,45 @@ export async function fetchAgent1Dashboard(): Promise<Agent1DashboardData> {
   const { data: evidenceRows, error: evidenceError } = await supabase
     .from('product_evidence')
     .select('*')
-    .eq('review_status', 'submitted')
+    .in('review_status', ['submitted', 'draft'])
     .order('bundle_version', { ascending: false })
 
   if (evidenceError) throw evidenceError
 
   const rows = (products ?? []) as ProductPipelineRow[]
-  const byId = new Map(rows.map((p) => [p.product_id, p]))
 
   const latestSubmitted = new Map<string, ProductEvidence>()
+  const latestDraft = new Map<string, ProductEvidence>()
   for (const row of evidenceRows ?? []) {
     const e = row as ProductEvidence
-    if (!latestSubmitted.has(e.product_id)) {
+    if (e.review_status === 'submitted' && !latestSubmitted.has(e.product_id)) {
       latestSubmitted.set(e.product_id, e)
+    }
+    if (e.review_status === 'draft' && !latestDraft.has(e.product_id)) {
+      latestDraft.set(e.product_id, e)
     }
   }
 
   const pendingReview: Agent1DashboardData['pendingReview'] = []
-  for (const [productId, evidence] of latestSubmitted) {
-    const product = byId.get(productId)
-    if (product) pendingReview.push({ product, evidence })
+  const heldRuns: Agent1DashboardData['heldRuns'] = []
+  for (const product of rows) {
+    if (product.agent_status === 'evidence_awaiting_review') {
+      const evidence = latestSubmitted.get(product.product_id)
+      if (!evidence) continue
+      pendingReview.push({ product, evidence })
+    }
+    if (product.agent_status === 'evidence_pending') {
+      heldRuns.push({
+        product,
+        evidence: latestDraft.get(product.product_id) ?? null,
+      })
+    }
   }
 
   pendingReview.sort((a, b) =>
+    a.product.product_name.localeCompare(b.product.product_name),
+  )
+  heldRuns.sort((a, b) =>
     a.product.product_name.localeCompare(b.product.product_name),
   )
 
@@ -61,7 +93,13 @@ export async function fetchAgent1Dashboard(): Promise<Agent1DashboardData> {
     statusCounts[key] = (statusCounts[key] ?? 0) + 1
   }
 
-  return { products: rows, pendingReview, statusCounts }
+  return {
+    products: rows,
+    pendingReview,
+    validationRunQueue: [],
+    heldRuns,
+    statusCounts,
+  }
 }
 
 export async function approveEvidence(
@@ -197,14 +235,25 @@ export async function runAgent1Remote(productId: string): Promise<Agent1RunOutco
   })
 
   const body = (await res.json().catch(() => ({}))) as {
-    error?: string
+    error?: string | Array<{ path?: string[]; message?: string }>
     ok?: boolean
     summary?: string
     api_usage?: Agent1ApiUsage
   }
 
   if (!res.ok) {
-    throw new Error(body.error || `Agent 1 failed (${res.status})`)
+    const errDetail =
+      typeof body.error === 'string'
+        ? body.error
+        : Array.isArray(body.error)
+          ? body.error
+              .slice(0, 3)
+              .map((i: { path?: string[]; message?: string }) =>
+                `${(i.path ?? []).join('.')}: ${i.message ?? 'invalid'}`,
+              )
+              .join('; ')
+          : `Agent 1 failed (${res.status})`
+    throw new Error(errDetail)
   }
 
   const usageSummary = formatAgent1ApiUsage(body.api_usage)
@@ -264,13 +313,38 @@ export async function runAgent1Batch(
   return results
 }
 
+function formatFactValueItem(item: unknown): string {
+  if (item == null) return ''
+  if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+    return String(item)
+  }
+  if (typeof item === 'object') {
+    const row = item as Record<string, unknown>
+    if (typeof row.cert_name === 'string') {
+      const url = row.source_url ?? row.registry_url ?? row.page_source_url
+      return url ? `${row.cert_name} (${url})` : row.cert_name
+    }
+    if (typeof row.certification_name === 'string') return row.certification_name
+  }
+  return String(item)
+}
+
 export function formatFactValue(value: EvidenceFact['fact_value']): string {
   if (value == null) return '—'
   if (typeof value === 'boolean') return value ? 'true' : 'false'
+  if (Array.isArray(value)) {
+    return value.map(formatFactValueItem).filter(Boolean).join('; ') || '—'
+  }
+  if (typeof value === 'object') {
+    const formatted = formatFactValueItem(value)
+    return formatted || '—'
+  }
   if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
     try {
       const parsed = JSON.parse(value) as unknown
-      if (Array.isArray(parsed)) return parsed.map(String).join('; ')
+      if (Array.isArray(parsed)) {
+        return parsed.map(formatFactValueItem).filter(Boolean).join('; ') || value
+      }
     } catch {
       /* use raw */
     }
@@ -311,8 +385,14 @@ export function getEvidenceGaps(facts: EvidenceFact[]): EvidenceFact[] {
 }
 
 export function getDisplayFacts(facts: EvidenceFact[]): EvidenceFact[] {
+  const hasStructuredCerts = facts.some(
+    (f) => f.fact_key === 'verified_certifications' || f.fact_key === 'claimed_but_not_verified',
+  )
   return facts.filter(
-    (f) => f.fact_key !== 'information_gaps' && f.fact_type !== 'gap',
+    (f) =>
+      f.fact_key !== 'information_gaps' &&
+      f.fact_type !== 'gap' &&
+      !(hasStructuredCerts && f.fact_key === 'certifications_found'),
   )
 }
 
@@ -320,8 +400,39 @@ export function getWarnings(metadata: AgentMetadata): string[] {
   return metadata.warnings ?? []
 }
 
+export function getStructuredEvidence(
+  metadata: AgentMetadata,
+): import('../types/agent').StructuredEvidencePayload | null {
+  return metadata.structured_evidence ?? null
+}
+
 /** Lodge — re-run Agent 1 from Run tab after pipeline moved on. */
 export const AGENT1_ADMIN_RERUN_PRODUCT_ID = '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8'
+
+/** Branch Basics concentrate — validation batch shortcut on Run tab. */
+export const BRANCH_BASICS_PRODUCT_ID = 'a0c72167-f0f6-491e-90f7-bbb622fa5123'
+
+/** Lodge, Branch Basics, HexClad — structured evidence schema v1 validation. */
+export const AGENT1_VALIDATION_RERUN_PRODUCT_IDS: readonly string[] = [
+  AGENT1_ADMIN_RERUN_PRODUCT_ID, // Lodge cast iron skillet
+  BRANCH_BASICS_PRODUCT_ID, // Branch Basics concentrate
+  'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5', // HexClad frying pan
+] as const
+
+export function isAgent1ValidationRerunProduct(productId: string): boolean {
+  return (AGENT1_VALIDATION_RERUN_PRODUCT_IDS as readonly string[]).includes(productId)
+}
+
+/** Statuses where validation products may re-run from Run tab (never while awaiting review). */
+const AGENT1_VALIDATION_RERUN_STATUSES = new Set([
+  'evidence_approved',
+  'normalization_rejected',
+  'normalization_in_progress',
+  'normalization_approved',
+  'normalization_awaiting_review',
+  'scoring_review_pending',
+  'scoring_approved',
+])
 
 /**
  * Lodge + 4 May-15 batch products (cookware, bottle, dish soap, concentrate) — prompt-cache test batch.
@@ -399,21 +510,49 @@ export function canAdminRerunAgent1(productId: string): boolean {
   )
 }
 
-/** First run or retry after failure — not products already awaiting evidence review. */
-export function canRunAgent1(status: string): boolean {
-  return (
+/**
+ * Agent 1 tab routing (do not special-case products):
+ * - evidence_awaiting_review → Awaiting review only (never Run tab).
+ * - Successful run → status becomes evidence_awaiting_review → UI switches to Awaiting review.
+ * - Re-run while awaiting review → Re-run button on the review card (validation products).
+ */
+export function isAgent1OnAwaitingReviewTab(status: string): boolean {
+  return status === 'evidence_awaiting_review'
+}
+
+/** First run, retry after failure, or validation re-run after evidence moved on. */
+export function canRunAgent1(status: string, productId?: string): boolean {
+  if (isAgent1OnAwaitingReviewTab(status)) return false
+
+  if (
     status === 'unscored' ||
     status === 'evidence_rejected' ||
     status === 'evidence_pending'
-  )
+  ) {
+    return true
+  }
+  if (productId && isAgent1ValidationRerunProduct(productId)) {
+    return AGENT1_VALIDATION_RERUN_STATUSES.has(status)
+  }
+  return false
 }
 
-/**
- * Run Agent 1 tab only — products that still need a first run or retry after reject/failure.
- * Approved products stay off this tab so new catalog rows are easy to spot.
- */
-export function canShowOnAgent1RunTab(product: { agent_status: string }): boolean {
-  return canRunAgent1(product.agent_status)
+/** Run Agent 1 tab — mutually exclusive with Awaiting review. */
+export function canShowOnAgent1RunTab(product: {
+  agent_status: string
+  product_id: string
+}): boolean {
+  return canRunAgent1(product.agent_status, product.product_id)
+}
+
+/** Re-run from Awaiting review card (validation trio while submitted evidence exists). */
+export function canRerunAgent1FromReviewCard(
+  status: string,
+  productId: string,
+): boolean {
+  return (
+    isAgent1OnAwaitingReviewTab(status) && isAgent1ValidationRerunProduct(productId)
+  )
 }
 
 export function isAgent1Rerun(status: string): boolean {

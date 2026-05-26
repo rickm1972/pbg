@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatSupabaseUnknownError } from '../../lib/supabaseClient'
 import {
   approveEvidence,
-  canRunAgent1,
+  AGENT1_VALIDATION_RERUN_PRODUCT_IDS,
+  BRANCH_BASICS_PRODUCT_ID,
+  canRerunAgent1FromReviewCard,
   canShowOnAgent1RunTab,
+  isAgent1ValidationRerunProduct,
   confidenceBadgeClass,
   fetchAgent1Dashboard,
   formatAgent1ApiUsage,
@@ -11,10 +14,10 @@ import {
   isAgent1Rerun,
   getDisplayFacts,
   getEvidenceGaps,
+  getStructuredEvidence,
   getWarnings,
   humanizeAgentStatus,
   rejectEvidence,
-  ALPHABET_NEXT_AGENT1_BATCH_PRODUCT_IDS,
   CACHE_TEST_AGENT1_BATCH_PRODUCT_IDS,
   runAgent1Batch,
   runAgent1Remote,
@@ -36,7 +39,7 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
-  const [listFilter, setListFilter] = useState<'review' | 'run' | 'all'>('review')
+  const [listFilter, setListFilter] = useState<'review' | 'run' | 'all'>('run')
   const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(() => new Set())
   const [batchProgress, setBatchProgress] = useState<{
     current: number
@@ -65,19 +68,28 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     const map = new Map<string, ProductEvidence>()
     if (!data) return map
     for (const item of data.pendingReview) {
-      map.set(item.product.product_id, item.evidence)
+      if (item.evidence) map.set(item.product.product_id, item.evidence)
     }
     return map
   }, [data])
 
   const reviewQueue = useMemo(() => {
     if (!data) return []
-    return data.pendingReview.map((x) => x.product)
+    return data.pendingReview
+      .filter((x) => x.evidence != null)
+      .map((x) => x.product)
   }, [data])
 
   const runnableProducts = useMemo(() => {
     if (!data) return []
-    return data.products.filter((p) => canShowOnAgent1RunTab(p))
+    return data.products
+      .filter((p) => canShowOnAgent1RunTab(p))
+      .sort((a, b) => {
+        const aVal = isAgent1ValidationRerunProduct(a.product_id) ? 0 : 1
+        const bVal = isAgent1ValidationRerunProduct(b.product_id) ? 0 : 1
+        if (aVal !== bVal) return aVal - bVal
+        return a.product_name.localeCompare(b.product_name)
+      })
   }, [data])
 
   const listProducts = useMemo(() => {
@@ -102,8 +114,8 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   const selectedEvidence = selectedId ? evidenceByProductId.get(selectedId) : undefined
 
   useEffect(() => {
-    if (!data || selectedId || listFilter !== 'review') return
-    if (reviewQueue.length > 0) {
+    if (!data || selectedId) return
+    if (listFilter === 'review' && reviewQueue.length > 0) {
       setSelectedId(reviewQueue[0].product_id)
     }
   }, [data, listFilter, reviewQueue, selectedId])
@@ -198,14 +210,16 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       )
       await load()
       setSelectedId(productId)
-      setListFilter('review')
+      if (outcome.ok) setListFilter('review')
+      else setListFilter('run')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Agent 1 run failed'
       onError(
         msg.includes('fetch') || msg.includes('Failed to fetch')
-          ? `${msg} — Is npm run dev running?`
+          ? `${msg} — Dev server not reachable.`
           : msg,
       )
+      setListFilter('run')
     } finally {
       setBusyId(null)
     }
@@ -222,6 +236,20 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   function selectAllRunnable() {
     setSelectedRunIds(new Set(runnableProducts.map((p) => p.product_id)))
+  }
+
+  function selectValidationBatch() {
+    const ids = AGENT1_VALIDATION_RERUN_PRODUCT_IDS.filter((id) =>
+      runnableProducts.some((p) => p.product_id === id),
+    )
+    setSelectedRunIds(new Set(ids))
+  }
+
+  function selectBranchBasicsOnly() {
+    if (runnableProducts.some((p) => p.product_id === BRANCH_BASICS_PRODUCT_ID)) {
+      setSelectedRunIds(new Set([BRANCH_BASICS_PRODUCT_ID]))
+    }
+    if (listFilter !== 'run') switchListFilter('run')
   }
 
   function selectCacheTestBatch() {
@@ -242,6 +270,8 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     setRejectNotes('')
     if (filter === 'run') {
       setSelectedId(null)
+      setRejecting(false)
+      setRejectNotes('')
     } else if (filter === 'review' && reviewQueue.length > 0) {
       setSelectedId((id) => id ?? reviewQueue[0].product_id)
     }
@@ -264,13 +294,19 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       const succeeded = results.filter((r) => r.ok).length
       const failed = results.length - succeeded
       onNotice(
-        `Batch complete: ${succeeded} submitted for review, ${failed} failed or held in testing queue.`,
+        `Batch complete: ${succeeded} submitted for review${failed > 0 ? `, ${failed} did not submit` : ''}.`,
       )
       setSelectedRunIds(new Set())
-      setListFilter('review')
       await load()
       const firstOk = results.find((r) => r.ok)
-      if (firstOk) setSelectedId(firstOk.productId)
+      const firstAny = results[0]
+      if (firstOk) {
+        setListFilter('review')
+        setSelectedId(firstOk.productId)
+      } else if (firstAny) {
+        setListFilter('run')
+        setSelectedId(firstAny.productId)
+      }
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Batch run failed')
     } finally {
@@ -294,10 +330,10 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     <div className="mt-6 space-y-6">
       {!authUserEmail ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <p className="font-semibold">Sign in above to open evidence detail</p>
+          <p className="font-semibold">Sign in above to approve or reject evidence</p>
           <p className="mt-1 text-amber-900/90">
-            You can browse the queue below, but sources, facts, and Approve/Reject require
-            Supabase Auth sign-in.
+            Evidence packets load via the dev API. Approve/Reject still requires Supabase Auth
+            sign-in.
           </p>
         </div>
       ) : null}
@@ -398,8 +434,9 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    Select products, then run in sequence (~2 min each). Leave this tab open until
-                    the batch finishes.
+                    Select products, then run in sequence (~2 min each). After a successful run they
+                    move to <strong>Awaiting review</strong>. Use{' '}
+                    <strong>Select Branch Basics</strong> to run only that product.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -409,6 +446,22 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
                       Select all
+                    </button>
+                    <button
+                      type="button"
+                      disabled={batchBusy}
+                      onClick={selectBranchBasicsOnly}
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                    >
+                      Select Branch Basics
+                    </button>
+                    <button
+                      type="button"
+                      disabled={batchBusy}
+                      onClick={selectValidationBatch}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Select validation (3)
                     </button>
                     <button
                       type="button"
@@ -448,60 +501,69 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   {listFilter === 'review'
                     ? 'Nothing awaiting review.'
                     : listFilter === 'run'
-                      ? 'Nothing to run. New or reset products (unscored) and retries after reject or a failed run appear here.'
+                      ? 'Nothing to run. New or reset products and retries after reject appear here.'
                       : 'No products found.'}
                 </li>
               ) : (
                 listProducts.map((p) => {
-                  const isSelected = p.product_id === selectedId
+                  const isSelected = listFilter !== 'run' && p.product_id === selectedId
                   const hasEvidence = evidenceByProductId.has(p.product_id)
                   const runnable = canShowOnAgent1RunTab(p)
                   const checked = selectedRunIds.has(p.product_id)
+                  const rowBody = (
+                    <>
+                      <div className="font-semibold text-ink-900">{p.product_name}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <StatusPill status={p.agent_status} />
+                        {listFilter !== 'run' && hasEvidence ? (
+                          <span className="text-[10px] font-semibold text-violet-700">
+                            Ready to review
+                          </span>
+                        ) : listFilter === 'run' && runnable ? (
+                          <span className="text-[10px] font-semibold text-emerald-800">
+                            Ready to run
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {p.brand ?? '—'} · {p.category ?? '—'}
+                      </p>
+                    </>
+                  )
                   return (
                     <li key={p.product_id}>
                       <div
                         className={`flex w-full transition ${
-                          isSelected ? 'bg-violet-50' : 'hover:bg-slate-50'
+                          isSelected || (listFilter === 'run' && checked)
+                            ? 'bg-violet-50'
+                            : 'hover:bg-slate-50'
                         }`}
                       >
                         {listFilter === 'run' && runnable ? (
-                          <label className="flex shrink-0 cursor-pointer items-start px-3 pt-4">
+                          <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-0 px-3 py-3">
                             <input
                               type="checkbox"
                               checked={checked}
                               disabled={batchBusy}
                               onChange={() => toggleRunSelection(p.product_id)}
-                              className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
                             />
+                            <span className="min-w-0 flex-1 pl-3 text-left">{rowBody}</span>
                           </label>
-                        ) : null}
-                        <button
-                          type="button"
-                          disabled={batchBusy}
-                          onClick={() => {
-                            setSelectedId(p.product_id)
-                            setRejecting(false)
-                            setRejectNotes('')
-                          }}
-                          className="min-w-0 flex-1 px-4 py-3 text-left disabled:opacity-60"
-                        >
-                        <div className="font-semibold text-ink-900">{p.product_name}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <StatusPill status={p.agent_status} />
-                          {hasEvidence ? (
-                            <span className="text-[10px] font-semibold text-violet-700">
-                              Ready to review
-                            </span>
-                          ) : p.agent_status === 'evidence_pending' ? (
-                            <span className="text-[10px] font-semibold text-amber-800">
-                              Retry — run failed or held
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 text-xs text-slate-600">
-                          {p.brand ?? '—'} · {p.category ?? '—'}
-                        </p>
-                        </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={batchBusy}
+                            onClick={() => {
+                              setSelectedId(p.product_id)
+                              setRejecting(false)
+                              setRejectNotes('')
+                            }}
+                            className="min-w-0 flex-1 px-4 py-3 text-left disabled:opacity-60"
+                          >
+                            {rowBody}
+                          </button>
+                        )}
                       </div>
                     </li>
                   )
@@ -514,11 +576,7 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
         <div className="lg:col-span-8">
           {listFilter === 'run' ? (
             <RunTabPanel
-              selectedProduct={
-                selectedProduct && canShowOnAgent1RunTab(selectedProduct)
-                  ? selectedProduct
-                  : null
-              }
+              selectedProduct={null}
               selectedRunnable={selectedRunnable}
               batchProgress={batchProgress}
               busyId={busyId}
@@ -547,6 +605,18 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               onRejectConfirm={() =>
                 handleReject(selectedEvidence.evidence_id, selectedProduct.product_id)
               }
+              onRerun={
+                canRerunAgent1FromReviewCard(
+                  selectedProduct.agent_status,
+                  selectedProduct.product_id,
+                )
+                  ? () =>
+                      handleRunAgent1(
+                        selectedProduct.product_id,
+                        selectedProduct.product_name,
+                      )
+                  : undefined
+              }
             />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -561,9 +631,11 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                 <StatusPill status={selectedProduct.agent_status} />
               </div>
               <p className="mt-4 text-sm text-slate-700">
-                {selectedProduct.agent_status === 'evidence_awaiting_review'
-                  ? 'Evidence is awaiting review but could not be loaded. Sign in with Supabase Auth and refresh.'
-                  : 'No submitted evidence packet for this product yet.'}
+                {selectedProduct.agent_status === 'evidence_pending'
+                  ? 'The last Agent 1 run did not save a submitted bundle (server error or threshold failure). Re-run from the Run Agent 1 tab after restarting npm run dev if you recently pulled fixes.'
+                  : selectedProduct.agent_status === 'evidence_awaiting_review'
+                    ? 'Evidence is awaiting review but could not be loaded. Refresh the page; if it persists, sign in with Supabase Auth.'
+                    : 'No submitted evidence packet for this product yet.'}
               </p>
               {canShowOnAgent1RunTab(selectedProduct) ? (
                 <button
@@ -587,9 +659,10 @@ export function Agent1ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       </div>
 
       <p className="text-xs text-slate-500">
-        Run products on the <strong>Run Agent 1</strong> tab. After a run they move to{' '}
-        <strong>Awaiting review</strong> only. Once approved they leave the run list; reject or
-        reset to run again. Requires <code className="font-mono">npm run dev</code>.
+        Run products on <strong>Run Agent 1</strong>. After a successful run they always move to{' '}
+        <strong>Awaiting review</strong>. Re-run from Run when unscored, failed, or after
+        reject/approve; re-run Lodge / Branch Basics / HexClad from the review card while awaiting
+        review.
       </p>
     </div>
   )
@@ -606,6 +679,7 @@ function ReviewCard({
   onRejectOpen,
   onRejectCancel,
   onRejectConfirm,
+  onRerun,
 }: {
   product: ProductPipelineRow
   evidence: ProductEvidence
@@ -617,10 +691,13 @@ function ReviewCard({
   onRejectOpen: () => void
   onRejectCancel: () => void
   onRejectConfirm: () => void
+  onRerun?: () => void
 }) {
-  const warnings = getWarnings(evidence.agent_metadata)
-  const gaps = getEvidenceGaps(evidence.facts)
-  const displayFacts = getDisplayFacts(evidence.facts)
+  const warnings = getWarnings(evidence.agent_metadata ?? {})
+  const facts = evidence.facts ?? []
+  const gaps = getEvidenceGaps(facts)
+  const structured = getStructuredEvidence(evidence.agent_metadata ?? {})
+  const displayFacts = getDisplayFacts(facts)
   const threshold = evidence.agent_metadata.minimum_threshold
   const apiUsageLine = formatAgent1ApiUsage(evidence.agent_metadata.api_usage)
 
@@ -683,9 +760,11 @@ function ReviewCard({
         </ul>
       </Section>
 
+      {structured ? <StructuredEvidenceSection structured={structured} /> : null}
+
       <Section title={`Facts (${displayFacts.length})`}>
         <div className="space-y-3">
-          {displayFacts.map((fact, i) => (
+          {(displayFacts ?? []).map((fact, i) => (
             <div
               key={`${fact.fact_key}-${i}`}
               className="rounded-xl border border-slate-100 bg-white px-3 py-3"
@@ -704,9 +783,16 @@ function ReviewCard({
                   &ldquo;{fact.excerpt}&rdquo;
                 </blockquote>
               ) : null}
-              {fact.source_index != null && evidence.sources[fact.source_index] ? (
+              {fact.source_url ? (
+                <p className="mt-1 break-all text-[10px] text-slate-500">
+                  <a href={fact.source_url} target="_blank" rel="noreferrer" className="underline">
+                    {fact.source_url}
+                  </a>
+                </p>
+              ) : fact.source_index != null && (evidence.sources ?? [])[fact.source_index] ? (
                 <p className="mt-1 text-[10px] text-slate-500">
-                  Source [{fact.source_index}]: {evidence.sources[fact.source_index].source_type}
+                  Source [{fact.source_index}]:{' '}
+                  {(evidence.sources ?? [])[fact.source_index].source_type}
                 </p>
               ) : null}
             </div>
@@ -782,6 +868,16 @@ function ReviewCard({
         >
           Reject
         </button>
+        {onRerun ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onRerun}
+            className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-60"
+          >
+            Re-run Agent 1
+          </button>
+        ) : null}
       </footer>
 
       {showRejectNotes ? (
@@ -859,8 +955,8 @@ function RunTabPanel({
           <StatusPill status={selectedProduct.agent_status} />
         </div>
         <p className="mt-4 text-sm text-slate-700">
-          Agent 1 will research this product and submit an evidence packet for review. Approval
-          happens under <strong>Awaiting review</strong>.
+          Agent 1 will research this product and submit an evidence packet. After a successful run,
+          open <strong>Awaiting review</strong> to approve or reject.
         </p>
         <button
           type="button"
@@ -903,11 +999,128 @@ function RunTabPanel({
       <div className="max-w-sm space-y-2">
         <p className="text-sm font-semibold text-ink-900">Run Agent 1 on new products</p>
         <p className="text-sm text-slate-600">
-          Check products on the left, then run in batch. Evidence review and approval are on the{' '}
-          <strong>Awaiting review</strong> tab.
+          Check products on the left, then use <strong>Run Agent 1 on selected</strong> in the left
+          panel. No per-product detail here — batch only.
         </p>
       </div>
     </div>
+  )
+}
+
+function StructuredEvidenceSection({
+  structured,
+}: {
+  structured: NonNullable<ReturnType<typeof getStructuredEvidence>>
+}) {
+  const pcm = structured.primary_contact_material
+  const certs = structured.certifications
+  const sc = structured.safety_claims
+
+  return (
+    <Section title="Structured evidence (schema v1)">
+      <div className="space-y-4 text-sm">
+        {pcm ? (
+          <div className="rounded-xl border border-violet-100 bg-violet-50/50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase text-violet-800">Primary contact</p>
+            <p className="mt-1 text-ink-900">
+              {pcm.undisclosed_code ?? pcm.material_identity ?? '—'}
+            </p>
+            {pcm.source_url ? (
+              <a href={pcm.source_url} className="mt-1 block break-all text-xs text-violet-900 underline">
+                {pcm.source_url}
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div>
+          <p className="text-xs font-semibold uppercase text-slate-600">Verified certifications</p>
+          {(certs?.verified_certifications ?? []).length === 0 ? (
+            <p className="mt-1 text-slate-600">None verified in certifying-body registries.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {certs?.verified_certifications?.map((v) => (
+                <li key={v.cert_name} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+                  <span className="font-medium text-emerald-900">{v.cert_name}</span>
+                  {(v.source_url ?? v.registry_url ?? v.page_source_url) ? (
+                    <a
+                      href={v.source_url ?? v.registry_url ?? v.page_source_url ?? '#'}
+                      className="mt-0.5 block break-all text-[10px] text-emerald-800 underline"
+                    >
+                      {v.source_url ?? v.registry_url ?? v.page_source_url}
+                    </a>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase text-slate-600">Claimed but not verified</p>
+          {(certs?.claimed_but_not_verified ?? []).length === 0 ? (
+            <p className="mt-1 text-slate-600">None.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {certs?.claimed_but_not_verified?.map((r) => (
+                <li key={r.cert_name} className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5">
+                  <span className="font-medium text-amber-950">{r.cert_name}</span>
+                  <p className="text-[10px] text-amber-900">{r.registry_check_result}</p>
+                  {r.claim_source_url ? (
+                    <a
+                      href={r.claim_source_url}
+                      className="block break-all text-[10px] underline"
+                    >
+                      {r.claim_source_url}
+                    </a>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {sc ? (
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-600">Safety claims</p>
+            <ul className="mt-2 space-y-1 text-slate-800">
+              {sc.pfas_free_claim?.claimed ? (
+                <li>
+                  PFAS-Free
+                  {sc.pfas_free_claim.structural_guarantee ? ' (structural)' : ''}
+                  {sc.pfas_free_claim.source_url ? (
+                    <span className="block break-all text-[10px] text-slate-500">
+                      {sc.pfas_free_claim.source_url}
+                    </span>
+                  ) : null}
+                </li>
+              ) : null}
+              {sc.non_toxic_claim?.claimed ? (
+                <li>
+                  Non-toxic
+                  {sc.non_toxic_claim.structural_guarantee ? ' (structural)' : ''}
+                  {sc.non_toxic_claim.source_url ? (
+                    <span className="block break-all text-[10px] text-slate-500">
+                      {sc.non_toxic_claim.source_url}
+                    </span>
+                  ) : null}
+                </li>
+              ) : null}
+              {sc.bpa_free_claim?.claimed ? (
+                <li>
+                  BPA-free
+                  {sc.bpa_free_claim.source_url ? (
+                    <span className="block break-all text-[10px] text-slate-500">
+                      {sc.bpa_free_claim.source_url}
+                    </span>
+                  ) : null}
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </Section>
   )
 }
 

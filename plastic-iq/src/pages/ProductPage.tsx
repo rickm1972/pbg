@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import {
-  CheckCircle2,
-  ChevronRight,
-  FlaskConical,
-  Leaf,
-  Package,
-  ShieldCheck,
-  Square,
-  UtensilsCrossed,
-} from 'lucide-react'
+import { ChevronRight, ShieldCheck } from 'lucide-react'
+import type { NormalizationComponent } from '../types/agent'
 import type { Product, ProductTier } from '../types'
 import { fetchProduct, fetchProductsByCategory } from '../lib/productsApi'
 import { fetchApprovedProductScore, type ApprovedProductScore } from '../lib/productScoresApi'
-import { fetchVerifiedCertificationNames } from '../lib/productEvidenceApi'
-import { VerifiedCertifications } from '../components/VerifiedCertifications'
+import { fetchWhyThisScore } from '../lib/whyThisScoreApi'
+import { WhyThisScore } from '../components/WhyThisScore'
+import type { WhyThisScoreFields } from '../lib/whyThisScoreApi'
+import { fetchNormalizationComponents } from '../lib/normalizationComponentsApi'
+import { RiskDashboard } from '../components/RiskDashboard'
 import { ScoreMark } from '../components/ScoreMark'
 import { FormulationSafetyScores } from '../components/FormulationSafetyScores'
 import { ScoreBasisBadge } from '../components/ScoreBasisBadge'
@@ -29,7 +24,10 @@ export function ProductPage() {
   const { productId } = useParams()
   const [product, setProduct] = useState<Product | null>(null)
   const [approvedScore, setApprovedScore] = useState<ApprovedProductScore | null>(null)
-  const [verifiedCertifications, setVerifiedCertifications] = useState<string[]>([])
+  const [normalizationComponents, setNormalizationComponents] = useState<
+    NormalizationComponent[] | null
+  >(null)
+  const [whyThisScore, setWhyThisScore] = useState<WhyThisScoreFields | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [alternatives, setAlternatives] = useState<Product[] | null>(null)
 
@@ -37,7 +35,7 @@ export function ProductPage() {
     if (!productId) return
     setProduct(null)
     setApprovedScore(null)
-    setVerifiedCertifications([])
+    setNormalizationComponents(null)
     setError(null)
     fetchProduct(productId)
       .then((d) => setProduct(d))
@@ -45,9 +43,12 @@ export function ProductPage() {
     fetchApprovedProductScore(productId)
       .then((row) => setApprovedScore(row))
       .catch(() => setApprovedScore(null))
-    fetchVerifiedCertificationNames(productId)
-      .then((names) => setVerifiedCertifications(names))
-      .catch(() => setVerifiedCertifications([]))
+    fetchNormalizationComponents(productId)
+      .then((components) => setNormalizationComponents(components))
+      .catch(() => setNormalizationComponents(null))
+    fetchWhyThisScore(productId)
+      .then((fields) => setWhyThisScore(fields))
+      .catch(() => setWhyThisScore(null))
   }, [productId])
 
   const score = approvedScore?.pac_safety_score ?? product?.pac_safety_score ?? 0
@@ -209,61 +210,21 @@ export function ProductPage() {
             </div>
           ) : null}
 
-          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
-            <div className="divide-y divide-slate-100">
-              <SpecRow icon={UtensilsCrossed} label="Category" value={product.category ?? '—'} />
-              <SpecRow icon={Package} label="Subcategory" value={product.subcategory ?? '—'} />
-              <SpecRow icon={Square} label="Primary Material" value={product.primary_material ?? '—'} />
-              <SpecRow
-                icon={Leaf}
-                label="Secondary Material"
-                value={product.secondary_material ?? '—'}
-              />
-              <SpecRow icon={ShieldCheck} label="BPA Free" value={product.bpa_free ?? '—'} />
-              <SpecRow
-                icon={FlaskConical}
-                label="Phthalate-Free Claim"
-                value={product.phthalate_free_claim ?? '—'}
-              />
-            </div>
-          </div>
+          {normalizationComponents && normalizationComponents.length > 0 ? (
+            <RiskDashboard components={normalizationComponents} className="mt-6" />
+          ) : null}
 
-          <VerifiedCertifications
-            certificationNames={verifiedCertifications}
-            className="mt-6"
-          />
-
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-card">
-            <div className="text-sm font-semibold text-ink-900">Why this score?
+          {whyThisScore ? (
+            <WhyThisScore fields={whyThisScore} className="mt-6" />
+          ) : (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-card">
+              <div className="text-sm font-semibold text-ink-900">Why this score?</div>
+              <p className="mt-2 leading-relaxed">
+                Structured score breakdown will appear after normalization is approved for this
+                product.
+              </p>
             </div>
-            {approvedScore?.explanation_draft ? (
-              <p className="mt-2 leading-relaxed">{approvedScore.explanation_draft}</p>
-            ) : (
-              <>
-                <p className="mt-2 leading-relaxed">
-                  PAC Safety Score reflects expected exposure risk from plastic-associated chemicals,
-                  based on materials, construction, and available data. Higher scores indicate less
-                  likely chemical exposure during normal use.
-                </p>
-                <ul className="mt-4 space-y-3 text-sm leading-relaxed text-slate-600">
-                  <li className="flex gap-2">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                    <span>
-                      Scores penalize direct food/liquid contact with plastics, especially under heat,
-                      acidity, or fat exposure.
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                    <span>
-                      “Score basis” communicates confidence: lab verification &gt; materials science &gt;
-                      AI estimate &gt; testing queue.
-                    </span>
-                  </li>
-                </ul>
-              </>
-            )}
-          </div>
+          )}
 
           {(tier === 'Caution' || tier === 'High Risk') && (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
@@ -415,27 +376,5 @@ function AlternativeRow({ product }: { product: Product }) {
 function scorePillStyle(tier: ProductTier) {
   const c = colorForTier(tier)
   return `${c.bg} ${c.text} ring-1 ${c.ring}`
-}
-
-function SpecRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string
-}) {
-  return (
-    <div className="flex items-center justify-between gap-5 px-5 py-2.5">
-      <div className="flex items-center gap-3">
-        <div className="grid h-[26px] w-[26px] place-items-center rounded-full bg-emerald-50 ring-1 ring-emerald-100">
-          <Icon className="h-3.5 w-3.5 text-emerald-700" />
-        </div>
-        <div className="text-[13px] font-medium text-slate-600">{label}</div>
-      </div>
-      <div className="text-right text-[13px] font-semibold text-ink-900">{value}</div>
-    </div>
-  )
 }
 

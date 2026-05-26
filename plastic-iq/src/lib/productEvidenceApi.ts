@@ -11,6 +11,12 @@ export function certificationBadgeLabel(certificationName: string): string {
 function shouldShowVerifiedCertification(certificationName: string): boolean {
   const name = certificationName.trim()
   if (!name) return false
+  // Marketing claim blobs (e.g. Lodge PFAS-Free / Made in USA prose) are not registry-verified certs.
+  if (name.includes(';')) return false
+  if (/manufacturer claim|manufacturer confirmed|not independently verified/i.test(name)) {
+    return false
+  }
+  if (/^(pfas[- ]?free|pfoa|ptfe|made in usa|non[- ]?toxic)\b/i.test(name)) return false
   if (/ewg\s*low\s*hazard/i.test(name)) return true
   if (/ewg\s*verified/i.test(name)) return false
   if (/not ewg verified|not confirmed for|does not have ewg verified/i.test(name)) return false

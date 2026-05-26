@@ -53,11 +53,13 @@ export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
       const productScore = latestPending.get(product.product_id)
       if (productScore) pendingReview.push({ product, productScore })
     }
-    if (
-      canRunAgent3(product.agent_status) &&
-      product.agent_status !== 'scoring_approved' &&
-      !latestApproved.has(product.product_id)
-    ) {
+    if (!canRunAgent3(product.agent_status)) continue
+    if (isAgent3ValidationRerunProduct(product.product_id)) {
+      runnable.push(product)
+      continue
+    }
+    if (product.agent_status === 'scoring_approved') continue
+    if (!latestApproved.has(product.product_id)) {
       runnable.push(product)
     }
   }
@@ -114,8 +116,23 @@ export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
   }
 }
 
+/** Lodge, Branch Basics concentrate, HexClad — Session 2 explanation validation. */
+export const AGENT3_VALIDATION_RERUN_PRODUCT_IDS: readonly string[] = [
+  '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8', // Lodge cast iron skillet
+  'a0c72167-f0f6-491e-90f7-bbb622fa5123', // Branch Basics concentrate
+  'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5', // HexClad frying pan
+] as const
+
+export function isAgent3ValidationRerunProduct(productId: string): boolean {
+  return AGENT3_VALIDATION_RERUN_PRODUCT_IDS.includes(productId)
+}
+
 export function canRunAgent3(status: string): boolean {
-  return status === 'normalization_approved' || status === 'scoring_review_pending'
+  return (
+    status === 'normalization_approved' ||
+    status === 'scoring_review_pending' ||
+    status === 'scoring_approved'
+  )
 }
 
 export function agent3ApiBase(): string {
