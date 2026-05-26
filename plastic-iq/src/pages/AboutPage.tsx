@@ -168,12 +168,12 @@ export function AboutPage() {
               <RiskFactorCard
                 icon={<Route className="h-5 w-5 text-violet-700" />}
                 iconTone="violet"
-                title="Pathway"
+                title="Use conditions"
                 body="How the product is used. Heat, fat, acid, and contact duration all increase chemical migration. Cookware faces harsher conditions than food storage. Rinse-off cleaners face gentler conditions than leave-on personal care."
               />
             </div>
             <p className="mt-4 text-sm leading-relaxed text-slate-700">
-              Risk emerges when all three combine. A concerning material with low migration and gentle use can
+              Risk emerges when all three factors combine. A concerning material with low migration and gentle use can
               still score well. A safer material with harsh conditions can still score well because it
               doesn&apos;t leach. Our algorithm weighs all three factors for every product.
             </p>
