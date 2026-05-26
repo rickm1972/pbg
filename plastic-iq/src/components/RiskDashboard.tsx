@@ -49,9 +49,9 @@ export function RiskDashboard({ components, className = '' }: Props) {
         <li>Use conditions — how intensely the product contacts food during normal use</li>
       </ul>
       <p className="mt-3 text-sm leading-relaxed text-slate-600">
-        Long bars mean lower risk. Risk emerges when all three combine. Some products score
-        high overall even when one factor is concerning — for example, cast iron cookware faces
-        harsh use conditions but stays safe because the material is inert.
+        Risk emerges when all three factors combine. Some products score high overall even when
+        one factor is concerning — for example, cast iron cookware faces harsh use conditions but
+        stays safe because the material is inert.
       </p>
 
       <div className="mt-6 space-y-6">
