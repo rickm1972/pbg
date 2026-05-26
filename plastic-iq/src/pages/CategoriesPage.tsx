@@ -9,7 +9,6 @@ import categoryFoodStorage from '../assets/category-food-storage.png'
 import categoryCookware from '../assets/category-cookware.png'
 import categoryCookingUtensils from '../assets/category-cooking-utensils.png'
 import categoryWaterBottles from '../assets/category-water-bottles.png'
-import categoryDishSoap from '../assets/category-dish-soap.png'
 
 export function CategoriesPage() {
   const [allProducts, setAllProducts] = useState<Product[] | null>(null)
@@ -132,7 +131,7 @@ export function CategoriesPage() {
               </p>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-5">
+            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
               <SubcategoryCard
                 ariaTitle="Food Storage"
                 title="Food Storage"
@@ -169,14 +168,6 @@ export function CategoriesPage() {
                 haloClass="bg-emerald-50"
                 count={countsBySubcategory['Water Bottles and Drinkware'] ?? 0}
                 to={`/category/${encodeURIComponent('Kitchen')}?subcategory=${encodeURIComponent('Water Bottles and Drinkware')}`}
-              />
-              <SubcategoryCard
-                ariaTitle="Dish Soap"
-                title="Dish Soap"
-                image={categoryDishSoap}
-                haloClass="bg-violet-50"
-                count={countsBySubcategory['Dish Soap'] ?? 0}
-                to={`/category/${encodeURIComponent('Kitchen')}?subcategory=${encodeURIComponent('Dish Soap')}`}
               />
             </div>
           </section>

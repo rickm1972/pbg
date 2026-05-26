@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Risk Dashboard — validation trio (agent2 packets, no Agent 1/2 re-run).
+ * Risk Dashboard — validation duo (agent2 packets, no Agent 1/2 re-run).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -8,20 +8,13 @@ import { projectRoot } from './lib/env.mjs'
 import { computeRiskDashboardMetrics } from './lib/risk-dashboard-metrics.mjs'
 import { runAgent2NormalizationPipeline } from './agent2/deterministic/pipeline.mjs'
 
-const TRIO = [
+const DUO = [
   {
     label: 'Lodge',
     id: '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8',
     material: { fill: [95, 99], status: 'Safe' },
     migration: { fill: [95, 98], status: 'Minimal' },
     useConditions: { fill: [0, 8], status: 'Harsh' },
-  },
-  {
-    label: 'Branch Basics',
-    id: 'a0c72167-f0f6-491e-90f7-bbb622fa5123',
-    material: { fill: [90, 94], status: 'Safe' },
-    migration: { fill: [88, 92], status: 'Minimal' },
-    useConditions: { fill: [88, 96], status: 'Gentle' },
   },
   {
     label: 'HexClad',
@@ -47,7 +40,7 @@ function checkIndicator(label, key, actual, expected) {
 
 let failed = false
 
-for (const row of TRIO) {
+for (const row of DUO) {
   const packet = JSON.parse(
     readFileSync(join(projectRoot, 'scripts/output', `agent2-${row.id}.json`), 'utf8'),
   )

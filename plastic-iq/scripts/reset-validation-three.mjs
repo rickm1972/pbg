@@ -11,7 +11,6 @@ import { createServiceClient } from './agent1/supabase.mjs'
 
 const VALIDATION_PRODUCTS = [
   'Lodge 10.25 Inch Cast Iron Skillet',
-  'Branch Basics Multi Purpose Concentrate for Dish Washing',
   'HexClad Hybrid Nonstick 10 Inch Frying Pan',
 ]
 

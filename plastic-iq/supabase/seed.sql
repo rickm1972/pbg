@@ -677,6 +677,11 @@ insert into public.products (
   true
 );
 
+-- V2.3.4: materials-science scope — hide dish soap / formulation products from public catalog
+update public.products
+set active = false
+where trim(coalesce(subcategory, '')) = 'Dish Soap';
+
 insert into public.categories (category_name, subcategory_name, description, display_order)
 select
   p.category,
@@ -686,7 +691,9 @@ select
 from (
   select distinct category, subcategory
   from public.products
-  where category is not null and subcategory is not null
+  where category is not null
+    and subcategory is not null
+    and active = true
 ) p
 order by p.category, p.subcategory;
 

@@ -60,6 +60,7 @@ export async function fetchProduct(productId: string): Promise<Product | null> {
     .from('products')
     .select(PRODUCT_SELECT_WITH_SCORE)
     .eq('product_id', productId)
+    .eq('active', true)
     .maybeSingle()
   if (error) throw error
   const row = (data as ProductRowWithScoreDetails | null) ?? null

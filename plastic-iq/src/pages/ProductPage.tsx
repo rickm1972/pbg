@@ -13,7 +13,6 @@ import { CertificationBadges } from '../components/CertificationBadges'
 import { RiskDashboard } from '../components/RiskDashboard'
 import { Sources } from '../components/Sources'
 import { ScoreMark } from '../components/ScoreMark'
-import { FormulationSafetyScores } from '../components/FormulationSafetyScores'
 import { ScoreBasisBadge } from '../components/ScoreBasisBadge'
 import { TransparencyBadge } from '../components/TransparencyBadge'
 import { transparencyBadgeSummary } from '../lib/transparencyBadge'
@@ -32,9 +31,11 @@ export function ProductPage() {
   const [whyThisScore, setWhyThisScore] = useState<WhyThisScoreFields | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [alternatives, setAlternatives] = useState<Product[] | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!productId) return
+    setLoading(true)
     setProduct(null)
     setApprovedScore(null)
     setNormalizationComponents(null)
@@ -42,6 +43,7 @@ export function ProductPage() {
     fetchProduct(productId)
       .then((d) => setProduct(d))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load product'))
+      .finally(() => setLoading(false))
     fetchApprovedProductScore(productId)
       .then((row) => setApprovedScore(row))
       .catch(() => setApprovedScore(null))
@@ -54,8 +56,6 @@ export function ProductPage() {
   }, [productId])
 
   const score = approvedScore?.pac_safety_score ?? product?.pac_safety_score ?? 0
-  const ingredientScore = approvedScore?.ingredient_transparency_score ?? null
-  const isFormulationProduct = ingredientScore != null
   const tier = useMemo(
     () => approvedScore?.tier ?? (product?.tier ? product.tier : tierForScore(score)),
     [approvedScore, product, score],
@@ -89,6 +89,14 @@ export function ProductPage() {
     }
   }, [product?.category, product?.subcategory, product?.product_id, tier])
 
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
+        <div className="text-sm text-slate-600">Loading…</div>
+      </div>
+    )
+  }
+
   if (error) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
@@ -102,7 +110,9 @@ export function ProductPage() {
   if (!product) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
-        <div className="text-sm text-slate-600">Loading…</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
+          Product not found.
+        </div>
       </div>
     )
   }
@@ -144,37 +154,18 @@ export function ProductPage() {
           </h1>
 
           <div className="mt-6 flex flex-wrap items-start gap-4">
-            {isFormulationProduct ? (
-              <FormulationSafetyScores
-                materialsScore={score}
-                ingredientScore={ingredientScore}
-                materialsTier={tier}
-              />
-            ) : (
-              <ScoreMark score={score} tier={tier} size="lg" />
-            )}
+            <ScoreMark score={score} tier={tier} size="lg" />
             <div className="min-w-[12rem] space-y-3">
-              {!isFormulationProduct ? (
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    PAC Safety Score
-                  </div>
-                  {product.score_basis ? (
-                    <div className="mt-2">
-                      <ScoreBasisBadge basis={product.score_basis} />
-                    </div>
-                  ) : null}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  PAC Safety Score
                 </div>
-              ) : product.score_basis ? (
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Score basis
-                  </div>
+                {product.score_basis ? (
                   <div className="mt-2">
                     <ScoreBasisBadge basis={product.score_basis} />
                   </div>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
               {approvedScore ? (
                 <div className="space-y-2 border-t border-slate-100 pt-3">
                   {approvedScore.displayed_confidence_range ? (
@@ -185,9 +176,6 @@ export function ProductPage() {
                       <div className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">
                         {approvedScore.displayed_confidence_range}
                       </div>
-                      {isFormulationProduct ? (
-                        <p className="mt-1 text-xs text-slate-500">Applies to Materials Safety score</p>
-                      ) : null}
                     </div>
                   ) : null}
                   {approvedScore.transparency_badge ? (

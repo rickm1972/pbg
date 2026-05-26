@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Reset Agent 2 only for Lodge / Branch Basics / HexClad.
+ * Reset Agent 2 only for Lodge + HexClad validation duo.
  * Keeps approved product_evidence. Deletes scoring_inputs (+ scores, QA).
  * Sets agent_status → evidence_approved so all three show on Run Agent 2 only.
  *
@@ -12,7 +12,6 @@ import { createServiceClient } from './agent1/supabase.mjs'
 
 const VALIDATION_PRODUCTS = [
   'Lodge 10.25 Inch Cast Iron Skillet',
-  'Branch Basics Multi Purpose Concentrate for Dish Washing',
   'HexClad Hybrid Nonstick 10 Inch Frying Pan',
 ]
 

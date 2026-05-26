@@ -226,6 +226,22 @@ export function AboutPage() {
             </div>
           </div>
 
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+            <h2 className={SECTION_TITLE}>What we score</h2>
+            <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-700">
+              <p>
+                PlasticBegone scores products where the plastic and other materials directly contact
+                food, drink, or skin. Cookware, drinkware, food storage, utensils, textiles, and similar
+                product categories.
+              </p>
+              <p>
+                We do not score the chemistry of cleaning formulations, cosmetics ingredients, or food
+                products themselves. For ingredient-level analysis of cleaning products and personal care, we
+                defer to EWG Skin Deep and similar databases.
+              </p>
+            </div>
+          </div>
+
           <div
             id="ftc-disclosure"
             className="relative isolate min-h-[240px] w-full overflow-hidden rounded-3xl border border-slate-200/90 shadow-card scroll-mt-28 sm:min-h-[260px] md:min-h-[280px]"

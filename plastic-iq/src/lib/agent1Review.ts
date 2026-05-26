@@ -412,10 +412,9 @@ export const AGENT1_ADMIN_RERUN_PRODUCT_ID = '1cf2fa4e-5cdd-4798-8f3c-6c273ae69f
 /** Branch Basics concentrate — validation batch shortcut on Run tab. */
 export const BRANCH_BASICS_PRODUCT_ID = 'a0c72167-f0f6-491e-90f7-bbb622fa5123'
 
-/** Lodge, Branch Basics, HexClad — structured evidence schema v1 validation. */
+/** Lodge + HexClad — materials-science validation duo (V2.3.4). */
 export const AGENT1_VALIDATION_RERUN_PRODUCT_IDS: readonly string[] = [
   AGENT1_ADMIN_RERUN_PRODUCT_ID, // Lodge cast iron skillet
-  BRANCH_BASICS_PRODUCT_ID, // Branch Basics concentrate
   'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5', // HexClad frying pan
 ] as const
 

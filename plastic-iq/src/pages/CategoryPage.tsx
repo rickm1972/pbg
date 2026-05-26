@@ -20,7 +20,6 @@ import categoryFoodStorage from '../assets/category-food-storage.png'
 import categoryCookware from '../assets/category-cookware.png'
 import categoryCookingUtensils from '../assets/category-cooking-utensils.png'
 import categoryWaterBottles from '../assets/category-water-bottles.png'
-import categoryDishSoap from '../assets/category-dish-soap.png'
 
 export function CategoryPage() {
   const { categoryName } = useParams()
@@ -70,16 +69,20 @@ export function CategoryPage() {
     const out: Record<string, number> = {}
     for (const p of products ?? []) {
       const s = (p.subcategory ?? '').trim()
-      if (!s) continue
+      if (!s || !isPublicSubcategory(s)) continue
       out[s] = (out[s] ?? 0) + 1
     }
     return out
   }, [products])
 
-  const subcategoryOptions = useMemo(() => sortSubcategoryLabels(Object.keys(subcategoryCounts), category), [
-    subcategoryCounts,
-    category,
-  ])
+  const subcategoryOptions = useMemo(
+    () =>
+      sortSubcategoryLabels(
+        Object.keys(subcategoryCounts).filter(isPublicSubcategory),
+        category,
+      ),
+    [subcategoryCounts, category],
+  )
 
   const subcategoryImage = useMemo(() => {
     const key = subcategory || ''
@@ -87,7 +90,6 @@ export function CategoryPage() {
     if (key === 'Cookware') return categoryCookware
     if (key === 'Cooking Utensils') return categoryCookingUtensils
     if (key === 'Water Bottles and Drinkware') return categoryWaterBottles
-    if (key === 'Dish Soap') return categoryDishSoap
     return null
   }, [subcategory])
 
@@ -431,13 +433,19 @@ export function CategoryPage() {
   )
 }
 
+/** Subcategories hidden from public catalog (materials-science scope only). */
+const EXCLUDED_SUBCATEGORIES = new Set(['Dish Soap'])
+
 const KITCHEN_SUBORDER = [
   'Food Storage',
   'Cookware',
   'Cooking Utensils',
   'Water Bottles and Drinkware',
-  'Dish Soap',
 ] as const
+
+function isPublicSubcategory(label: string): boolean {
+  return label.trim().length > 0 && !EXCLUDED_SUBCATEGORIES.has(label.trim())
+}
 
 function sortSubcategoryLabels(labels: string[], categoryName: string): string[] {
   const unique = [...new Set(labels)]

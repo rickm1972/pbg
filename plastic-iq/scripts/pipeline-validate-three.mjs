@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Full pipeline validation for three products only (V2.3.4 build).
- * Lodge, Branch Basics, HexClad — does not touch other catalog items.
+ * Full pipeline validation for validation duo only (V2.3.4 materials-science scope).
+ * Lodge + HexClad — does not touch other catalog items.
  */
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -16,7 +16,6 @@ import { createServiceClient } from './agent1/supabase.mjs'
 
 const VALIDATION_PRODUCTS = [
   'Lodge 10.25 Inch Cast Iron Skillet',
-  'Branch Basics Multi Purpose Concentrate for Dish Washing',
   'HexClad Hybrid Nonstick 10 Inch Frying Pan',
 ]
 

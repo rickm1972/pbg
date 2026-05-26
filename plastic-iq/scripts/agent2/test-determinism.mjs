@@ -11,7 +11,6 @@ import { scoreNormalization } from '../agent3/algorithm.mjs'
 
 const PRODUCTS = [
   { label: 'Lodge', id: '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8' },
-  { label: 'Branch Basics', id: 'a0c72167-f0f6-491e-90f7-bbb622fa5123' },
   { label: 'HexClad', id: 'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5' },
 ]
 
@@ -96,22 +95,6 @@ for (const { label, id } of PRODUCTS) {
     if (label === 'Lodge' && positives.some((a) => /made safe/i.test(a.reason))) {
       console.error('  ✗ Lodge must not receive MADE SAFE Layer 4A credit')
       failed = true
-    }
-    if (label === 'Branch Basics') {
-      const madeSafe = positives.filter((a) => /made safe/i.test(a.reason))
-      if (madeSafe.length > 1 || (madeSafe[0] && madeSafe[0].value > 2)) {
-        console.error('  ✗ Branch Basics MADE SAFE must be +2 once only')
-        failed = true
-      }
-      if (parsed.category !== 'rinse-off') {
-        console.error(`  ✗ Branch Basics category must be rinse-off, got ${parsed.category}`)
-        failed = true
-      }
-      const form = parsed.components.find((c) => c.role === 'formulation')
-      if (!form || form.ci !== 0.25) {
-        console.error(`  ✗ Branch Basics formulation CI must be 0.25, got ${form?.ci}`)
-        failed = true
-      }
     }
     if (label === 'HexClad') {
       if (parsed.components.length !== 6) {
