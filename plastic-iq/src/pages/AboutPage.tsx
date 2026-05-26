@@ -23,6 +23,9 @@ const PAC_SAFETY_CERTIFICATIONS = [
   { name: 'USDA Organic', description: 'Organic material verification' },
 ] as const
 
+/** Matches Home / Why PlasticBegone section titles (Playfair, xl). */
+const SECTION_TITLE = 'font-display text-xl font-semibold tracking-tight text-ink-900'
+
 export function AboutPage() {
   return (
     <div className="bg-transparent">
@@ -128,9 +131,7 @@ export function AboutPage() {
             className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-card scroll-mt-28"
           >
             <div>
-              <h2 className="text-base font-semibold text-ink-900">
-                How the PAC Safety Score is calculated
-              </h2>
+              <h2 className={SECTION_TITLE}>How the PAC Safety Score is calculated</h2>
               <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-700">
                 Scores are driven by expected exposure risk based on materials, construction, and
                 available evidence. We emphasize direct-contact surfaces (food, drink, skin contact)
@@ -148,7 +149,7 @@ export function AboutPage() {
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-            <h2 className="text-base font-semibold text-ink-900">How we measure risk</h2>
+            <h2 className={SECTION_TITLE}>How we measure risk</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-700">
               Every product is evaluated on three factors:
             </p>
@@ -186,7 +187,7 @@ export function AboutPage() {
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-50 ring-1 ring-emerald-200">
                     <BadgeCheck className="h-4 w-4 text-emerald-700" aria-hidden />
                   </span>
-                  <h2 className="text-base font-semibold text-ink-900">Verified certifications</h2>
+                  <h2 className={SECTION_TITLE}>Verified certifications</h2>
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-slate-700">
                   We only credit certifications we can verify in the certifying body&apos;s own registry. A
@@ -241,9 +242,7 @@ export function AboutPage() {
               aria-hidden
             />
             <div className="relative z-10 flex min-h-[240px] flex-col justify-center p-6 sm:min-h-[260px] md:min-h-[280px] md:max-w-2xl md:p-8 lg:max-w-3xl">
-              <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900 md:text-xl">
-                FTC affiliate disclosure
-              </h2>
+              <h2 className={SECTION_TITLE}>FTC affiliate disclosure</h2>
               <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-700 md:text-base">
                 PlasticBegone may earn commissions on purchases made through affiliate links. This does not
                 influence ratings. Scores are based entirely on independent scientific methodology.
@@ -340,7 +339,7 @@ function Panel({
   return (
     <div className="grid items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-card md:grid-cols-12">
       <div className="md:col-span-7">
-        <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+        <h2 className={SECTION_TITLE}>{title}</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{subtitle}</p>
       </div>
       <div className="md:col-span-5">{right}</div>
