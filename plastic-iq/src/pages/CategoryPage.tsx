@@ -202,13 +202,13 @@ export function CategoryPage() {
         <div className="md:col-span-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
             <div className="flex items-start justify-between gap-4">
-              <div className="text-sm font-semibold text-ink-900">What is PACScore?</div>
+              <div className="text-sm font-semibold text-ink-900">What is the PAC Safety Score?</div>
               <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-50 ring-1 ring-slate-200">
                 <Info className="h-4 w-4 text-slate-500" />
               </div>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-slate-600">
-              PACScore rates products on a 0–100 scale based on plastic-associated chemical exposure
+              The PAC Safety Score rates products on a 0–100 scale based on plastic-associated chemical exposure
               risk. Higher scores are safer.
             </p>
             <Link

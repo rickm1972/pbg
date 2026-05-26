@@ -1,31 +1,22 @@
 import { supabase } from './supabaseClient'
-import type { CertificationVerifiedRow } from '../types/agent'
+import type { CertificationVerifiedRow, EvidenceSource } from '../types/agent'
 
-/** Badge label from Agent 1 verification row — never invent copy. */
-export function certificationBadgeLabel(certificationName: string): string {
-  const name = certificationName.trim()
-  if (/ewg\s*low\s*hazard/i.test(name)) return 'EWG Low Hazard'
-  return name
+export type ProductPageSource = {
+  source_type: string
+  url: string
+  title: string | null
+  fetched_at?: string
 }
 
-function shouldShowVerifiedCertification(certificationName: string): boolean {
-  const name = certificationName.trim()
-  if (!name) return false
-  // Marketing claim blobs (e.g. Lodge PFAS-Free / Made in USA prose) are not registry-verified certs.
-  if (name.includes(';')) return false
-  if (/manufacturer claim|manufacturer confirmed|not independently verified/i.test(name)) {
-    return false
-  }
-  if (/^(pfas[- ]?free|pfoa|ptfe|made in usa|non[- ]?toxic)\b/i.test(name)) return false
-  if (/ewg\s*low\s*hazard/i.test(name)) return true
-  if (/ewg\s*verified/i.test(name)) return false
-  if (/not ewg verified|not confirmed for|does not have ewg verified/i.test(name)) return false
-  return true
+export type VerifiedCertification = {
+  cert_name: string
+  source_url: string
 }
 
-export async function fetchVerifiedCertificationNames(
+/** Verified certs from approved Agent 1 evidence (bridged from structured_evidence.verified_certifications). */
+export async function fetchVerifiedCertifications(
   productId: string,
-): Promise<string[]> {
+): Promise<VerifiedCertification[]> {
   const { data, error } = await supabase.rpc('get_verified_certifications', {
     p_product_id: productId,
   })
@@ -37,7 +28,31 @@ export async function fetchVerifiedCertificationNames(
 
   return rows
     .filter((row) => row.found_in_page_content === true)
-    .filter((row) => shouldShowVerifiedCertification(row.certification_name))
-    .map((row) => certificationBadgeLabel(row.certification_name))
-    .filter(Boolean)
+    .filter((row) => typeof row.source_url === 'string' && row.source_url.trim().length > 0)
+    .map((row) => ({
+      cert_name: row.certification_name.trim(),
+      source_url: row.source_url!.trim(),
+    }))
+    .filter((row) => row.cert_name.length > 0)
+}
+
+/** Sources from approved Agent 1 evidence packet (`product_evidence.sources`). */
+export async function fetchProductSources(productId: string): Promise<ProductPageSource[]> {
+  const { data, error } = await supabase.rpc('get_product_sources', {
+    p_product_id: productId,
+  })
+
+  if (error) throw error
+
+  const rows = (data ?? []) as EvidenceSource[]
+  if (!Array.isArray(rows)) return []
+
+  return rows
+    .filter((row) => typeof row.url === 'string' && row.url.trim().length > 0)
+    .map((row) => ({
+      source_type: String(row.source_type ?? 'other').trim() || 'other',
+      url: row.url.trim(),
+      title: typeof row.title === 'string' && row.title.trim().length > 0 ? row.title.trim() : null,
+      fetched_at: row.fetched_at,
+    }))
 }

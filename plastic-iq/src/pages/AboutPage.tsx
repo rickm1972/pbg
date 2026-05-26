@@ -1,22 +1,28 @@
 import { Link } from 'react-router-dom'
-import {
-  AlertTriangle,
-  ArrowRight,
-  Beaker,
-  CheckCircle2,
-  FlaskConical,
-  Info,
-  Microscope,
-  Shield,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from 'lucide-react'
+import { ArrowRight, FlaskConical, Layers, Route, ShieldCheck, Users, Waves } from 'lucide-react'
 import aboutHero from '../assets/about-hero.png'
 import aboutScienceCard from '../assets/about-science-card.png'
 import aboutFtcCard from '../assets/about-ftc-card.png'
 import aboutCtaBanner from '../assets/about-cta-banner.png'
+import { PacTierAboutGrid } from '../components/PacTierLegend'
 import { TopNav } from '../components/nav/TopNav'
+
+const PAC_SAFETY_CERTIFICATIONS = [
+  {
+    name: 'MADE SAFE',
+    description: 'Comprehensive human health and ecosystem hazard screening',
+  },
+  {
+    name: 'EWG Verified',
+    description:
+      'Ingredient transparency and hazard criteria for cleaning and personal care',
+  },
+  { name: 'NSF', description: 'Food contact materials standards' },
+  { name: 'OEKO-TEX Standard 100', description: 'Harmful substance testing for textiles' },
+  { name: 'GOTS', description: 'Global Organic Textile Standard' },
+  { name: 'Bluesign', description: 'Chemical management in textile production' },
+  { name: 'USDA Organic', description: 'Organic material verification' },
+] as const
 
 export function AboutPage() {
   return (
@@ -55,7 +61,7 @@ export function AboutPage() {
                       Making plastic disappear from everyday life.
                     </h1>
                     <p className="mt-4 text-pretty text-sm font-medium leading-relaxed text-slate-700 sm:text-[0.9375rem] lg:text-base">
-                      PACScore is our science-based rating system that helps you identify safer products
+                      PlasticBegone is our science-based rating system that helps you identify safer products
                       and reduce exposure to plastic-associated chemicals.
                     </p>
                   </div>
@@ -133,85 +139,73 @@ export function AboutPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-5">
-              <TierCard
-                className="md:col-span-1"
-                tone="excellent"
-                range="90–100"
-                tier="Excellent"
-                body="Minimal PAC exposure pathways."
-                icon={<CheckCircle2 className="h-6 w-6 text-emerald-700" strokeWidth={2.75} />}
-              />
-              <TierCard
-                className="md:col-span-1"
-                tone="good"
-                range="70–89"
-                tier="Good"
-                body="Generally low risk with some exposure considerations."
-                icon={<CheckCircle2 className="h-6 w-6 text-blue-700" strokeWidth={2.75} />}
-              />
-              <TierCard
-                className="md:col-span-1"
-                tone="caution"
-                range="50–69"
-                tier="Caution"
-                body="Meaningful exposure pathways; consider alternatives."
-                icon={<AlertTriangle className="h-6 w-6 text-amber-700" strokeWidth={2.75} />}
-              />
-              <TierCard
-                className="md:col-span-1"
-                tone="highrisk"
-                range="0–49"
-                tier="High Risk"
-                body="High likelihood of PAC exposure under normal use."
-                icon={<AlertTriangle className="h-6 w-6 text-red-700" strokeWidth={2.75} />}
-              />
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:col-span-1">
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
-                  <Beaker className="h-5 w-5 text-emerald-700" />
-                </div>
-                <p className="mt-4 text-xs leading-relaxed text-slate-700">
-                  PACScore is not an overall product quality score. It reflects expected chemical
-                  exposure risk from plastic-associated sources.
-                </p>
-              </div>
+            <div className="space-y-3">
+              <PacTierAboutGrid />
+              <p className="border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-700">
+                The PAC Safety Score is not an overall product quality score. It reflects expected chemical
+                exposure risk from plastic-associated sources.
+              </p>
             </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+            <h2 className="text-base font-semibold text-ink-900">How we measure risk</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-700">
+              Every product is evaluated on three factors:
+            </p>
+            <div className="mt-4 grid items-stretch gap-3 md:grid-cols-3">
+              <RiskFactorCard
+                icon={<Layers className="h-5 w-5 text-emerald-700" />}
+                iconTone="emerald"
+                title="Material"
+                body="What the product is made of. Some materials are inert (cast iron, glass, stainless steel) and don't transfer chemicals. Others (plastics, undisclosed coatings) can release plastic-associated chemicals into food, drink, or skin."
+              />
+              <RiskFactorCard
+                icon={<Waves className="h-5 w-5 text-blue-700" />}
+                iconTone="blue"
+                title="Migration"
+                body="How easily the material transfers chemicals. A material might be concerning on paper but rarely release anything in real use. Or a material might look fine but leach heavily under heat or fat exposure."
+              />
+              <RiskFactorCard
+                icon={<Route className="h-5 w-5 text-violet-700" />}
+                iconTone="violet"
+                title="Pathway"
+                body="How the product is used. Heat, fat, acid, and contact duration all increase chemical migration. Cookware faces harsher conditions than food storage. Rinse-off cleaners face gentler conditions than leave-on personal care."
+              />
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-slate-700">
+              Risk emerges when all three combine. A concerning material with low migration and gentle use can
+              still score well. A safer material with harsh conditions can still score well because it
+              doesn&apos;t leach. Our algorithm weighs all three factors for every product.
+            </p>
           </div>
 
           <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
             <div>
-              <h2 className="text-base font-semibold text-ink-900">Score basis categories</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
-                Each product includes a score basis badge to communicate confidence and methodology.
-              </p>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-4">
-              <BasisCard
-                title="Lab Verified"
-                body="Supported by lab testing and measurements."
-                tone="lab"
-                icon={<Microscope className="h-4 w-4 text-emerald-700" />}
-              />
-              <BasisCard
-                title="Based on Materials Science"
-                body="Derived from materials and product design principles."
-                tone="materials"
-                icon={<Shield className="h-4 w-4 text-blue-700" />}
-              />
-              <BasisCard
-                title="AI Estimated"
-                body="Preliminary estimate pending stronger evidence."
-                tone="ai"
-                icon={<Sparkles className="h-4 w-4 text-violet-700" />}
-              />
-              <BasisCard
-                title="In Testing Queue"
-                body="Awaiting additional testing or review."
-                tone="queue"
-                icon={<Info className="h-4 w-4 text-amber-700" />}
-              />
+              <h2 className="text-base font-semibold text-ink-900">Verified certifications</h2>
+              <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-700">
+                <p>
+                  We only credit certifications we can verify in the certifying body&apos;s own registry. A
+                  product page may claim &apos;MADE SAFE Certified&apos; on its label, but we check madesafe.org
+                  directly to confirm the product is listed there. If we can&apos;t verify it on the registry, we
+                  don&apos;t credit it.
+                </p>
+                <p className="font-semibold text-ink-900">
+                  The certifications we recognize for PAC safety:
+                </p>
+                <ul className="mt-1 grid list-none gap-x-4 gap-y-1.5 pl-0 sm:grid-cols-2">
+                  {PAC_SAFETY_CERTIFICATIONS.map((cert) => (
+                    <li key={cert.name} className="text-sm leading-snug">
+                      <span className="font-semibold text-ink-900">{cert.name}</span>
+                      <span className="text-slate-700"> — {cert.description}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  Each verified certification on a product page links to the certifying body&apos;s registry
+                  entry. Click through to verify it yourself.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -377,95 +371,37 @@ function Panel({
   )
 }
 
-function TierCard({
-  tier,
-  range,
-  body,
-  tone,
+function RiskFactorCard({
   icon,
-  className,
-}: {
-  tier: string
-  range: string
-  body: string
-  tone: 'excellent' | 'good' | 'caution' | 'highrisk'
-  icon: React.ReactNode
-  className?: string
-}) {
-  const toneCls =
-    tone === 'excellent'
-      ? 'border-emerald-100 bg-emerald-50/60'
-      : tone === 'good'
-        ? 'border-blue-100 bg-blue-50/60'
-        : tone === 'caution'
-          ? 'border-amber-100 bg-amber-50/70'
-          : 'border-red-100 bg-red-50/70'
-  const rangeCls =
-    tone === 'excellent'
-      ? 'text-emerald-700'
-      : tone === 'good'
-        ? 'text-blue-700'
-        : tone === 'caution'
-          ? 'text-amber-700'
-          : 'text-red-700'
-
-  return (
-    <div
-      className={`rounded-2xl border p-3.5 shadow-sm ${toneCls} ${className ?? ''}`}
-      style={{ minHeight: 132 }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className={`text-base font-semibold ${rangeCls}`}>{range}</div>
-          <div className={`mt-1 text-base font-semibold ${rangeCls}`}>{tier}</div>
-        </div>
-        <div className="rounded-full bg-transparent p-2.5 ring-1 ring-slate-200">{icon}</div>
-      </div>
-      <div className="mt-3 text-xs leading-relaxed text-slate-700">{body}</div>
-    </div>
-  )
-}
-
-function BasisCard({
+  iconTone,
   title,
   body,
-  tone,
-  icon,
 }: {
+  icon: React.ReactNode
+  iconTone: 'emerald' | 'blue' | 'violet'
   title: string
   body: string
-  tone: 'lab' | 'materials' | 'ai' | 'queue'
-  icon: React.ReactNode
 }) {
-  const toneTitle =
-    tone === 'lab'
-      ? 'text-emerald-700'
-      : tone === 'materials'
-        ? 'text-blue-700'
-        : tone === 'ai'
-          ? 'text-violet-700'
-          : 'text-amber-700'
-  const toneBubble =
-    tone === 'lab'
+  const bubble =
+    iconTone === 'emerald'
       ? 'bg-emerald-50 ring-emerald-100'
-      : tone === 'materials'
+      : iconTone === 'blue'
         ? 'bg-blue-50 ring-blue-100'
-        : tone === 'ai'
-          ? 'bg-violet-50 ring-violet-100'
-          : 'bg-amber-50 ring-amber-100'
+        : 'bg-violet-50 ring-violet-100'
+  const titleTone =
+    iconTone === 'emerald'
+      ? 'text-emerald-700'
+      : iconTone === 'blue'
+        ? 'text-blue-700'
+        : 'text-violet-700'
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ring-1 ${toneBubble}`}>
-          {icon}
-        </span>
-        <div>
-          <div className={`text-sm font-semibold ${toneTitle}`}>{title}</div>
-          <div className="mt-1 text-xs leading-relaxed text-slate-600">{body}</div>
-        </div>
-      </div>
+    <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ring-1 ${bubble}`}>
+        {icon}
+      </span>
+      <h3 className={`mt-3 text-sm font-semibold ${titleTone}`}>{title}</h3>
+      <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-700">{body}</p>
     </div>
   )
 }
-

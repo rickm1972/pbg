@@ -1,6 +1,7 @@
 /**
  * Agent 1 — verify certifications against certifying-body registries (live search + fetch).
  */
+import { CERTIFICATION_TAXONOMY, resolveCertEntry } from '../../src/shared/certification-taxonomy.mjs'
 import { certificationAppearsInText } from './certification-verify.mjs'
 import { PERPLEXITY_SEARCH_COST_PER_REQUEST_USD } from './perplexity-search.mjs'
 
@@ -12,29 +13,13 @@ const USER_AGENT =
 
 /** @typedef {{ brand: string, productName: string }} ProductContext */
 
-/**
- * @type {Array<{
- *   id: string,
- *   patterns: RegExp[],
- *   registryDomains: string[],
- *   registryHomeUrl: string,
- *   buildSearchQuery: (ctx: ProductContext) => string,
- * }>}
- */
-export const CERT_REGISTRY_CONFIGS = [
-  {
-    id: 'made_safe',
-    patterns: [/made\s*safe/i],
-    registryDomains: ['madesafe.org'],
-    registryHomeUrl: 'https://www.madesafe.org/',
+/** Registry search queries keyed by taxonomy id (verification-only; not duplicated in shared taxonomy). */
+const REGISTRY_SEARCH_BY_ID = {
+  made_safe: {
     buildSearchQuery: (ctx) =>
       `site:madesafe.org "${ctx.brand}" certified product registry`,
   },
-  {
-    id: 'ewg_verified',
-    patterns: [/ewg\s*verified/i],
-    registryDomains: ['ewg.org', 'verified-portal.ewg.org'],
-    registryHomeUrl: 'https://www.ewg.org/ewgverified/products.php',
+  ewg_verified: {
     buildSearchQuery: (ctx) =>
       `site:ewg.org/cleaners/products "${ctx.brand}" "EWG Verified" concentrate`,
     extraSearchQueries: (ctx) => [
@@ -42,61 +27,47 @@ export const CERT_REGISTRY_CONFIGS = [
       `"${ctx.brand}" "EWG Verified" site:ewg.org/cleaners`,
     ],
   },
-  {
-    id: 'leaping_bunny',
-    patterns: [/leaping\s*bunny/i],
-    registryDomains: ['leapingbunny.org'],
-    registryHomeUrl: 'https://www.leapingbunny.org/',
+  leaping_bunny: {
     buildSearchQuery: (ctx) =>
       `site:leapingbunny.org "${ctx.brand}" approved company cruelty-free database`,
   },
-  {
-    id: 'usda_organic',
-    patterns: [/usda\s*organic/i],
-    registryDomains: ['organic.ams.usda.gov', 'usda.gov'],
-    registryHomeUrl: 'https://organic.ams.usda.gov/integrity/',
+  usda_organic: {
     buildSearchQuery: (ctx) =>
       `site:organic.ams.usda.gov integrity database "${ctx.brand}" organic certified`,
   },
-  {
-    id: 'oeko_tex',
-    patterns: [/oeko[\s-]*tex/i],
-    registryDomains: ['oeko-tex.com'],
-    registryHomeUrl: 'https://www.oeko-tex.com/en/label-check',
+  oeko_tex: {
     buildSearchQuery: (ctx) =>
       `site:oeko-tex.com label check certificate "${ctx.brand}" ${ctx.productName}`,
   },
-  {
-    id: 'nsf',
-    patterns: [/^nsf\b|nsf\s+certified/i],
-    registryDomains: ['nsf.org', 'info.nsf.org'],
-    registryHomeUrl: 'https://info.nsf.org/Certified/Food/',
+  nsf: {
     buildSearchQuery: (ctx) =>
       `site:nsf.org OR site:info.nsf.org "${ctx.brand}" NSF certified product listing`,
   },
-  {
-    id: 'gots',
-    patterns: [/\bgots\b|global\s+organic\s+textile/i],
-    registryDomains: ['global-standard.org'],
-    registryHomeUrl: 'https://global-standard.org/find-suppliers-certificates/',
+  gots: {
     buildSearchQuery: (ctx) =>
       `site:global-standard.org "${ctx.brand}" GOTS certified supplier database`,
   },
-  {
-    id: 'bluesign',
-    patterns: [/bluesign/i],
-    registryDomains: ['bluesign.com'],
-    registryHomeUrl: 'https://www.bluesign.com/en/partners',
+  bluesign: {
     buildSearchQuery: (ctx) =>
       `site:bluesign.com "${ctx.brand}" bluesign partner finder`,
   },
-]
+}
+
+/**
+ * @type {Array<import('../../src/shared/certification-taxonomy.mjs').CertificationTaxonomyEntry & {
+ *   buildSearchQuery: (ctx: ProductContext) => string,
+ *   extraSearchQueries?: (ctx: ProductContext) => string[],
+ * }>}
+ */
+export const CERT_REGISTRY_CONFIGS = CERTIFICATION_TAXONOMY.map((entry) => ({
+  ...entry,
+  ...REGISTRY_SEARCH_BY_ID[entry.id],
+}))
 
 export function resolveRegistryConfig(certName) {
-  for (const config of CERT_REGISTRY_CONFIGS) {
-    if (config.patterns.some((p) => p.test(certName))) return config
-  }
-  return null
+  const entry = resolveCertEntry(certName)
+  if (!entry) return null
+  return CERT_REGISTRY_CONFIGS.find((c) => c.id === entry.id) ?? null
 }
 
 function normalizeHost(hostname) {

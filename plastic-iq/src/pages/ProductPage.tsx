@@ -9,7 +9,9 @@ import { fetchWhyThisScore } from '../lib/whyThisScoreApi'
 import { WhyThisScore } from '../components/WhyThisScore'
 import type { WhyThisScoreFields } from '../lib/whyThisScoreApi'
 import { fetchNormalizationComponents } from '../lib/normalizationComponentsApi'
+import { CertificationBadges } from '../components/CertificationBadges'
 import { RiskDashboard } from '../components/RiskDashboard'
+import { Sources } from '../components/Sources'
 import { ScoreMark } from '../components/ScoreMark'
 import { FormulationSafetyScores } from '../components/FormulationSafetyScores'
 import { ScoreBasisBadge } from '../components/ScoreBasisBadge'
@@ -107,7 +109,9 @@ export function ProductPage() {
 
   const retailerLinks = orderedRetailerLinks(product)
   const buySectionTitle =
-    tier === 'Caution' || tier === 'High Risk' ? 'Where to view' : 'Where to buy'
+    tier === 'Caution' || tier === 'Concern' || tier === 'High Risk'
+      ? 'View product here'
+      : 'Where to buy'
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
@@ -214,6 +218,8 @@ export function ProductPage() {
             <RiskDashboard components={normalizationComponents} className="mt-6" />
           ) : null}
 
+          {productId ? <CertificationBadges productId={productId} className="mt-6" /> : null}
+
           {whyThisScore ? (
             <WhyThisScore fields={whyThisScore} className="mt-6" />
           ) : (
@@ -283,6 +289,8 @@ export function ProductPage() {
               </div>
             </div>
           )}
+
+          {productId ? <Sources productId={productId} className="mt-6" /> : null}
         </div>
 
         <aside className="md:col-span-5">
@@ -312,7 +320,7 @@ export function ProductPage() {
               )}
               {retailerLinks.length > 0 ? (
                 <div className="mt-3 text-xs leading-relaxed text-slate-500">
-                  FTC disclosure: PACScore may earn a commission if you purchase through affiliate
+                  FTC disclosure: PlasticBegone may earn a commission if you purchase through affiliate
                   links. Ratings are independent and based on our PAC Safety Score methodology.
                 </div>
               ) : null}

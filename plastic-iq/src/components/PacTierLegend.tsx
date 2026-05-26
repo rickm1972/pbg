@@ -50,6 +50,37 @@ function tierPill(tone: PacTierLegendTone) {
   }
 }
 
+function tierCardSurface(tone: PacTierLegendTone) {
+  switch (tone) {
+    case 'excellent':
+      return 'border-emerald-100 bg-emerald-50/60'
+    case 'good':
+      return 'border-blue-100 bg-blue-50/60'
+    case 'caution':
+      return 'border-amber-100 bg-amber-50/70'
+    case 'concern':
+      return 'border-orange-100 bg-orange-50/70'
+    case 'highrisk':
+      return 'border-red-100 bg-red-50/70'
+  }
+}
+
+function tierAccentText(tone: PacTierLegendTone) {
+  switch (tone) {
+    case 'excellent':
+      return 'text-emerald-700'
+    case 'good':
+      return 'text-blue-700'
+    case 'caution':
+      return 'text-amber-700'
+    case 'concern':
+      return 'text-orange-700'
+    case 'highrisk':
+      return 'text-red-700'
+  }
+}
+
+/** Product page sidebar — vertical list, icon + label + range pill. */
 export function PacTierLegend({ className = '' }: { className?: string }) {
   return (
     <div className={`grid gap-2 ${className}`}>
@@ -69,6 +100,41 @@ export function PacTierLegend({ className = '' }: { className?: string }) {
           <div className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${tierPill(t.tone)}`}>
             {t.range}
           </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** About page — five equal-height tier cards (matches PacTierLegend sidebar styling, larger type). */
+export function PacTierAboutGrid({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 ${className}`}
+    >
+      {PAC_TIER_LEGEND.map((t) => (
+        <div
+          key={t.label}
+          className={`flex h-full flex-col rounded-2xl border p-4 shadow-sm ${tierCardSurface(t.tone)}`}
+        >
+          <div className="flex shrink-0 items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className={`text-base font-semibold leading-tight ${tierAccentText(t.tone)}`}>
+                {t.label}
+              </div>
+              <span
+                className={`mt-1.5 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${tierPill(t.tone)}`}
+              >
+                {t.range}
+              </span>
+            </div>
+            <span
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/90 ring-1 ${tierRing(t.tone)}`}
+            >
+              {tierIcon(t.tone)}
+            </span>
+          </div>
+          <p className="mt-3 min-h-[4.25rem] text-sm leading-relaxed text-slate-800">{t.description}</p>
         </div>
       ))}
     </div>
