@@ -27,7 +27,6 @@ const RISK_FACTORS = [
   {
     step: 1,
     title: 'Material',
-    border: 'border-t-emerald-600',
     bubble: 'bg-emerald-50 ring-emerald-100',
     iconClass: 'text-emerald-700',
     Icon: Layers,
@@ -36,7 +35,6 @@ const RISK_FACTORS = [
   {
     step: 2,
     title: 'Migration',
-    border: 'border-t-blue-600',
     bubble: 'bg-blue-50 ring-blue-100',
     iconClass: 'text-blue-700',
     Icon: Waves,
@@ -45,7 +43,6 @@ const RISK_FACTORS = [
   {
     step: 3,
     title: 'Use conditions',
-    border: 'border-t-violet-600',
     bubble: 'bg-violet-50 ring-violet-100',
     iconClass: 'text-violet-700',
     Icon: Route,
@@ -197,7 +194,7 @@ export function AboutPage() {
               {RISK_FACTORS.map((factor) => (
                 <li
                   key={factor.title}
-                  className={`border-t-4 bg-white px-5 py-5 md:px-5 md:py-6 ${factor.border}`}
+                  className="bg-white px-5 py-5 md:px-5 md:py-6"
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-bold tabular-nums tracking-wider text-slate-400">
@@ -216,7 +213,7 @@ export function AboutPage() {
             </ol>
 
             <div className="border-t border-slate-200/90 bg-white/90 px-5 py-4 md:px-6">
-              <p className="border-l-4 border-forest/80 pl-4 text-sm leading-relaxed text-slate-700">
+              <p className="text-sm leading-relaxed text-slate-700">
                 <span className="font-semibold text-ink-900">Risk emerges when all three factors combine.</span>{' '}
                 A concerning material with low migration and gentle use can still score well. A safer material with
                 harsh conditions can still score well because it doesn&apos;t leach. Our algorithm weighs all three
