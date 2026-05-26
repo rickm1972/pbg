@@ -23,6 +23,36 @@ const PAC_SAFETY_CERTIFICATIONS = [
   { name: 'USDA Organic', description: 'Organic material verification' },
 ] as const
 
+const RISK_FACTORS = [
+  {
+    step: 1,
+    title: 'Material',
+    border: 'border-t-emerald-600',
+    bubble: 'bg-emerald-50 ring-emerald-100',
+    iconClass: 'text-emerald-700',
+    Icon: Layers,
+    body: "What the product is made of. Some materials are inert (cast iron, glass, stainless steel) and don't transfer chemicals. Others (plastics, undisclosed coatings) can release plastic-associated chemicals into food, drink, or skin.",
+  },
+  {
+    step: 2,
+    title: 'Migration',
+    border: 'border-t-blue-600',
+    bubble: 'bg-blue-50 ring-blue-100',
+    iconClass: 'text-blue-700',
+    Icon: Waves,
+    body: 'How easily the material transfers chemicals. A material might be concerning on paper but rarely release anything in real use. Or a material might look fine but leach heavily under heat or fat exposure.',
+  },
+  {
+    step: 3,
+    title: 'Use conditions',
+    border: 'border-t-violet-600',
+    bubble: 'bg-violet-50 ring-violet-100',
+    iconClass: 'text-violet-700',
+    Icon: Route,
+    body: 'How the product is used. Heat, fat, acid, and contact duration all increase chemical migration. Cookware faces harsher conditions than food storage. Rinse-off cleaners face gentler conditions than leave-on personal care.',
+  },
+] as const
+
 export function AboutPage() {
   return (
     <div className="bg-transparent">
@@ -147,37 +177,53 @@ export function AboutPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-            <h2 className="text-base font-semibold text-ink-900">How we measure risk</h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-700">
-              Every product is evaluated on three factors:
-            </p>
-            <div className="mt-4 grid items-stretch gap-3 md:grid-cols-3">
-              <RiskFactorCard
-                icon={<Layers className="h-5 w-5 text-emerald-700" />}
-                iconTone="emerald"
-                title="Material"
-                body="What the product is made of. Some materials are inert (cast iron, glass, stainless steel) and don't transfer chemicals. Others (plastics, undisclosed coatings) can release plastic-associated chemicals into food, drink, or skin."
-              />
-              <RiskFactorCard
-                icon={<Waves className="h-5 w-5 text-blue-700" />}
-                iconTone="blue"
-                title="Migration"
-                body="How easily the material transfers chemicals. A material might be concerning on paper but rarely release anything in real use. Or a material might look fine but leach heavily under heat or fat exposure."
-              />
-              <RiskFactorCard
-                icon={<Route className="h-5 w-5 text-violet-700" />}
-                iconTone="violet"
-                title="Use conditions"
-                body="How the product is used. Heat, fat, acid, and contact duration all increase chemical migration. Cookware faces harsher conditions than food storage. Rinse-off cleaners face gentler conditions than leave-on personal care."
-              />
+          <section
+            aria-labelledby="how-we-measure-risk"
+            className="overflow-hidden rounded-3xl border border-slate-200 bg-[#f4f7f5] shadow-card"
+          >
+            <div className="border-b border-slate-200/90 bg-white px-5 py-5 md:px-6">
+              <h2
+                id="how-we-measure-risk"
+                className="font-display text-xl font-semibold tracking-tight text-ink-900 md:text-2xl"
+              >
+                How we measure risk
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 md:text-[0.9375rem]">
+                Every product is evaluated on three factors:
+              </p>
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-slate-700">
-              Risk emerges when all three factors combine. A concerning material with low migration and gentle use can
-              still score well. A safer material with harsh conditions can still score well because it
-              doesn&apos;t leach. Our algorithm weighs all three factors for every product.
-            </p>
-          </div>
+
+            <ol className="grid list-none divide-y divide-slate-200/90 p-0 md:grid-cols-3 md:divide-x md:divide-y-0">
+              {RISK_FACTORS.map((factor) => (
+                <li
+                  key={factor.title}
+                  className={`border-t-4 bg-white px-5 py-5 md:px-5 md:py-6 ${factor.border}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold tabular-nums tracking-wider text-slate-400">
+                      {String(factor.step).padStart(2, '0')}
+                    </span>
+                    <span
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ${factor.bubble}`}
+                    >
+                      <factor.Icon className={`h-5 w-5 ${factor.iconClass}`} aria-hidden />
+                    </span>
+                    <h3 className="text-base font-semibold text-ink-900">{factor.title}</h3>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600">{factor.body}</p>
+                </li>
+              ))}
+            </ol>
+
+            <div className="border-t border-slate-200/90 bg-white/90 px-5 py-4 md:px-6">
+              <p className="border-l-4 border-forest/80 pl-4 text-sm leading-relaxed text-slate-700">
+                <span className="font-semibold text-ink-900">Risk emerges when all three factors combine.</span>{' '}
+                A concerning material with low migration and gentle use can still score well. A safer material with
+                harsh conditions can still score well because it doesn&apos;t leach. Our algorithm weighs all three
+                factors for every product.
+              </p>
+            </div>
+          </section>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -344,49 +390,6 @@ function Panel({
         <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{subtitle}</p>
       </div>
       <div className="md:col-span-5">{right}</div>
-    </div>
-  )
-}
-
-function RiskFactorCard({
-  icon,
-  iconTone,
-  title,
-  body,
-}: {
-  icon: React.ReactNode
-  iconTone: 'emerald' | 'blue' | 'violet'
-  title: string
-  body: string
-}) {
-  const bubble =
-    iconTone === 'emerald'
-      ? 'bg-emerald-50 ring-emerald-100'
-      : iconTone === 'blue'
-        ? 'bg-blue-50 ring-blue-100'
-        : 'bg-violet-50 ring-violet-100'
-  const titleTone =
-    iconTone === 'emerald'
-      ? 'text-emerald-700'
-      : iconTone === 'blue'
-        ? 'text-blue-700'
-        : 'text-violet-700'
-  const accent =
-    iconTone === 'emerald'
-      ? 'from-emerald-500/12 to-emerald-500/0 ring-emerald-200/70'
-      : iconTone === 'blue'
-        ? 'from-blue-500/12 to-blue-500/0 ring-blue-200/70'
-        : 'from-violet-500/12 to-violet-500/0 ring-violet-200/70'
-
-  return (
-    <div
-      className={`flex h-full flex-col rounded-2xl border border-slate-200 bg-gradient-to-b p-4 shadow-[0_14px_50px_-26px_rgba(15,61,38,0.35)] ring-1 ${accent}`}
-    >
-      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ring-1 ${bubble}`}>
-        {icon}
-      </span>
-      <h3 className={`mt-3 text-sm font-semibold ${titleTone}`}>{title}</h3>
-      <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-700">{body}</p>
     </div>
   )
 }
