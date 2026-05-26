@@ -147,39 +147,42 @@ export function AboutPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-            <h2 className="text-base font-semibold text-ink-900">How we measure risk</h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-700">
+          <div className="rounded-3xl bg-ink-900 p-5 shadow-card md:p-6">
+            <h2 className="text-base font-semibold text-white">How we measure risk</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">
               Every product is evaluated on three factors:
             </p>
             <div className="mt-4 grid items-stretch gap-3 md:grid-cols-3">
               <RiskFactorCard
+                onDark
                 icon={<Layers className="h-5 w-5 text-emerald-700" />}
                 iconTone="emerald"
                 title="Material"
                 body="What the product is made of. Some materials are inert (cast iron, glass, stainless steel) and don't transfer chemicals. Others (plastics, undisclosed coatings) can release plastic-associated chemicals into food, drink, or skin."
               />
               <RiskFactorCard
+                onDark
                 icon={<Waves className="h-5 w-5 text-blue-700" />}
                 iconTone="blue"
                 title="Migration"
                 body="How easily the material transfers chemicals. A material might be concerning on paper but rarely release anything in real use. Or a material might look fine but leach heavily under heat or fat exposure."
               />
               <RiskFactorCard
+                onDark
                 icon={<Route className="h-5 w-5 text-violet-700" />}
                 iconTone="violet"
                 title="Use conditions"
                 body="How the product is used. Heat, fat, acid, and contact duration all increase chemical migration. Cookware faces harsher conditions than food storage. Rinse-off cleaners face gentler conditions than leave-on personal care."
               />
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-slate-700">
+            <p className="mt-4 text-sm leading-relaxed text-slate-300">
               Risk emerges when all three factors combine. A concerning material with low migration and gentle use can
               still score well. A safer material with harsh conditions can still score well because it
               doesn&apos;t leach. Our algorithm weighs all three factors for every product.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-emerald-200/80 bg-gradient-to-b from-emerald-50/50 via-white to-white p-5 shadow-card ring-1 ring-emerald-100/60">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="max-w-xl">
                 <div className="flex items-center gap-2">
@@ -353,11 +356,13 @@ function RiskFactorCard({
   iconTone,
   title,
   body,
+  onDark = false,
 }: {
   icon: React.ReactNode
   iconTone: 'emerald' | 'blue' | 'violet'
   title: string
   body: string
+  onDark?: boolean
 }) {
   const bubble =
     iconTone === 'emerald'
@@ -378,10 +383,12 @@ function RiskFactorCard({
         ? 'from-blue-500/12 to-blue-500/0 ring-blue-200/70'
         : 'from-violet-500/12 to-violet-500/0 ring-violet-200/70'
 
+  const surface = onDark
+    ? 'border-slate-200 bg-white shadow-[0_16px_48px_-20px_rgba(0,0,0,0.45)]'
+    : `border-slate-200 bg-gradient-to-b shadow-[0_14px_50px_-26px_rgba(15,61,38,0.35)] ring-1 ${accent}`
+
   return (
-    <div
-      className={`group flex h-full flex-col rounded-2xl border border-slate-200 bg-gradient-to-b p-4 shadow-[0_14px_50px_-26px_rgba(15,61,38,0.35)] ring-1 transition ${accent}`}
-    >
+    <div className={`flex h-full flex-col rounded-2xl border p-4 ${surface}`}>
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ring-1 ${bubble}`}>
         {icon}
       </span>
