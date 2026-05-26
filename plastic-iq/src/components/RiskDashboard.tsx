@@ -12,22 +12,19 @@ type Props = {
 
 const TONE_STYLES: Record<
   RiskIndicatorTone,
-  { text: string; bar: string; track: string }
+  { text: string; bar: string }
 > = {
   safe: {
     text: 'text-emerald-700',
     bar: 'bg-emerald-500',
-    track: 'bg-emerald-50',
   },
   moderate: {
     text: 'text-amber-700',
     bar: 'bg-amber-500',
-    track: 'bg-amber-50',
   },
   concerning: {
     text: 'text-red-700',
     bar: 'bg-red-500',
-    track: 'bg-red-50',
   },
 }
 
@@ -83,7 +80,7 @@ function RiskIndicatorRow({
         <span className={`text-sm font-semibold ${styles.text}`}>{indicator.statusLabel}</span>
       </div>
       <div
-        className={`h-2.5 w-full overflow-hidden rounded-full ${styles.track}`}
+        className="h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]"
         role="meter"
         aria-label={`${label}: ${indicator.statusLabel}, ${fill}%`}
         aria-valuemin={0}
