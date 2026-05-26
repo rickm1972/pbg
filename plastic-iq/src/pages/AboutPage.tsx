@@ -394,9 +394,17 @@ function RiskFactorCard({
       : iconTone === 'blue'
         ? 'text-blue-700'
         : 'text-violet-700'
+  const accent =
+    iconTone === 'emerald'
+      ? 'from-emerald-500/12 to-emerald-500/0 ring-emerald-200/70'
+      : iconTone === 'blue'
+        ? 'from-blue-500/12 to-blue-500/0 ring-blue-200/70'
+        : 'from-violet-500/12 to-violet-500/0 ring-violet-200/70'
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div
+      className={`group flex h-full flex-col rounded-2xl border border-slate-200 bg-gradient-to-b p-4 shadow-[0_14px_50px_-26px_rgba(15,61,38,0.35)] ring-1 transition ${accent}`}
+    >
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ring-1 ${bubble}`}>
         {icon}
       </span>
