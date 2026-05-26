@@ -106,7 +106,7 @@ export function PacTierLegend({ className = '' }: { className?: string }) {
   )
 }
 
-/** About page — five equal-height tier cards (matches PacTierLegend sidebar styling, larger type). */
+/** About page — five equal-height tier cards with stronger tier accent (mirrors About risk cards). */
 export function PacTierAboutGrid({ className = '' }: { className?: string }) {
   return (
     <div
@@ -115,7 +115,7 @@ export function PacTierAboutGrid({ className = '' }: { className?: string }) {
       {PAC_TIER_LEGEND.map((t) => (
         <div
           key={t.label}
-          className={`flex h-full flex-col rounded-2xl border p-4 shadow-sm ${tierCardSurface(t.tone)}`}
+          className={`flex h-full flex-col rounded-2xl border bg-gradient-to-b p-4 shadow-[0_18px_55px_-30px_rgba(15,61,38,0.55)] ring-1 ${tierCardSurface(t.tone)}`}
         >
           <div className="flex shrink-0 items-start justify-between gap-2">
             <div className="min-w-0">
