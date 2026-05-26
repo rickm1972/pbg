@@ -208,14 +208,14 @@ export function AboutPage() {
               <p className="text-[0.78rem] font-semibold uppercase tracking-wide text-slate-500">
                 Certifications we recognize for PAC safety
               </p>
-              <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {PAC_SAFETY_CERTIFICATIONS.map((cert) => (
                   <li
                     key={cert.name}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-sm leading-relaxed text-slate-700"
+                    className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-[0_10px_40px_-24px_rgba(15,61,38,0.35)] ring-1 ring-slate-200/80"
                   >
                     <div className="text-sm font-semibold text-ink-900">{cert.name}</div>
-                    <div className="mt-0.5 text-[0.85rem]">{cert.description}</div>
+                    <div className="mt-1 text-sm text-slate-600">{cert.description}</div>
                   </li>
                 ))}
               </ul>
