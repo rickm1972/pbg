@@ -3,6 +3,7 @@
  * Evidence prose and taxonomy *Options arrays are not used (prevents phantom dropdown values).
  */
 
+import { isPacRelevant, resolveCertEntry } from '../../src/shared/certification-taxonomy.mjs'
 import { isUnknownFoodContactCoatingMaterial } from './deterministic/material-taxonomy.mjs'
 import { whyThisScoreLabelForComponent } from './why-this-score-labels.mjs'
 import { finalizeOptions, NONE, VOCABULARY } from './why-this-score-vocabulary.mjs'
@@ -101,30 +102,17 @@ function mapDisclosureQuality(inputs) {
   return finalizeOptions([], 'disclosure_quality_options')
 }
 
-const CERT_RULES = [
-  [/made\s*safe/i, 'MADE SAFE'],
-  [/leaping\s*bunny/i, 'Leaping Bunny'],
-  [/ewg\s*verified/i, 'EWG Verified'],
-  [/epa\s*safer\s*choice/i, 'EPA Safer Choice'],
-  [/usda\s*biobased/i, 'USDA Biobased'],
-  [/\bb\s*corp\b/i, 'B Corp'],
-  [/climate\s*neutral/i, 'Climate Neutral'],
-  [/ifra\s*allergen/i, 'IFRA Allergen'],
-  [/\bnsf\b/i, 'NSF'],
-  [/fda\s*food\s*contact/i, 'FDA Food Contact'],
-  [/bps\s*bpf|independent.*bps/i, 'Independent BPS BPF tested'],
-]
-
 function mapCertifications(evidence) {
   const rows = evidence?.agent_metadata?.certifications_verified ?? []
   const picked = []
   for (const row of rows) {
     if (!/verified|kept|confirmed|valid/i.test(String(row.action_taken ?? ''))) continue
-    const raw = String(row.certification_name ?? '')
-    if (/no third.party|not found|e\.g\.,\s*made safe/i.test(raw.toLowerCase())) continue
-    for (const [pattern, label] of CERT_RULES) {
-      if (pattern.test(raw) && !picked.includes(label)) picked.push(label)
-    }
+    const raw = String(row.certification_name ?? '').trim()
+    if (!raw || /no third.party|not found|e\.g\.,\s*made safe/i.test(raw.toLowerCase())) continue
+    if (!isPacRelevant(raw)) continue
+
+    const label = resolveCertEntry(raw)?.name ?? raw
+    if (!picked.includes(label)) picked.push(label)
   }
   if (!picked.length) {
     return finalizeOptions(['Third-party verification absent'], 'certifications_options')
