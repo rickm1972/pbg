@@ -187,16 +187,33 @@ function appliesMarketingLanguageNegative(evidence, components, unknownCoating) 
 
   const safety = getSafetyClaims(evidence)
   if (safety) {
-    const claimed =
-      safety.pfas_free_claim?.claimed ||
-      safety.bpa_free_claim?.claimed ||
-      safety.non_toxic_claim?.claimed
+    const claimedPfasFree = Boolean(safety.pfas_free_claim?.claimed)
+    const claimedBpaFree = Boolean(safety.bpa_free_claim?.claimed)
+    const claimedNonToxic = Boolean(safety.non_toxic_claim?.claimed)
+    const claimed = claimedPfasFree || claimedBpaFree || claimedNonToxic
     if (!claimed) return false
+
+    const structuralPfas = Boolean(safety.pfas_free_claim?.structural_guarantee)
+    const structuralNonToxic = Boolean(safety.non_toxic_claim?.structural_guarantee)
     const structural =
-      safety.pfas_free_claim?.structural_guarantee ||
-      safety.bpa_free_claim?.structural_guarantee ||
-      safety.non_toxic_claim?.structural_guarantee
-    if (structural) return false
+      structuralPfas ||
+      Boolean(safety.bpa_free_claim?.structural_guarantee) ||
+      structuralNonToxic
+
+    const hasFluoropolymer = components.some((c) =>
+      /ptfe|pfa|fep|fluoropolymer/i.test(`${c.material_id} ${c.material}`),
+    )
+    const hasHighHazard = components.some((c) => Number(c.material_hazard) >= 0.5)
+
+    const contradiction =
+      (claimedPfasFree && hasFluoropolymer) || (claimedNonToxic && hasHighHazard)
+
+    if (structural && !contradiction) {
+      // Structurally guaranteed and consistent with disclosed materials — no -2.
+      return false
+    }
+
+    // Either not structurally guaranteed or structurally guaranteed but contradicted by materials.
     return true
   }
 

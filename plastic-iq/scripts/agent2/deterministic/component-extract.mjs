@@ -421,8 +421,7 @@ function extractFormulationPrimary(evidence) {
 
   const primaryMat = factValue(evidence, 'primary_material')
   const blob = `${ingredients} ${primaryMat}`
-  const materialId =
-    detectMaterialId(blob) ?? 'plant_mineral_formulation'
+  const materialId = detectMaterialId(blob) ?? 'plant_mineral_formulation'
 
   const confidence = resolveConfidenceLabel(evidence, row, { fullIngredientList: true })
 
@@ -451,6 +450,42 @@ function extractCookwarePrimary(evidence, product) {
   const material = factValue(evidence, 'primary_material')
   const finishing = factValue(evidence, 'finishing_treatments')
   const components = extractAllPrimaryCookingSurfaces(evidence, product)
+
+  // Compound primary material IDs like "ptfe_nonstick_on_hard_anodized_aluminum"
+  // should split into distinct coating + body components instead of falling back.
+  const compoundMatch =
+    typeof material === 'string' && material.includes('_on_')
+      ? /^([a-z0-9_]+)_on_([a-z0-9_]+)$/i.exec(material.trim())
+      : null
+  if (compoundMatch && components.length === 0) {
+    const [, coatingId, bodyId] = compoundMatch
+    const coatingMat = requireMaterial(coatingId)
+    const bodyMat = requireMaterial(bodyId)
+    const contactRow = factByKey(evidence, 'primary_contact_surface')
+    const coatingConfidence = resolveConfidenceLabel(evidence, contactRow || materialRow)
+    const bodyConfidence = resolveConfidenceLabel(evidence, materialRow || contactRow)
+
+    components.push({
+      component_name: `Cooking Surface — ${coatingMat.name}`,
+      role: 'primary_food_contact',
+      material_id: coatingId,
+      material: contact || material,
+      evidence_source: factSource(
+        evidence,
+        contactRow ? 'primary_contact_surface' : 'primary_material',
+      ),
+      data_confidence: coatingConfidence,
+    })
+
+    components.push({
+      component_name: `Pan Body — ${bodyMat.name}`,
+      role: 'structural',
+      material_id: bodyId,
+      material: material,
+      evidence_source: factSource(evidence, 'primary_material'),
+      data_confidence: bodyConfidence,
+    })
+  }
 
   const hasSeasoning =
     /vegetable oil|pre.seasoned|natural oil seasoning/i.test(`${contact} ${finishing}`) &&

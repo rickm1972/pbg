@@ -95,10 +95,21 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     throw err
   }
 
-  console.log('Step 5: JSON parsed and validated')
+  const taxonomyBlocked = inputs.status === 'taxonomy_expansion_required'
+  console.log(
+    taxonomyBlocked
+      ? 'Step 5: taxonomy_expansion_required — normalization halted for missing material taxonomy.'
+      : 'Step 5: JSON parsed and validated',
+  )
 
-  const whyThisScore = buildWhyThisScoreOptions(evidence, inputs)
-  console.log('Step 5b: Why This Score vocabulary options mapped')
+  const whyThisScore = taxonomyBlocked ? null : buildWhyThisScoreOptions(evidence, inputs)
+  if (taxonomyBlocked) {
+    console.log(
+      'Step 5b: skipping Why This Score vocabulary mapping (taxonomy expansion required).',
+    )
+  } else {
+    console.log('Step 5b: Why This Score vocabulary options mapped')
+  }
 
   if (inputs.human_review_required) {
     console.log('  human_review_required: true')
@@ -116,15 +127,20 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     agent_version: inputs.normalization_metadata?.agent_version ?? AGENT_VERSION,
     algorithm_version: inputs.normalization_metadata?.algorithm_version ?? ALGORITHM_VERSION,
     inputs,
-    review_status: 'submitted',
+    review_status: taxonomyBlocked ? 'draft' : 'submitted',
     human_review_required: Boolean(inputs.human_review_required),
     human_review_reason: inputs.human_review_reason ?? null,
-    ...whyThisScore,
+    ...(whyThisScore || {}),
   })
   console.log(`Step 6: saved scoring_inputs (${row.input_id})`)
 
-  await updateAgentStatus(supabase, id, 'normalization_awaiting_review')
-  console.log('Step 7: agent_status → normalization_awaiting_review')
+  if (taxonomyBlocked) {
+    await updateAgentStatus(supabase, id, 'taxonomy_expansion_required')
+    console.log('Step 7: agent_status → taxonomy_expansion_required')
+  } else {
+    await updateAgentStatus(supabase, id, 'normalization_awaiting_review')
+    console.log('Step 7: agent_status → normalization_awaiting_review')
+  }
 
   const outDir = join(projectRoot, 'scripts', 'output')
   mkdirSync(outDir, { recursive: true })
