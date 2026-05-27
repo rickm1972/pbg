@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { Product } from '../types'
 import { ScoreMark } from './ScoreMark'
-import { ScoreBasisBadge } from './ScoreBasisBadge'
 import { tierForScore } from '../lib/score'
 import { ProductImage } from './ProductImage'
 
@@ -24,7 +23,6 @@ export function ProductCard({ product }: { product: Product }) {
               </div>
               <div className="truncate text-sm text-slate-600">{product.brand ?? '—'}</div>
             </div>
-            {product.score_basis ? <ScoreBasisBadge basis={product.score_basis} /> : null}
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-3">

@@ -6,6 +6,7 @@ import {
   hasPackagingOnlyInference,
   hasPrimaryInferredComponent,
 } from '../agent3/confidence-interval.mjs'
+import { safetyClaimContradictsMaterials } from './safety-claim-contradiction.mjs'
 
 const MARKETING_LANGUAGE_REASON = 'marketing language only, no verifiable claims'
 
@@ -50,6 +51,9 @@ export function shouldStripMarketingLanguageNegative(inputs) {
   if (inputs.layer_4a?.unknown_coating_cap_applies) return false
   if (hasPrimaryInferredComponent(inputs)) return false
   if (hasUnknownFoodContactCoating(inputs)) return false
+  if (inputs.evidence && safetyClaimContradictsMaterials(inputs.evidence, inputs.components)) {
+    return false
+  }
   return true
 }
 

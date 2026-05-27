@@ -26,7 +26,6 @@ import categoryCookingUtensils from '../assets/category-cooking-utensils.png'
 import categoryCookware from '../assets/category-cookware.png'
 import magicHero from '../assets/magic-wide-cropped.png'
 import { colorForTier, tierForScore } from '../lib/score'
-import { ScoreBasisBadge } from '../components/ScoreBasisBadge'
 import { ProductImage } from '../components/ProductImage'
 import { TopNav } from '../components/nav/TopNav'
 
@@ -646,12 +645,6 @@ function TopRatedCard({ product }: { product: Product }) {
           {product.product_name}
         </div>
         <div className="mt-1 text-xs text-slate-600">{product.brand ?? '—'}</div>
-
-        <div className="mt-3 min-h-[28px]">
-          {product.score_basis ? (
-            <ScoreBasisBadge basis={product.score_basis} className="bg-white" />
-          ) : null}
-        </div>
 
         <div className="mt-3 min-h-[32px] text-xs leading-snug text-slate-600 line-clamp-2">
           {product.category ?? '—'}

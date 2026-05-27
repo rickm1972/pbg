@@ -4,8 +4,11 @@ import { ChevronRight, ShieldCheck } from 'lucide-react'
 import type { NormalizationComponent } from '../types/agent'
 import type { Product, ProductTier } from '../types'
 import { fetchProduct, fetchProductsByCategory } from '../lib/productsApi'
-import { fetchApprovedProductScore, type ApprovedProductScore } from '../lib/productScoresApi'
-import { fetchWhyThisScore } from '../lib/whyThisScoreApi'
+import { fetchProductPageScore, type ProductPageScore } from '../lib/productScoresApi'
+import {
+  fetchWhyThisScore,
+  primaryContactMaterialDisplay,
+} from '../lib/whyThisScoreApi'
 import { WhyThisScore } from '../components/WhyThisScore'
 import type { WhyThisScoreFields } from '../lib/whyThisScoreApi'
 import { fetchNormalizationComponents } from '../lib/normalizationComponentsApi'
@@ -13,7 +16,6 @@ import { CertificationBadges } from '../components/CertificationBadges'
 import { RiskDashboard } from '../components/RiskDashboard'
 import { Sources } from '../components/Sources'
 import { ScoreMark } from '../components/ScoreMark'
-import { ScoreBasisBadge } from '../components/ScoreBasisBadge'
 import { TransparencyBadge } from '../components/TransparencyBadge'
 import { transparencyBadgeSummary } from '../lib/transparencyBadge'
 import { PacTierLegend } from '../components/PacTierLegend'
@@ -24,7 +26,7 @@ import { orderedRetailerLinks, RetailerBuyButtons } from '../components/Retailer
 export function ProductPage() {
   const { productId } = useParams()
   const [product, setProduct] = useState<Product | null>(null)
-  const [approvedScore, setApprovedScore] = useState<ApprovedProductScore | null>(null)
+  const [pageScore, setPageScore] = useState<ProductPageScore | null>(null)
   const [normalizationComponents, setNormalizationComponents] = useState<
     NormalizationComponent[] | null
   >(null)
@@ -37,16 +39,16 @@ export function ProductPage() {
     if (!productId) return
     setLoading(true)
     setProduct(null)
-    setApprovedScore(null)
+    setPageScore(null)
     setNormalizationComponents(null)
     setError(null)
     fetchProduct(productId)
       .then((d) => setProduct(d))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load product'))
       .finally(() => setLoading(false))
-    fetchApprovedProductScore(productId)
-      .then((row) => setApprovedScore(row))
-      .catch(() => setApprovedScore(null))
+    fetchProductPageScore(productId)
+      .then((row) => setPageScore(row))
+      .catch(() => setPageScore(null))
     fetchNormalizationComponents(productId)
       .then((components) => setNormalizationComponents(components))
       .catch(() => setNormalizationComponents(null))
@@ -55,10 +57,14 @@ export function ProductPage() {
       .catch(() => setWhyThisScore(null))
   }, [productId])
 
-  const score = approvedScore?.pac_safety_score ?? product?.pac_safety_score ?? 0
+  const score = pageScore?.pac_safety_score ?? product?.pac_safety_score ?? 0
   const tier = useMemo(
-    () => approvedScore?.tier ?? (product?.tier ? product.tier : tierForScore(score)),
-    [approvedScore, product, score],
+    () => pageScore?.tier ?? (product?.tier ? product.tier : tierForScore(score)),
+    [pageScore, product, score],
+  )
+  const primaryMaterialName = useMemo(
+    () => primaryContactMaterialDisplay(whyThisScore?.primary_material_options),
+    [whyThisScore],
   )
 
   useEffect(() => {
@@ -153,44 +159,25 @@ export function ProductPage() {
             {product.product_name}
           </h1>
 
-          <div className="mt-6 flex flex-wrap items-start gap-4">
-            <ScoreMark score={score} tier={tier} size="lg" />
-            <div className="min-w-[12rem] space-y-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  PAC Safety Score
-                </div>
-                {product.score_basis ? (
-                  <div className="mt-2">
-                    <ScoreBasisBadge basis={product.score_basis} />
-                  </div>
-                ) : null}
+          <div className="mt-6 flex flex-wrap items-start gap-5">
+            <div className="flex flex-col items-center gap-2">
+              <ScoreMark score={score} tier={tier} size="lg" />
+              {pageScore?.displayed_confidence_range ? (
+                <p className="text-center text-sm font-semibold tabular-nums text-slate-700">
+                  Range {pageScore.displayed_confidence_range}
+                </p>
+              ) : null}
+            </div>
+            <div className="min-w-[12rem] space-y-3 pt-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                PAC Safety Score
               </div>
-              {approvedScore ? (
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                  {approvedScore.displayed_confidence_range ? (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Confidence range
-                      </div>
-                      <div className="mt-0.5 text-sm font-semibold tabular-nums text-ink-900">
-                        {approvedScore.displayed_confidence_range}
-                      </div>
-                    </div>
-                  ) : null}
-                  {approvedScore.transparency_badge ? (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Transparency
-                      </div>
-                      <div className="mt-1.5">
-                        <TransparencyBadge badge={approvedScore.transparency_badge} />
-                        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                          {transparencyBadgeSummary(approvedScore.transparency_badge)}
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
+              {pageScore?.transparency_badge ? (
+                <div>
+                  <TransparencyBadge badge={pageScore.transparency_badge} />
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                    {transparencyBadgeSummary(pageScore.transparency_badge)}
+                  </p>
                 </div>
               ) : null}
             </div>
@@ -203,7 +190,11 @@ export function ProductPage() {
           ) : null}
 
           {normalizationComponents && normalizationComponents.length > 0 ? (
-            <RiskDashboard components={normalizationComponents} className="mt-6" />
+            <RiskDashboard
+              components={normalizationComponents}
+              primaryMaterialName={primaryMaterialName}
+              className="mt-6"
+            />
           ) : null}
 
           {productId ? <CertificationBadges productId={productId} className="mt-6" /> : null}

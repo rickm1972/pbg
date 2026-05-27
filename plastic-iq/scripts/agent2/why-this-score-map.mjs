@@ -50,7 +50,8 @@ function mapCoatingsFinishes(_evidence, inputs) {
       if (label && !picked.includes(label)) picked.push(label)
     } else if (
       role === 'primary_food_contact' &&
-      isUnknownFoodContactCoatingMaterial(c.material_id)
+      (isUnknownFoodContactCoatingMaterial(c.material_id) ||
+        /^ptfe/i.test(String(c.material_id ?? '')))
     ) {
       const label = whyThisScoreLabelForComponent(c.material_id, role, 'coating')
       if (label && !picked.includes(label)) picked.push(label)

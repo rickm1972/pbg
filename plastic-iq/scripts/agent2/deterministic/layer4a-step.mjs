@@ -43,6 +43,7 @@ export function runLayer4aStep(evidence, inferredComponents, category) {
     layer_4a: layer4aPacket.layer_4a,
     layer_4a_verified: layer4aPacket.layer_4a_verified,
     components: inferredComponents,
+    evidence,
   }
   const { inputs: stripped, stripped: didStrip } = stripMarketingLanguageNegative(stripCtx)
   if (stripped.layer_4a) {

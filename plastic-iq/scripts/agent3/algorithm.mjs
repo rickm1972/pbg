@@ -1,4 +1,7 @@
-import { deriveTransparencyBadgeAndCI } from './confidence-interval.mjs'
+import {
+  deriveTransparencyBadgeAndCI,
+  transparencyFromAgent2Layer4b,
+} from './confidence-interval.mjs'
 
 export const ALGORITHM_VERSION = '2.3.4'
 
@@ -284,7 +287,12 @@ export function scoreNormalization(inputs, options = {}) {
   const pacSafetyScore = core.pac_safety_score
   const tier = core.tier
   const componentResults = core.component_results
-  const layer4bDerived = deriveTransparencyBadgeAndCI(inputs, pacSafetyScore)
+
+  const agent2Layer4b = options.agent2Layer4b ?? inputs.layer_4b
+  const layer4bDerived =
+    transparencyFromAgent2Layer4b(agent2Layer4b, pacSafetyScore) ??
+    deriveTransparencyBadgeAndCI(inputs, pacSafetyScore)
+
   const confidenceInterval = layer4bDerived.confidence_interval
   const displayedConfidenceRange = layer4bDerived.displayed_confidence_range
   const transparencyBadge = layer4bDerived.transparency_badge

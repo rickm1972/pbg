@@ -47,6 +47,14 @@ export const WHY_THIS_SCORE_BY_MATERIAL_ROLE = {
     primary_food_contact: 'PTFE coating',
     coating: 'PTFE nonstick coating',
   },
+  ptfe_nonstick: {
+    primary_food_contact: 'PTFE coating',
+    coating: 'PTFE nonstick coating',
+  },
+  ptfe_nonstick_titanium_reinforced: {
+    primary_food_contact: 'PTFE coating',
+    coating: 'PTFE nonstick coating',
+  },
   vitreous_enamel: {
     primary_food_contact: 'Vitreous enamel over cast iron',
     coating: 'Vitreous enamel glaze',
@@ -58,8 +66,10 @@ export const WHY_THIS_SCORE_BY_MATERIAL_ROLE = {
   },
   hard_anodized_aluminum: {
     primary_food_contact: 'Hard anodized aluminum',
+    structural: 'Hard anodized aluminum',
     coating: 'Hard anodized finish',
   },
+  silicone_over_riveted_base: { handle: 'Silicone-coated handle' },
   aluminum_core: { structural: 'Aluminum core' },
   tempered_glass_lid: { lid: 'Tempered glass lid' },
   plastic_lid_unspecified: { lid: 'Plastic lid resin unspecified' },

@@ -11,8 +11,52 @@ import {
   getPrimaryContact,
   getSecondaryComponentsFromSchema,
   getStructuredEvidence,
+  getStructuredSubcategory,
   hasStructuredEvidence,
 } from './schema-input.mjs'
+
+const COMPOUND_MATERIAL_RE = /^([a-z0-9_]+)_on_([a-z0-9_]+)$/i
+
+/** @param {string} materialId */
+function parseCompoundMaterialId(materialId) {
+  const m = COMPOUND_MATERIAL_RE.exec(String(materialId ?? '').trim())
+  if (!m) return null
+  return { coatingId: m[1], bodyId: m[2] }
+}
+
+function pushCompoundMaterialComponents(
+  components,
+  { coatingId, bodyId, materialText, evidence_source, confidence },
+) {
+  const coatingMat = requireMaterial(coatingId)
+  const bodyMat = requireMaterial(bodyId)
+  if (!hasPrimaryCookingMaterial(components, coatingId)) {
+    components.push({
+      component_name: `Cooking Surface — ${coatingMat.name}`,
+      role: 'primary_food_contact',
+      material_id: coatingId,
+      material: materialText,
+      evidence_source,
+      data_confidence: confidence,
+    })
+  }
+  if (!components.some((c) => c.role === 'structural' && c.material_id === bodyId)) {
+    components.push({
+      component_name: `Pan Body — ${bodyMat.name}`,
+      role: 'structural',
+      material_id: bodyId,
+      material: materialText,
+      evidence_source,
+      data_confidence: confidence,
+    })
+  }
+}
+
+function isFormulationSubcategory(subcategory) {
+  return /^(dish_soap|detergent|hand_soap|body_wash|shampoo|laundry|cleaner|formulation)/.test(
+    subcategory,
+  )
+}
 
 /** Affirmative text for laser-etched stainless cooking-surface peaks. */
 const PEAKS_AFFIRMATIVE =
@@ -102,6 +146,22 @@ function addPrimaryFromStructuredContact(evidence, components) {
         }),
       )
     }
+    return
+  }
+
+  const compound =
+    parseCompoundMaterialId(matId) ?? parseCompoundMaterialId(identity)
+  if (compound) {
+    pushCompoundMaterialComponents(components, {
+      ...compound,
+      materialText: primary.material_identity,
+      evidence_source: {
+        fact_key: 'primary_contact_material',
+        excerpt: primary.excerpt,
+        source_url: primary.source_url,
+      },
+      confidence: primary.confidence,
+    })
     return
   }
 
@@ -453,37 +513,18 @@ function extractCookwarePrimary(evidence, product) {
 
   // Compound primary material IDs like "ptfe_nonstick_on_hard_anodized_aluminum"
   // should split into distinct coating + body components instead of falling back.
-  const compoundMatch =
-    typeof material === 'string' && material.includes('_on_')
-      ? /^([a-z0-9_]+)_on_([a-z0-9_]+)$/i.exec(material.trim())
-      : null
-  if (compoundMatch && components.length === 0) {
-    const [, coatingId, bodyId] = compoundMatch
-    const coatingMat = requireMaterial(coatingId)
-    const bodyMat = requireMaterial(bodyId)
+  const compound = parseCompoundMaterialId(material)
+  if (compound && components.length === 0) {
     const contactRow = factByKey(evidence, 'primary_contact_surface')
     const coatingConfidence = resolveConfidenceLabel(evidence, contactRow || materialRow)
-    const bodyConfidence = resolveConfidenceLabel(evidence, materialRow || contactRow)
-
-    components.push({
-      component_name: `Cooking Surface — ${coatingMat.name}`,
-      role: 'primary_food_contact',
-      material_id: coatingId,
-      material: contact || material,
+    pushCompoundMaterialComponents(components, {
+      ...compound,
+      materialText: contact || material,
       evidence_source: factSource(
         evidence,
         contactRow ? 'primary_contact_surface' : 'primary_material',
       ),
-      data_confidence: coatingConfidence,
-    })
-
-    components.push({
-      component_name: `Pan Body — ${bodyMat.name}`,
-      role: 'structural',
-      material_id: bodyId,
-      material: material,
-      evidence_source: factSource(evidence, 'primary_material'),
-      data_confidence: bodyConfidence,
+      confidence: coatingConfidence,
     })
   }
 
@@ -646,8 +687,14 @@ function extractFromStructuredSchema(evidence, product) {
   const components = []
   const log = [{ step: 'structured_schema_v1', multi_material_cooking_surface: true }]
 
+  const subcategory = getStructuredSubcategory(evidence, product)
+  const primaryContact = getPrimaryContact(evidence)
   const ingredients = getIngredientList(evidence)
-  if (ingredients?.text) {
+  if (
+    ingredients?.text &&
+    isFormulationSubcategory(subcategory) &&
+    !primaryContact
+  ) {
     const materialId = detectMaterialId(ingredients.text) ?? 'plant_mineral_formulation'
     components.push({
       component_name: 'Liquid Formulation (Concentrate)',
@@ -675,6 +722,18 @@ function extractFromStructuredSchema(evidence, product) {
       materialId = detectMaterialId(sec.material_identity) ?? materialId
     }
     if (!getMaterial(materialId)) continue
+
+    if (
+      components.some(
+        (c) =>
+          c.material_id === materialId &&
+          (c.role === role ||
+            (role === 'structural' && c.role === 'structural') ||
+            (sec.component_role === 'other' && c.role === 'structural')),
+      )
+    ) {
+      continue
+    }
     let confidence = sec.confidence
     if (role === 'packaging' && /unspecified|not disclosed/i.test(sec.material_identity ?? '')) {
       confidence = 'inferred from category pattern'

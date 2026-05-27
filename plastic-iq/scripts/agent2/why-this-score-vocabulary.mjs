@@ -49,6 +49,7 @@ export const VOCABULARY = {
     'TPR soft grip handle',
     'Bamboo lid with silicone seal',
     'Stay-cool handle material unspecified',
+    'Silicone-coated handle',
     'Magnetic stainless steel base',
     'Stainless steel grade unspecified',
     'Aluminum core',

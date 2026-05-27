@@ -5,6 +5,10 @@ import aboutFtcCard from '../assets/about-ftc-card.png'
 import aboutCtaBanner from '../assets/about-cta-banner.png'
 import { PacTierAboutGrid } from '../components/PacTierLegend'
 import { TopNav } from '../components/nav/TopNav'
+import {
+  RISK_MEASURE_CLOSING,
+  RISK_MEASURE_INTRO,
+} from '../lib/riskMeasureCopy'
 
 const PAC_SAFETY_CERTIFICATIONS = [
   {
@@ -151,33 +155,29 @@ export function AboutPage() {
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
             <h2 className={SECTION_TITLE}>How we measure risk</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-700">
-              Every product is evaluated on three factors:
+              {RISK_MEASURE_INTRO}
             </p>
             <div className="mt-4 grid items-stretch gap-3 md:grid-cols-3">
               <RiskFactorCard
                 icon={<Layers className="h-5 w-5 text-emerald-700" />}
                 iconTone="emerald"
-                title="Material"
-                body="What the product is made of. Some materials are inert (cast iron, glass, stainless steel) and don't transfer chemicals. Others (plastics, undisclosed coatings) can release plastic-associated chemicals into food, drink, or skin."
+                title="Contact material"
+                body="What material touches your food, drink, or skin."
               />
               <RiskFactorCard
                 icon={<Waves className="h-5 w-5 text-blue-700" />}
                 iconTone="blue"
                 title="Migration"
-                body="How easily the material transfers chemicals. A material might be concerning on paper but rarely release anything in real use. Or a material might look fine but leach heavily under heat or fat exposure."
+                body="How easily that material transfers chemicals."
               />
               <RiskFactorCard
                 icon={<Route className="h-5 w-5 text-violet-700" />}
                 iconTone="violet"
                 title="Use conditions"
-                body="How the product is used. Heat, fat, acid, and contact duration all increase chemical migration. Cookware faces harsher conditions than food storage. Rinse-off cleaners face gentler conditions than leave-on personal care."
+                body="How intensely the product is used (heat, fat, contact time)."
               />
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-slate-700">
-              Risk emerges when all three factors combine. A concerning material with low migration and gentle use can
-              still score well. A safer material with harsh conditions can still score well because it
-              doesn&apos;t leach. Our algorithm weighs all three factors for every product.
-            </p>
+            <p className="mt-4 text-sm leading-relaxed text-slate-700">{RISK_MEASURE_CLOSING}</p>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">

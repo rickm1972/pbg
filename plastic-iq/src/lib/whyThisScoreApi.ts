@@ -21,6 +21,15 @@ export function displayOptions(options: string[]): string[] {
   return options.filter((o) => o !== 'None')
 }
 
+/** Primary contact material label for Risk Dashboard (first scored primary material). */
+export function primaryContactMaterialDisplay(
+  primaryMaterialOptions: string[] | undefined,
+): string | null {
+  const names = displayOptions(primaryMaterialOptions ?? [])
+  if (!names.length) return null
+  return names.join(', ')
+}
+
 /** Same rule as CertificationBadges — only PAC-relevant certs in Why This Score display. */
 export function filterPacRelevantCertificationOptions(options: string[]): string[] {
   const absent = 'Third-party verification absent'

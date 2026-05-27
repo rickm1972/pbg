@@ -48,6 +48,10 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
     `Step 2: loaded approved normalization (${scoringInput.input_id}, v${scoringInput.algorithm_version})`,
   )
 
+  const agent2Layer4b = scoringInput.inputs?.layer_4b
+    ? structuredClone(scoringInput.inputs.layer_4b)
+    : null
+
   const inputs = finalizeNormalization(
     enforceLayer4a(
       enforceNormalizationDeterminism(structuredClone(scoringInput.inputs)),
@@ -62,7 +66,11 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
     console.log('Step 2b: (no approved evidence bundle — pathway from normalization fields only)')
   }
 
-  const result = scoreNormalization(inputs, { brand: product.brand, evidence })
+  const result = scoreNormalization(inputs, {
+    brand: product.brand,
+    evidence,
+    agent2Layer4b,
+  })
 
   if (result.pac_safety_score !== 99 && product.product_name.includes('Lodge') && product.product_name.includes('Cast Iron')) {
     console.log('\n*** CALIBRATION FAILED — Lodge must score exactly 99 ***\n')
@@ -106,6 +114,20 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
   })
 
   console.log(`Step 14: saved product_scores (${scoreRow.score_id})`)
+
+  const { error: catalogError } = await supabase
+    .from('products')
+    .update({
+      pac_safety_score: result.pac_safety_score,
+      tier: result.tier,
+      score_basis: null,
+    })
+    .eq('product_id', id)
+
+  if (catalogError) throw catalogError
+  console.log(
+    `Step 14b: products catalog synced (score ${result.pac_safety_score}, tier ${result.tier})`,
+  )
 
   await updateAgentStatus(supabase, id, 'scoring_review_pending')
   console.log('Step 14: agent_status → scoring_review_pending')

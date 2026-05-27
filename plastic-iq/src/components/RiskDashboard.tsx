@@ -3,10 +3,17 @@ import {
   type RiskDashboardIndicator,
   type RiskIndicatorTone,
 } from '../lib/riskDashboard'
+import {
+  RISK_MEASURE_CLOSING,
+  RISK_MEASURE_FACTORS,
+  RISK_MEASURE_INTRO,
+} from '../lib/riskMeasureCopy'
 import type { NormalizationComponent } from '../types/agent'
 
 type Props = {
   components: NormalizationComponent[]
+  /** From Why This Score primary_material_options — shown on Contact material row. */
+  primaryMaterialName?: string | null
   className?: string
 }
 
@@ -28,9 +35,17 @@ const TONE_STYLES: Record<
   },
 }
 
-export function RiskDashboard({ components, className = '' }: Props) {
+export function RiskDashboard({
+  components,
+  primaryMaterialName,
+  className = '',
+}: Props) {
   const metrics = computeRiskDashboardMetrics(components)
   if (!metrics) return null
+
+  const contactMaterialLabel = primaryMaterialName
+    ? `Contact material: ${primaryMaterialName}`
+    : 'Contact material'
 
   return (
     <section
@@ -40,22 +55,18 @@ export function RiskDashboard({ components, className = '' }: Props) {
       <h2 id="risk-dashboard-heading" className="text-sm font-semibold text-ink-900">
         How we measure risk
       </h2>
-      <p className="mt-3 text-sm leading-relaxed text-slate-600">
-        Every product is evaluated on three factors:
-      </p>
+      <p className="mt-3 text-sm leading-relaxed text-slate-600">{RISK_MEASURE_INTRO}</p>
       <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-600">
-        <li>Material — what the product is made of</li>
-        <li>Migration — how easily the material transfers chemicals</li>
-        <li>Use conditions — how intensely the product contacts food during normal use</li>
+        {RISK_MEASURE_FACTORS.map((factor) => (
+          <li key={factor.name}>
+            {factor.name} — {factor.description}
+          </li>
+        ))}
       </ul>
-      <p className="mt-3 text-sm leading-relaxed text-slate-600">
-        Risk emerges when all three factors combine. Some products score high overall even when
-        one factor is concerning — for example, cast iron cookware faces harsh use conditions but
-        stays safe because the material is inert.
-      </p>
+      <p className="mt-3 text-sm leading-relaxed text-slate-600">{RISK_MEASURE_CLOSING}</p>
 
       <div className="mt-6 space-y-6">
-        <RiskIndicatorRow label="Material" indicator={metrics.material} />
+        <RiskIndicatorRow label={contactMaterialLabel} indicator={metrics.material} />
         <RiskIndicatorRow label="Migration" indicator={metrics.migration} />
         <RiskIndicatorRow label="Use conditions" indicator={metrics.useConditions} />
       </div>
@@ -76,8 +87,10 @@ function RiskIndicatorRow({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="text-sm font-semibold text-ink-900">{label}</span>
-        <span className={`text-sm font-semibold ${styles.text}`}>{indicator.statusLabel}</span>
+        <span className="min-w-0 text-sm font-semibold text-ink-900">{label}</span>
+        <span className={`shrink-0 text-sm font-semibold ${styles.text}`}>
+          {indicator.statusLabel}
+        </span>
       </div>
       <div
         className="h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]"

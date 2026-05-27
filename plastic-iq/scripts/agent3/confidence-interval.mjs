@@ -234,6 +234,35 @@ function hasOnlyDocumentationBands(inputs) {
 }
 
 /**
+ * Agent 2 is the source of truth for transparency badge and CI half-width.
+ * Agent 3 only derives the displayed score range from the final PAC score ± CI.
+ * @param {object} layer4b — scoring_inputs.inputs.layer_4b from Agent 2
+ * @param {number} pacScore
+ */
+export function transparencyFromAgent2Layer4b(layer4b, pacScore) {
+  const badge = String(layer4b?.transparency_badge ?? '').trim()
+  if (!badge) return null
+
+  const confidence_interval = Math.max(0, Number(layer4b.confidence_interval) || 0)
+  const lower = Math.max(0, pacScore - confidence_interval)
+  const upper = Math.min(99, pacScore + confidence_interval)
+  const displayed_confidence_range =
+    confidence_interval === 0 ? null : `${lower}–${upper}`
+
+  return {
+    transparency_badge: badge,
+    confidence_interval,
+    displayed_confidence_range,
+    score_swing_half_width: layer4b.score_swing_half_width ?? null,
+    badge_justification:
+      layer4b.badge_justification ??
+      `From Agent 2 layer_4b (${badge}, ±${confidence_interval}).`,
+    source: 'agent2_layer_4b',
+  }
+}
+
+/**
+ * @deprecated Agent 3 must use transparencyFromAgent2Layer4b. Kept for legacy packets missing layer_4b.
  * @param {object} inputs — scoring_inputs.inputs
  * @param {number} pacScore — score at assigned hazards
  */

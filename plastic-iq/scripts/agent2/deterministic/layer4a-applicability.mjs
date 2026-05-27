@@ -7,6 +7,10 @@ import { LAYER_4A_POSITIVE_MAX, lookupLayer4aPositive } from '../layer4a-positiv
 import { isUnknownFoodContactCoatingMaterial } from './material-taxonomy.mjs'
 import { factByKey, factValue } from './evidence-facts.mjs'
 import {
+  safetyClaimContradictsMaterials,
+  isStructuralSafetyClaimValid,
+} from '../safety-claim-contradiction.mjs'
+import {
   getConflictReview,
   getSafetyClaims,
   tokensFromStructuredVerifiedCerts,
@@ -193,27 +197,13 @@ function appliesMarketingLanguageNegative(evidence, components, unknownCoating) 
     const claimed = claimedPfasFree || claimedBpaFree || claimedNonToxic
     if (!claimed) return false
 
-    const structuralPfas = Boolean(safety.pfas_free_claim?.structural_guarantee)
-    const structuralNonToxic = Boolean(safety.non_toxic_claim?.structural_guarantee)
-    const structural =
-      structuralPfas ||
-      Boolean(safety.bpa_free_claim?.structural_guarantee) ||
-      structuralNonToxic
+    const contradiction = safetyClaimContradictsMaterials(evidence, components)
+    if (contradiction) return true
 
-    const hasFluoropolymer = components.some((c) =>
-      /ptfe|pfa|fep|fluoropolymer/i.test(`${c.material_id} ${c.material}`),
-    )
-    const hasHighHazard = components.some((c) => Number(c.material_hazard) >= 0.5)
-
-    const contradiction =
-      (claimedPfasFree && hasFluoropolymer) || (claimedNonToxic && hasHighHazard)
-
-    if (structural && !contradiction) {
-      // Structurally guaranteed and consistent with disclosed materials — no -2.
+    if (isStructuralSafetyClaimValid(evidence, components)) {
       return false
     }
 
-    // Either not structurally guaranteed or structurally guaranteed but contradicted by materials.
     return true
   }
 

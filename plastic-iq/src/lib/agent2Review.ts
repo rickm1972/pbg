@@ -159,16 +159,19 @@ export function isAgent2OnAwaitingReviewTab(status: string): boolean {
 }
 
 /**
- * Validation trio with old normalization awaiting review — Run tab only until a successful
- * re-run moves them to Awaiting review (dashboard tracks via pendingReviewOverride Set).
+ * Normalization awaiting review with a stale bundle — show on Run tab until a successful
+ * re-run moves the product to Awaiting review (dashboard tracks via readyForReviewAfterRunIds).
  */
+export function isAgent2AwaitingRerunOnRunTab(status: string): boolean {
+  return isAgent2OnAwaitingReviewTab(status)
+}
+
+/** @deprecated Use isAgent2AwaitingRerunOnRunTab — validation products follow the same rule. */
 export function isAgent2ValidationAwaitingRerunOnRunTab(
   status: string,
-  productId: string,
+  _productId: string,
 ): boolean {
-  return (
-    isAgent2OnAwaitingReviewTab(status) && isAgent2ValidationRerunProduct(productId)
-  )
+  return isAgent2AwaitingRerunOnRunTab(status)
 }
 
 /** Run tab — pipeline states that allow a new normalization run (not awaiting review). */
@@ -191,7 +194,7 @@ export function showOnAgent2RunTab(
 ): boolean {
   if (canRunAgent2(product.agent_status, product.product_id)) return true
   if (
-    isAgent2ValidationAwaitingRerunOnRunTab(product.agent_status, product.product_id) &&
+    isAgent2AwaitingRerunOnRunTab(product.agent_status) &&
     !readyForReviewAfterRunIds.has(product.product_id)
   ) {
     return true
@@ -206,7 +209,7 @@ export function showOnAgent2ReviewTab(
 ): boolean {
   if (!isAgent2OnAwaitingReviewTab(product.agent_status)) return false
   if (
-    isAgent2ValidationAwaitingRerunOnRunTab(product.agent_status, product.product_id) &&
+    isAgent2AwaitingRerunOnRunTab(product.agent_status) &&
     !readyForReviewAfterRunIds.has(product.product_id)
   ) {
     return false
@@ -220,11 +223,7 @@ export function canRerunAgent2FromReviewCard(
   productId: string,
   readyForReviewAfterRunIds: ReadonlySet<string>,
 ): boolean {
-  return (
-    isAgent2OnAwaitingReviewTab(status) &&
-    isAgent2ValidationRerunProduct(productId) &&
-    readyForReviewAfterRunIds.has(productId)
-  )
+  return isAgent2OnAwaitingReviewTab(status) && readyForReviewAfterRunIds.has(productId)
 }
 
 export async function checkAgent2ServerHealth(): Promise<boolean> {
