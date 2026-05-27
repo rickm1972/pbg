@@ -24,7 +24,6 @@ import categoryFoodStorage from '../assets/category-food-storage.png'
 import categoryWaterBottles from '../assets/category-water-bottles.png'
 import categoryCookingUtensils from '../assets/category-cooking-utensils.png'
 import categoryCookware from '../assets/category-cookware.png'
-import categoryDishSoap from '../assets/category-dish-soap.png'
 import magicHero from '../assets/magic-wide-cropped.png'
 import { colorForTier, tierForScore } from '../lib/score'
 import { ScoreBasisBadge } from '../components/ScoreBasisBadge'
@@ -93,8 +92,10 @@ const FEATURED_SUBCATEGORIES = [
   { label: 'Food Storage', db: 'Food Storage', image: categoryFoodStorage },
   { label: 'Cookware', db: 'Cookware', image: categoryCookware },
   { label: 'Cooking Utensils', db: 'Cooking Utensils', image: categoryCookingUtensils },
-  { label: 'Dish Soap', db: 'Dish Soap', image: categoryDishSoap },
 ] as const
+
+/** Subcategories outside materials-science scope (formulation products). */
+const EXCLUDED_SUBCATEGORIES = new Set(['Dish Soap'])
 
 export function HomePage() {
   const [searchParams] = useSearchParams()
@@ -131,7 +132,7 @@ export function HomePage() {
     const set = new Set<string>()
     for (const p of kitchenProducts) {
       const s = (p.subcategory ?? '').trim()
-      if (s) set.add(s)
+      if (s && !EXCLUDED_SUBCATEGORIES.has(s)) set.add(s)
     }
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [kitchenProducts])
@@ -139,7 +140,7 @@ export function HomePage() {
     const out: Record<string, number> = {}
     for (const p of kitchenProducts) {
       const s = (p.subcategory ?? '').trim()
-      if (!s) continue
+      if (!s || EXCLUDED_SUBCATEGORIES.has(s)) continue
       out[s] = (out[s] ?? 0) + 1
     }
     return out
