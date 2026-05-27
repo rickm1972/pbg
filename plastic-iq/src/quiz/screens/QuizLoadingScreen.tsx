@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { QuizCard, QuizShell } from '../ui'
 
 const FINAL_FACT =
   'Most PAC exposure comes from food and drinks — small daily doses add up over years.'
@@ -13,19 +14,21 @@ export function QuizLoadingScreen() {
   }, [navigate])
 
   return (
-    <div className="min-h-dvh bg-[#fdfcf9] text-ink-900">
-      <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center px-4 pb-10 pt-10 text-center">
-        <div className="text-xl font-semibold text-ink-900">
-          Calculating your kitchen PAC Safety Score…
-        </div>
-        <div className="mt-4 w-full max-w-sm">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
-            <div className="h-full w-2/3 animate-pulse bg-emerald-700" />
+    <QuizShell>
+      <main className="flex min-h-dvh flex-col items-center justify-center px-4 pb-10 pt-10 text-center">
+        <QuizCard className="w-full max-w-md text-left">
+          <div className="font-display text-xl font-semibold text-ink-900">
+            Calculating your kitchen PAC Safety Score…
           </div>
-        </div>
-        <div className="mt-8 max-w-sm text-sm leading-relaxed text-slate-600">{FINAL_FACT}</div>
+          <div className="mt-4">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+              <div className="h-full w-2/3 animate-pulse bg-forest" />
+            </div>
+          </div>
+          <div className="mt-5 text-sm leading-relaxed text-slate-600">{FINAL_FACT}</div>
+        </QuizCard>
       </main>
-    </div>
+    </QuizShell>
   )
 }
 

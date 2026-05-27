@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { getResponseId, getMotivationAnswers, setMotivationAnswer } from '../quizStorage'
+import { QuizCard, QuizOutlineButton, QuizShell } from '../ui'
 
 type Step = 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'
 
@@ -86,30 +87,29 @@ export function QuizMotivationScreen() {
             : 'q21'
 
   return (
-    <div className="min-h-dvh bg-[#fdfcf9] text-ink-900">
-      <main className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 pb-10 pt-10">
-        <div>
-          <div className="text-sm font-semibold text-slate-700">
+    <QuizShell>
+      <main className="flex min-h-dvh flex-col px-4 pb-10 pt-10">
+        <QuizCard>
+          <div className="text-sm font-semibold uppercase tracking-wide text-slate-600">
             A few more questions to help us improve
           </div>
-          <div className="mt-4 text-2xl font-semibold leading-snug text-ink-900">{prompt}</div>
-        </div>
+          <div className="mt-3 text-2xl font-semibold leading-snug text-ink-900">{prompt}</div>
+        </QuizCard>
 
-        <div className="mt-auto grid gap-3 pb-2">
+        <div className="mt-auto grid gap-3 pt-6 pb-2">
           {options.map((opt) => (
-            <button
+            <QuizOutlineButton
               key={opt}
-              type="button"
               disabled={saving}
               onClick={() => pick(storageKey, opt)}
-              className="h-16 w-full rounded-2xl border-2 border-slate-200 bg-white px-5 text-left text-base font-semibold text-ink-900 active:border-emerald-700 active:bg-emerald-50 disabled:opacity-80"
+              className="text-left"
             >
-              {opt}
-            </button>
+              <span className="flex w-full justify-start">{opt}</span>
+            </QuizOutlineButton>
           ))}
         </div>
       </main>
-    </div>
+    </QuizShell>
   )
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { generateShareCardPng } from '../shareCard'
+import { QuizCard, QuizOutlineButton, QuizPrimaryButton, QuizShell } from '../ui'
 import {
   BRIDGE_SENTENCE,
   computeQuizScore,
@@ -66,12 +67,9 @@ export function QuizResultsScreen() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#fdfcf9] text-ink-900">
-      <main className="mx-auto max-w-lg px-4 pb-10 pt-8">
-        <div
-          className="rounded-3xl p-6 shadow-card"
-          style={{ backgroundColor: result.color }}
-        >
+    <QuizShell>
+      <main className="px-4 pb-10 pt-8">
+        <div className="rounded-3xl p-6 shadow-card" style={{ backgroundColor: result.color }}>
           <div className="text-center text-white">
             <div className="text-sm font-semibold uppercase tracking-wide opacity-95">
               Your kitchen PAC Safety Score
@@ -83,17 +81,15 @@ export function QuizResultsScreen() {
           </div>
         </div>
 
-        <p className="mt-5 text-sm leading-relaxed text-slate-700">{BRIDGE_SENTENCE}</p>
+        <QuizCard className="mt-5">
+          <p className="text-sm leading-relaxed text-slate-700">{BRIDGE_SENTENCE}</p>
+        </QuizCard>
 
-        <button
-          type="button"
-          onClick={share}
-          className="mt-5 h-14 w-full rounded-2xl border-2 border-slate-200 bg-white text-base font-semibold text-ink-900 active:border-emerald-700 active:bg-emerald-50"
-        >
-          Share my score
-        </button>
+        <div className="mt-5">
+          <QuizOutlineButton onClick={share}>Share my score</QuizOutlineButton>
+        </div>
 
-        <div className="mt-8">
+        <QuizCard className="mt-8">
           <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             What are these chemicals?
           </div>
@@ -148,17 +144,13 @@ export function QuizResultsScreen() {
               you can make.
             </p>
           </div>
-        </div>
+        </QuizCard>
 
-        <button
-          type="button"
-          onClick={() => navigate('/motivation')}
-          className="mt-8 h-16 w-full rounded-2xl bg-emerald-700 px-5 text-base font-semibold text-white active:bg-emerald-800"
-        >
-          Continue
-        </button>
+        <div className="mt-8">
+          <QuizPrimaryButton onClick={() => navigate('/motivation')}>Continue</QuizPrimaryButton>
+        </div>
       </main>
-    </div>
+    </QuizShell>
   )
 }
 
