@@ -268,8 +268,6 @@ export function QuizAdminDashboard({
 
   const voc = useMemo(() => {
     const list = rows ?? []
-    const preKeys = ['Very concerned', 'Somewhat concerned', 'Not concerned'] as const
-    const postKeys = ['More concerned', 'About the same', 'Less concerned'] as const
 
     const combos: Record<string, number> = {}
     let moved = 0
