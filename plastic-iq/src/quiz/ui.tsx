@@ -216,7 +216,7 @@ export function QuizChoiceButton({
         'flex h-[4rem] min-h-[4rem] w-full items-center justify-center rounded-2xl border-2 px-6 text-lg font-semibold transition-all duration-200',
         selected
           ? 'border-forest bg-forest text-white shadow-[0_12px_28px_-18px_rgba(15,61,38,0.45)]'
-          : 'border-slate-800 bg-white text-ink-900 hover:border-forest hover:bg-emerald-50/80',
+          : 'border-slate-800 bg-white text-ink-900 hover:border-forest active:bg-slate-50',
         disabled && 'opacity-70',
       )}
     >

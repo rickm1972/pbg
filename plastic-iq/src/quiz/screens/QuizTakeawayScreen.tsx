@@ -60,7 +60,7 @@ export function QuizTakeawayScreen() {
                 {topItems.map((item, index) => (
                   <li
                     key={item.id}
-                    className="flex items-start gap-4 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-[#fdfcf9] to-emerald-50/40 px-4 py-3.5 shadow-sm"
+                    className="flex items-start gap-4 rounded-2xl border border-slate-200/90 bg-[#fdfcf9] px-4 py-3.5 shadow-sm"
                   >
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-forest text-sm font-bold text-white"
@@ -92,13 +92,8 @@ export function QuizTakeawayScreen() {
             </p>
           </section>
 
-          <div
-            className="my-8 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            aria-hidden
-          />
-
-          <section className="rounded-2xl bg-gradient-to-br from-emerald-50/80 to-[#fdfcf9] px-1 py-1">
-            <div className="space-y-4 px-3 py-4 text-base leading-relaxed text-slate-700 sm:px-4">
+          <section className="mt-5 rounded-2xl border border-emerald-200/90 bg-emerald-50 px-4 py-5 sm:px-5">
+            <div className="space-y-4 text-base leading-relaxed text-slate-700">
               <p className="font-display text-xl font-semibold leading-snug text-ink-900">
                 You&apos;re now ahead of most people on this.
               </p>
