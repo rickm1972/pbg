@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:quiz": "tsc -b && vite build --config vite.quiz.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:repair": "node scripts/apply-product-retailer-columns.mjs",

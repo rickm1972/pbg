@@ -179,6 +179,7 @@ export type NormalizationComponent = {
   component_name: string
   component_role?: string
   role?: string
+  material_id?: string
   material: string
   material_hazard: number
   base_migration_potential?: number
@@ -192,6 +193,7 @@ export type NormalizationComponent = {
   material_hazard_table_entry?: string
   migration_table_entry?: string
   data_confidence?: string
+  evidence_source?: unknown
   rationale?: string
 }
 
