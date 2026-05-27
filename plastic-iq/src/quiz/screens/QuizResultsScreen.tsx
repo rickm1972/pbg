@@ -96,7 +96,7 @@ export function QuizResultsScreen() {
 
         <div className="mt-6">
           <QuizPrimaryButton onClick={() => navigate('/motivation')}>
-            What&apos;s hurting my score?
+            A few quick questions to help us
           </QuizPrimaryButton>
         </div>
       </QuizPage>
