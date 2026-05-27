@@ -14,6 +14,7 @@ import {
   setAwarenessAnswer,
   setScoredAnswer,
 } from '../quizStorage'
+import { QuizOutlineButton, QuizShell } from '../ui'
 
 const TOTAL_QUESTIONS = 17
 
@@ -103,10 +104,10 @@ export function QuizQuestionScreen() {
   const isFirst = qId === 'q1'
 
   return (
-    <div className="min-h-dvh bg-[#fdfcf9] text-ink-900">
-      <div className="mx-auto max-w-lg px-4 pt-4">
+    <QuizShell>
+      <div className="px-4 pt-4">
         <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
-          <div className="h-full bg-emerald-700 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-forest transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
         <div className="mt-3 flex items-center justify-between">
           <button
@@ -124,38 +125,27 @@ export function QuizQuestionScreen() {
         </div>
       </div>
 
-      <main className="mx-auto flex max-w-lg flex-col px-4 pb-10 pt-8">
+      <main className="flex flex-col px-4 pb-10 pt-8">
         <div className="min-h-[32vh]">
           <div className="text-2xl font-semibold leading-snug text-ink-900">{questionText}</div>
         </div>
 
         <div className="mt-auto grid gap-3 pb-2">
-          <button
-            type="button"
+          <QuizOutlineButton
             disabled={saving}
             onClick={() => answer(true)}
-            className={[
-              'h-16 w-full rounded-2xl border-2 border-emerald-700 bg-transparent text-base font-semibold text-emerald-800',
-              'active:bg-emerald-700 active:text-white',
-              pulse === 'yes' ? 'bg-emerald-700 text-white' : '',
-              saving ? 'opacity-80' : '',
-            ].join(' ')}
+            selected={pulse === 'yes'}
+            className="border-forest text-forest"
           >
             Yes
-          </button>
-          <button
-            type="button"
+          </QuizOutlineButton>
+          <QuizOutlineButton
             disabled={saving}
             onClick={() => answer(false)}
-            className={[
-              'h-16 w-full rounded-2xl border-2 border-slate-300 bg-white text-base font-semibold text-slate-800',
-              'active:border-emerald-700 active:bg-emerald-700 active:text-white',
-              pulse === 'no' ? 'border-emerald-700 bg-emerald-700 text-white' : '',
-              saving ? 'opacity-80' : '',
-            ].join(' ')}
+            selected={pulse === 'no'}
           >
             No
-          </button>
+          </QuizOutlineButton>
         </div>
       </main>
 
@@ -164,7 +154,7 @@ export function QuizQuestionScreen() {
         {INTERSTITIAL_AFTER_Q9}
         {INTERSTITIAL_AFTER_Q14}
       </div>
-    </div>
+    </QuizShell>
   )
 }
 
