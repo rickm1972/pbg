@@ -1,10 +1,14 @@
 import plasticBegoneLogo from '../assets/plastic-begone-logo-transparent.png'
 
-export type ShareCardParams = {
-  score: number
-  letterGrade: string
-  tierColor: string
-  url: string
+const HEADLINE = 'Do you know how much plastic is leaking into your food?'
+const SUBHEAD = 'Take the 2-minute Kitchen PAC Safety Quiz.'
+
+const BRAND = {
+  forest: '#0f3d26',
+  forestMuted: '#1a5c40',
+  ink: '#0B1220',
+  paper: '#FFFFFF',
+  cream: '#fdfcf9',
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -16,8 +20,41 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-export async function generateShareCardPng(params: ShareCardParams): Promise<File> {
-  // Mobile-friendly portrait.
+function wrapTextLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string[] {
+  const words = text.split(/\s+/)
+  const lines: string[] = []
+  let line = ''
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line)
+      line = word
+    } else {
+      line = test
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+function drawCenteredLines(
+  ctx: CanvasRenderingContext2D,
+  lines: string[],
+  centerX: number,
+  startY: number,
+  lineHeight: number,
+) {
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], centerX, startY + i * lineHeight)
+  }
+}
+
+/** Invite card for sharing the quiz (no score or personal data). */
+export async function generateQuizInviteShareCardPng(): Promise<File> {
   const width = 1080
   const height = 1350
   const canvas = document.createElement('canvas')
@@ -26,54 +63,49 @@ export async function generateShareCardPng(params: ShareCardParams): Promise<Fil
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas unavailable')
 
-  // Background.
-  ctx.fillStyle = '#FFFFFF'
+  ctx.fillStyle = BRAND.paper
   ctx.fillRect(0, 0, width, height)
 
-  // Accent block.
-  ctx.fillStyle = params.tierColor
-  ctx.fillRect(0, 0, width, 360)
+  // Soft brand frame
+  ctx.fillStyle = BRAND.cream
+  ctx.fillRect(0, 0, width, height)
+  ctx.strokeStyle = '#dfe6dd'
+  ctx.lineWidth = 2
+  ctx.strokeRect(48, 48, width - 96, height - 96)
 
-  // Logo (centered on white area).
+  ctx.fillStyle = BRAND.forest
+  ctx.fillRect(48, 48, width - 96, 10)
+
   const logo = await loadImage(plasticBegoneLogo)
-  const logoMaxW = 760
+  const logoMaxW = 820
   const logoScale = Math.min(1, logoMaxW / logo.width)
   const logoW = Math.round(logo.width * logoScale)
   const logoH = Math.round(logo.height * logoScale)
   const logoX = Math.round((width - logoW) / 2)
-  const logoY = 410
+  const logoY = 200
   ctx.drawImage(logo, logoX, logoY, logoW, logoH)
 
-  // Main grade + score.
-  ctx.fillStyle = '#FFFFFF'
+  const textMaxW = width - 160
+  const centerX = width / 2
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
 
-  ctx.font = '800 210px "Source Sans 3", system-ui, -apple-system, sans-serif'
-  ctx.fillText(params.letterGrade, width / 2, 250)
+  let y = logoY + logoH + 100
 
-  ctx.font = '800 120px "Source Sans 3", system-ui, -apple-system, sans-serif'
-  ctx.fillText(String(params.score), width / 2, 330)
+  ctx.fillStyle = BRAND.ink
+  ctx.font = '700 52px "Playfair Display", Georgia, serif'
+  const headlineLines = wrapTextLines(ctx, HEADLINE, textMaxW)
+  drawCenteredLines(ctx, headlineLines, centerX, y, 64)
+  y += headlineLines.length * 64 + 36
 
-  // Tagline.
-  ctx.fillStyle = '#0F172A'
-  ctx.font = '700 54px "Source Sans 3", system-ui, -apple-system, sans-serif'
-  ctx.fillText(`I got a ${params.letterGrade} on my`, width / 2, 780)
-  ctx.fillText('kitchen PAC Safety Score.', width / 2, 845)
-
-  ctx.font = '600 44px "Source Sans 3", system-ui, -apple-system, sans-serif'
-  ctx.fillStyle = '#334155'
-  ctx.fillText("What's yours?", width / 2, 920)
-
-  // URL.
-  ctx.fillStyle = '#0F172A'
-  ctx.font = '700 46px "Source Sans 3", system-ui, -apple-system, sans-serif'
-  ctx.fillText(params.url.replace(/^https?:\/\//, ''), width / 2, 1180)
+  ctx.fillStyle = BRAND.forestMuted
+  ctx.font = '600 40px "Source Sans 3", system-ui, -apple-system, sans-serif'
+  const subheadLines = wrapTextLines(ctx, SUBHEAD, textMaxW)
+  drawCenteredLines(ctx, subheadLines, centerX, y, 52)
 
   const blob: Blob = await new Promise((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Failed to encode PNG'))), 'image/png')
   })
 
-  return new File([blob], 'plasticbegone-kitchen-score.png', { type: 'image/png' })
+  return new File([blob], 'plasticbegone-quiz-invite.png', { type: 'image/png' })
 }
-

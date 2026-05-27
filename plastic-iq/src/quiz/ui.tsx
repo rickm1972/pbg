@@ -201,13 +201,11 @@ export function QuizChoiceButton({
   onClick,
   disabled,
   selected,
-  variant = 'default',
 }: {
   children: React.ReactNode
   onClick?: () => void
   disabled?: boolean
   selected?: boolean
-  variant?: 'default' | 'yes' | 'no'
 }) {
   return (
     <button

@@ -1,41 +1,30 @@
-/** Public URL for the quiz landing page (share / invite). */
+import { generateQuizInviteShareCardPng } from './shareCard'
+
+export const QUIZ_PUBLIC_URL = 'https://quiz.plasticbegone.com'
+
+export const QUIZ_SHARE_MESSAGE =
+  'Found this quiz that shows how much plastic is in your kitchen. Took me 2 minutes — worth checking. quiz.plasticbegone.com'
+
+const SHARE_TITLE = 'Kitchen PAC Safety Quiz'
+
+/** URL used for share sheet link previews (production quiz domain). */
 export function getQuizShareUrl(): string {
-  const { origin, pathname } = window.location
-  if (pathname.endsWith('index.quiz.html')) return `${origin}/index.quiz.html`
-  return `${origin}/`
+  const fromEnv = import.meta.env.VITE_QUIZ_PUBLIC_URL as string | undefined
+  const trimmed = fromEnv?.trim()
+  return trimmed || QUIZ_PUBLIC_URL
 }
 
-export function buildQuizShareCaption(score: number, letterGrade: string): string {
-  const url = getQuizShareUrl()
-  return (
-    `Protect the people you love — take the free Kitchen PAC Safety Quiz (about 2 minutes). ` +
-    `I scored ${score}/100 (Grade ${letterGrade}). See what's in your kitchen.\n\n${url}`
-  )
+export function buildQuizShareCaption(): string {
+  return QUIZ_SHARE_MESSAGE
 }
 
-export async function shareQuizInvite(options: {
-  score: number
-  letterGrade: string
-  tierColor: string
-  generateImage: (params: {
-    score: number
-    letterGrade: string
-    tierColor: string
-    url: string
-  }) => Promise<File>
-}): Promise<'shared' | 'copied' | 'cancelled'> {
+export async function shareQuizInvite(): Promise<'shared' | 'copied' | 'cancelled'> {
   const url = getQuizShareUrl()
-  const text = buildQuizShareCaption(options.score, options.letterGrade)
-  const title = 'Kitchen PAC Safety Quiz'
+  const text = buildQuizShareCaption()
 
   let file: File | null = null
   try {
-    file = await options.generateImage({
-      score: options.score,
-      letterGrade: options.letterGrade,
-      tierColor: options.tierColor,
-      url,
-    })
+    file = await generateQuizInviteShareCardPng()
   } catch {
     file = null
   }
@@ -48,9 +37,14 @@ export async function shareQuizInvite(options: {
         navigator.canShare({ files: [file] })
 
       if (withFiles && file) {
-        await navigator.share({ title, text, url, files: [file] })
+        await navigator.share({
+          title: SHARE_TITLE,
+          text,
+          url,
+          files: [file],
+        })
       } else {
-        await navigator.share({ title, text, url })
+        await navigator.share({ title: SHARE_TITLE, text, url })
       }
       return 'shared'
     } catch (err) {
@@ -64,7 +58,7 @@ export async function shareQuizInvite(options: {
     // ignore
   }
 
-  const mailto = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`
+  const mailto = `mailto:?subject=${encodeURIComponent(SHARE_TITLE)}&body=${encodeURIComponent(text)}`
   window.open(mailto, '_blank', 'noopener,noreferrer')
 
   return 'copied'

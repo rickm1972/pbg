@@ -72,9 +72,6 @@ export function QuizEmailCaptureScreen() {
           <h2 className="mt-3 font-display text-2xl font-semibold leading-snug text-ink-900">
             Get my score
           </h2>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
-            We&apos;ll email you your detailed results.
-          </p>
           <label className="mt-6 block">
             <span className="mb-2 block text-sm font-medium text-slate-700">
               First name <span className="text-red-600">*</span>

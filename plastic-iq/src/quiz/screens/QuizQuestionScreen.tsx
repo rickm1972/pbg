@@ -149,7 +149,6 @@ export function QuizQuestionScreen() {
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <QuizChoiceButton
-            variant="yes"
             disabled={saving}
             selected={pulse === 'yes'}
             onClick={() => answer(true)}
@@ -157,7 +156,6 @@ export function QuizQuestionScreen() {
             Yes
           </QuizChoiceButton>
           <QuizChoiceButton
-            variant="no"
             disabled={saving}
             selected={pulse === 'no'}
             onClick={() => answer(false)}

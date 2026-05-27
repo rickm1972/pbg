@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
-import { generateShareCardPng } from '../shareCard'
 import { shareQuizInvite } from '../shareQuiz'
 import {
   QuizHeader,
@@ -47,12 +46,7 @@ export function QuizResultsScreen() {
     if (sharing) return
     setSharing(true)
     try {
-      const outcome = await shareQuizInvite({
-        score,
-        letterGrade: result.letterGrade,
-        tierColor: result.color,
-        generateImage: generateShareCardPng,
-      })
+      const outcome = await shareQuizInvite()
       if (outcome === 'copied') {
         alert(
           'Share link copied. You can paste it into a text or email — or use the email draft that opened.',

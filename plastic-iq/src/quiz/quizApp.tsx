@@ -7,7 +7,6 @@ import { QuizLoadingScreen } from './screens/QuizLoadingScreen'
 import { QuizResultsScreen } from './screens/QuizResultsScreen'
 import { QuizMotivationScreen } from './screens/QuizMotivationScreen'
 import { QuizTakeawayScreen } from './screens/QuizTakeawayScreen'
-import { QuizClosingScreen } from './screens/QuizClosingScreen'
 
 export function QuizApp() {
   return (
@@ -21,9 +20,9 @@ export function QuizApp() {
         <Route path="/result" element={<QuizResultsScreen />} />
         <Route path="/motivation" element={<QuizMotivationScreen />} />
         <Route path="/takeaway" element={<QuizTakeawayScreen />} />
-        <Route path="/closing" element={<QuizClosingScreen />} />
+        <Route path="/closing" element={<Navigate to="/takeaway" replace />} />
         <Route path="/learn" element={<Navigate to="/takeaway" replace />} />
-        <Route path="/thanks" element={<Navigate to="/closing" replace />} />
+        <Route path="/thanks" element={<Navigate to="/takeaway" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

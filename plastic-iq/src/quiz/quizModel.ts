@@ -122,6 +122,10 @@ export const SCORED_QUESTIONS: QuizScoredQuestion[] = [
   },
 ]
 
+export function countScoredYesAnswers(scoredAnswers: Record<string, boolean>): number {
+  return SCORED_QUESTIONS.filter((q) => scoredAnswers[q.id] === true).length
+}
+
 /** Top yes answers from Q1–Q14 by point value (for personalized takeaway). */
 export function topScoredYesItems(
   scoredAnswers: Record<string, boolean>,

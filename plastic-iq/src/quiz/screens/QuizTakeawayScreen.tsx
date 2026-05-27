@@ -1,69 +1,116 @@
 import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { topScoredYesItems } from '../quizModel'
+import { countScoredYesAnswers, topScoredYesItems } from '../quizModel'
 import { getFirstName, getResponseId, getScoredAnswers } from '../quizStorage'
-import {
-  QuizCard,
-  QuizHeader,
-  QuizPage,
-  QuizPrimaryButton,
-  QuizShell,
-} from '../ui'
+import { QuizCard, QuizHeader, QuizPage, QuizShell } from '../ui'
+
+const SUPPORTING_TAIL =
+  " PlasticBegone is building the safer alternatives — we'll share them when ready."
+
+function takeawayHeader(firstName: string | null, yesCount: number): string {
+  if (yesCount === 0) {
+    return firstName
+      ? `${firstName}, your kitchen is in great shape.`
+      : 'Your kitchen is in great shape.'
+  }
+  return firstName
+    ? `${firstName}, here's what's pulling your score down the most.`
+    : "Here's what's pulling your score down the most."
+}
+
+function takeawaySupportingLine(yesCount: number): string {
+  if (yesCount === 0) {
+    return `You're already doing what most people aren't.${SUPPORTING_TAIL}`
+  }
+  if (yesCount === 1) {
+    return `Swapping this one would raise your score the most.${SUPPORTING_TAIL}`
+  }
+  if (yesCount === 2) {
+    return `Swapping these two would raise your score the most.${SUPPORTING_TAIL}`
+  }
+  return `Swapping these three would raise your score the most.${SUPPORTING_TAIL}`
+}
 
 export function QuizTakeawayScreen() {
   const navigate = useNavigate()
   const firstName = getFirstName()
-  const topItems = useMemo(() => topScoredYesItems(getScoredAnswers(), 3), [])
+  const scoredAnswers = useMemo(() => getScoredAnswers(), [])
+  const yesCount = useMemo(() => countScoredYesAnswers(scoredAnswers), [scoredAnswers])
+  const topItems = useMemo(() => topScoredYesItems(scoredAnswers, 3), [scoredAnswers])
 
   useEffect(() => {
     if (!getResponseId()) navigate('/', { replace: true })
   }, [navigate])
 
-  const header = firstName
-    ? `${firstName}, here's what's pulling your score down the most.`
-    : "Here's what's pulling your score down the most."
+  const header = takeawayHeader(firstName, yesCount)
+  const supportingLine = takeawaySupportingLine(yesCount)
 
   return (
     <QuizShell>
       <QuizHeader size="hero" />
       <QuizPage>
-        <QuizCard padding="lg">
-          <h1 className="font-display text-2xl font-semibold leading-snug text-ink-900">
-            {header}
-          </h1>
+        <QuizCard padding="lg" className="overflow-hidden">
+          <section>
+            <h1 className="font-display text-[1.65rem] font-semibold leading-snug text-ink-900 sm:text-[1.85rem]">
+              {header}
+            </h1>
 
-          {topItems.length > 0 ? (
-            <ul className="mt-5 space-y-3">
-              {topItems.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-[#fdfcf9] px-4 py-3 text-base text-ink-900"
-                >
-                  <span
-                    className="mt-2 h-2 w-2 shrink-0 rounded-full bg-forest"
-                    aria-hidden
-                  />
-                  <span className="leading-snug">{item.itemName}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-5 text-base leading-relaxed text-slate-700">
-              Your answers didn&apos;t flag our highest-impact kitchen items.
+            {yesCount > 0 ? (
+              <ol className="mt-6 space-y-3">
+                {topItems.map((item, index) => (
+                  <li
+                    key={item.id}
+                    className="flex items-start gap-4 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-[#fdfcf9] to-emerald-50/40 px-4 py-3.5 shadow-sm"
+                  >
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-forest text-sm font-bold text-white"
+                      aria-hidden
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <p className="text-base font-semibold leading-snug text-ink-900">
+                        {item.itemName}
+                      </p>
+                      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-forest-muted">
+                        High-impact swap
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+
+            <p
+              className={
+                yesCount > 0
+                  ? 'mt-6 text-sm leading-relaxed text-slate-600 sm:text-[0.95rem]'
+                  : 'mt-6 text-sm leading-relaxed text-slate-600 sm:text-base'
+              }
+            >
+              {supportingLine}
             </p>
-          )}
+          </section>
 
-          <p className="mt-6 text-sm leading-relaxed text-slate-700">
-            Swapping these three would raise your score the most. PlasticBegone is building the
-            safer alternatives — we&apos;ll share them when ready.
-          </p>
+          <div
+            className="my-8 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent"
+            aria-hidden
+          />
+
+          <section className="rounded-2xl bg-gradient-to-br from-emerald-50/80 to-[#fdfcf9] px-1 py-1">
+            <div className="space-y-4 px-3 py-4 text-base leading-relaxed text-slate-700 sm:px-4">
+              <p className="font-display text-xl font-semibold leading-snug text-ink-900">
+                You&apos;re now ahead of most people on this.
+              </p>
+              <p>The hardest part is knowing. Every swap from here moves the needle.</p>
+              <p className="text-ink-900">
+                {firstName
+                  ? `Thanks for taking the quiz, ${firstName} — talk soon.`
+                  : 'Thanks for taking the quiz — talk soon.'}
+              </p>
+            </div>
+          </section>
         </QuizCard>
-
-        <div className="mt-6">
-          <QuizPrimaryButton onClick={() => navigate('/closing', { replace: true })}>
-            Next
-          </QuizPrimaryButton>
-        </div>
       </QuizPage>
     </QuizShell>
   )
