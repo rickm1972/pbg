@@ -10,23 +10,71 @@ export function QuizShell({ children }: { children: React.ReactNode }) {
         className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-emerald-50/80 via-[#fdfcf9] to-transparent"
         aria-hidden
       />
-      <div className="relative mx-auto min-h-dvh w-full max-w-lg">{children}</div>
+      <div className="relative mx-auto flex min-h-dvh w-full max-w-lg flex-col">
+        {children}
+      </div>
     </div>
   )
 }
 
-export function QuizHeader({ compact = false }: { compact?: boolean }) {
+function PlasticBegoneLogoMark({
+  size = 'default',
+}: {
+  size?: 'hero' | 'default' | 'compact'
+}) {
   return (
-    <header className={cn('flex justify-center px-4', compact ? 'pt-4' : 'pt-6')}>
-      <img
-        src={plasticBegoneLogo}
-        alt="Plastic Begone"
-        className={cn(
-          'w-auto object-contain',
-          compact ? 'h-12 max-w-[14rem]' : 'h-[3.75rem] max-w-[min(78vw,22rem)]',
-        )}
-      />
+    <img
+      src={plasticBegoneLogo}
+      alt="Plastic Begone — Making plastic disappear. One smart swap at a time."
+      className={cn(
+        'mx-auto block object-contain object-center',
+        size === 'hero' &&
+          'w-[min(94vw,22rem)] sm:w-[min(92vw,26rem)] md:w-[28rem]',
+        size === 'default' &&
+          'w-[min(92vw,26rem)] sm:w-[min(88vw,30rem)] md:w-[32rem]',
+        size === 'compact' && 'w-[min(88vw,14rem)] sm:w-[16rem]',
+      )}
+    />
+  )
+}
+
+export function QuizHeader({
+  size = 'default',
+}: {
+  /** hero = landing (large). default = in-flow screens. compact = question screens. */
+  size?: 'hero' | 'default' | 'compact'
+}) {
+  return (
+    <header
+      className={cn(
+        'flex shrink-0 justify-center px-3',
+        size === 'hero' ? 'pt-2 pb-2' : size === 'compact' ? 'pt-2 pb-0' : 'pt-3 pb-1',
+      )}
+    >
+      <PlasticBegoneLogoMark size={size} />
     </header>
+  )
+}
+
+export function QuizBackButton({
+  onBack,
+  className,
+}: {
+  onBack?: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className={cn(
+        'grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm',
+        className,
+      )}
+      aria-label="Back"
+    >
+      <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
+    </button>
   )
 }
 
@@ -45,18 +93,11 @@ export function QuizProgressBar({
   return (
     <div className="sticky top-0 z-20 border-b border-[#dfe6dd]/90 bg-[#fdfcf9]/95 px-4 pb-3 pt-3 backdrop-blur-md">
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={!showBack}
-          className={cn(
-            'grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm',
-            !showBack && 'invisible pointer-events-none',
-          )}
-          aria-label="Back"
-        >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
-        </button>
+        {showBack ? (
+          <QuizBackButton onBack={onBack} />
+        ) : (
+          <div className="h-10 w-10" />
+        )}
         <div className="text-center text-xs font-semibold uppercase tracking-wide text-slate-600">
           Question {current} of {total}
         </div>
@@ -122,6 +163,39 @@ export function QuizPrimaryButton({
   )
 }
 
+export function QuizShareButton({
+  onClick,
+  disabled,
+  busy = false,
+}: {
+  onClick?: () => void
+  disabled?: boolean
+  busy?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={cn(
+        'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-forest bg-emerald-50 px-5 py-4 text-center',
+        'shadow-[0_10px_32px_-14px_rgba(15,61,38,0.45)] ring-1 ring-forest/15',
+        'transition-all duration-200 hover:border-forest hover:bg-emerald-100/90 active:scale-[0.99]',
+        'disabled:opacity-70 disabled:active:scale-100',
+      )}
+    >
+      <span className="text-lg font-bold leading-tight text-forest">
+        {busy ? 'Preparing…' : 'Protect your people'}
+      </span>
+      {!busy ? (
+        <span className="text-sm font-medium leading-snug text-slate-600">
+          Share the quiz with someone you love
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
 export function QuizChoiceButton({
   children,
   onClick,
@@ -144,9 +218,7 @@ export function QuizChoiceButton({
         'flex h-[4rem] min-h-[4rem] w-full items-center justify-center rounded-2xl border-2 px-6 text-lg font-semibold transition-all duration-200',
         selected
           ? 'border-forest bg-forest text-white shadow-[0_12px_28px_-18px_rgba(15,61,38,0.45)]'
-          : variant === 'yes'
-            ? 'border-forest/30 bg-white text-forest hover:border-forest hover:bg-emerald-50/80'
-            : 'border-slate-200 bg-white text-ink-900 hover:border-slate-300 hover:bg-slate-50',
+          : 'border-slate-800 bg-white text-ink-900 hover:border-forest hover:bg-emerald-50/80',
         disabled && 'opacity-70',
       )}
     >
@@ -163,10 +235,10 @@ export function QuizPage({
   footer?: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <div className="flex-1 px-4 py-6">{children}</div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
       {footer ? (
-        <div className="sticky bottom-0 border-t border-[#dfe6dd]/90 bg-[#fdfcf9]/95 px-4 py-4 backdrop-blur-md">
+        <div className="shrink-0 border-t border-[#dfe6dd]/90 bg-[#fdfcf9]/95 px-4 py-4 backdrop-blur-md">
           {footer}
         </div>
       ) : null}
@@ -174,9 +246,20 @@ export function QuizPage({
   )
 }
 
-export function QuizEyebrow({ children }: { children: React.ReactNode }) {
+export function QuizEyebrow({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-forest-muted">
+    <div
+      className={cn(
+        'text-xs font-semibold uppercase tracking-[0.14em] text-forest-muted',
+        className,
+      )}
+    >
       {children}
     </div>
   )

@@ -3,6 +3,15 @@ export function getResponseId(): string | null {
   return id && id.trim() ? id : null
 }
 
+export function getFirstName(): string | null {
+  const name = sessionStorage.getItem('quiz_first_name')
+  return name && name.trim() ? name.trim() : null
+}
+
+export function setFirstName(name: string) {
+  sessionStorage.setItem('quiz_first_name', name.trim())
+}
+
 function parseBoolMap(key: string): Record<string, boolean> {
   const raw = sessionStorage.getItem(key)
   if (!raw) return {}

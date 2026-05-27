@@ -12,6 +12,7 @@ export async function createQuizResponse(userAgent: string | null): Promise<stri
 export type QuizResponsePatch = {
   completed_at?: string | null
   user_email?: string | null
+  first_name?: string | null
   final_score?: number | null
   letter_grade?: string | null
   tier?: string | null
@@ -28,6 +29,7 @@ export async function patchQuizResponse(
     p_response_id: responseId,
     p_completed_at: patch.completed_at ?? null,
     p_user_email: patch.user_email ?? null,
+    p_first_name: patch.first_name ?? null,
     p_final_score: patch.final_score ?? null,
     p_letter_grade: patch.letter_grade ?? null,
     p_tier: patch.tier ?? null,

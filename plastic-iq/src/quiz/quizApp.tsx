@@ -6,7 +6,8 @@ import { QuizEmailCaptureScreen } from './screens/QuizEmailCaptureScreen'
 import { QuizLoadingScreen } from './screens/QuizLoadingScreen'
 import { QuizResultsScreen } from './screens/QuizResultsScreen'
 import { QuizMotivationScreen } from './screens/QuizMotivationScreen'
-import { QuizThankYouScreen } from './screens/QuizThankYouScreen'
+import { QuizTakeawayScreen } from './screens/QuizTakeawayScreen'
+import { QuizClosingScreen } from './screens/QuizClosingScreen'
 
 export function QuizApp() {
   return (
@@ -19,10 +20,12 @@ export function QuizApp() {
         <Route path="/loading" element={<QuizLoadingScreen />} />
         <Route path="/result" element={<QuizResultsScreen />} />
         <Route path="/motivation" element={<QuizMotivationScreen />} />
-        <Route path="/thanks" element={<QuizThankYouScreen />} />
+        <Route path="/takeaway" element={<QuizTakeawayScreen />} />
+        <Route path="/closing" element={<QuizClosingScreen />} />
+        <Route path="/learn" element={<Navigate to="/takeaway" replace />} />
+        <Route path="/thanks" element={<Navigate to="/closing" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
 }
-

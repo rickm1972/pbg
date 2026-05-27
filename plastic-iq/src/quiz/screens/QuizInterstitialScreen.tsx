@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { INTERSTITIAL_AFTER_Q14, INTERSTITIAL_AFTER_Q9 } from '../quizModel'
 import {
+  QuizBackButton,
   QuizCard,
   QuizEyebrow,
   QuizHeader,
@@ -30,14 +31,29 @@ export function QuizInterstitialScreen() {
     else if (which === 'kids') navigate('/q/q15', { replace: true })
   }
 
+  function goBack() {
+    if (which === 'heat') navigate('/q/q9')
+    else if (which === 'kids') navigate('/q/q14')
+    else navigate('/')
+  }
+
   return (
     <QuizShell>
-      <QuizHeader compact />
-      <QuizPage footer={<QuizPrimaryButton onClick={continueNext}>Continue</QuizPrimaryButton>}>
-        <QuizCard padding="lg" className="mt-4">
-          <QuizEyebrow>PAC fact</QuizEyebrow>
-          <p className="mt-4 font-display text-2xl font-semibold leading-snug text-ink-900">{text}</p>
+      <QuizHeader size="hero" />
+      <div className="px-4 pb-1">
+        <QuizBackButton onBack={goBack} />
+      </div>
+      <QuizPage>
+        <QuizCard padding="lg">
+          <QuizEyebrow className="font-bold">Did You Know?</QuizEyebrow>
+          <p className="mt-4 font-display text-2xl font-normal leading-snug text-ink-900">
+            {text}
+          </p>
         </QuizCard>
+
+        <div className="mt-6">
+          <QuizPrimaryButton onClick={continueNext}>Continue</QuizPrimaryButton>
+        </div>
       </QuizPage>
     </QuizShell>
   )

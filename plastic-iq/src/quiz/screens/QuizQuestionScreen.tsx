@@ -34,6 +34,13 @@ function nextQuestionId(currentId: string): string | null {
   return ids[idx + 1] ?? null
 }
 
+function previousQuestionId(currentId: string): string | null {
+  const ids = allQuestionIds()
+  const idx = ids.indexOf(currentId)
+  if (idx <= 0) return null
+  return ids[idx - 1] ?? null
+}
+
 function questionIndex(currentId: string): number {
   const ids = allQuestionIds()
   const idx = ids.indexOf(currentId)
@@ -49,6 +56,7 @@ export function QuizQuestionScreen() {
 
   const [saving, setSaving] = useState(false)
   const [pulse, setPulse] = useState<'yes' | 'no' | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!qId || (!scored && !awareness)) {
@@ -61,9 +69,17 @@ export function QuizQuestionScreen() {
   }, [qId, scored, awareness, navigate])
 
   const idx = questionIndex(qId ?? '')
-  const isFirst = qId === 'q1'
   const questionText = scored?.text ?? awareness?.text ?? ''
-  const isAwareness = Boolean(awareness)
+
+  function goBack() {
+    if (!qId || qId === 'q1') {
+      navigate('/')
+      return
+    }
+    const prev = previousQuestionId(qId)
+    if (prev) navigate(`/q/${prev}`)
+    else navigate('/')
+  }
 
   async function answer(value: boolean) {
     const responseId = getResponseId()
@@ -72,6 +88,7 @@ export function QuizQuestionScreen() {
 
     setSaving(true)
     setPulse(value ? 'yes' : 'no')
+    setError(null)
 
     try {
       if (scored) {
@@ -101,6 +118,8 @@ export function QuizQuestionScreen() {
         return
       }
       window.setTimeout(() => navigate(`/q/${next}`), 280)
+    } catch {
+      setError('Could not save your answer. Please try again.')
     } finally {
       window.setTimeout(() => setPulse(null), 320)
       setSaving(false)
@@ -109,45 +128,43 @@ export function QuizQuestionScreen() {
 
   return (
     <QuizShell>
-      <QuizHeader compact />
+      <QuizHeader size="hero" />
       <QuizProgressBar
         current={idx}
         total={TOTAL_QUESTIONS}
-        showBack={!isFirst}
-        onBack={() => navigate(-1)}
+        onBack={goBack}
       />
-      <QuizPage
-        footer={
-          <div className="grid grid-cols-2 gap-3">
-            <QuizChoiceButton
-              variant="yes"
-              disabled={saving}
-              selected={pulse === 'yes'}
-              onClick={() => answer(true)}
-            >
-              Yes
-            </QuizChoiceButton>
-            <QuizChoiceButton
-              variant="no"
-              disabled={saving}
-              selected={pulse === 'no'}
-              onClick={() => answer(false)}
-            >
-              No
-            </QuizChoiceButton>
-          </div>
-        }
-      >
-        <QuizCard padding="lg" className="min-h-[40vh]">
-          {isAwareness ? (
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Quick check — not scored
-            </div>
-          ) : null}
+      <QuizPage>
+        <QuizCard padding="lg">
           <p className="text-xl font-semibold leading-snug text-ink-900 sm:text-[1.35rem] sm:leading-snug">
             {questionText}
           </p>
         </QuizCard>
+
+        {error ? (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <QuizChoiceButton
+            variant="yes"
+            disabled={saving}
+            selected={pulse === 'yes'}
+            onClick={() => answer(true)}
+          >
+            Yes
+          </QuizChoiceButton>
+          <QuizChoiceButton
+            variant="no"
+            disabled={saving}
+            selected={pulse === 'no'}
+            onClick={() => answer(false)}
+          >
+            No
+          </QuizChoiceButton>
+        </div>
       </QuizPage>
     </QuizShell>
   )

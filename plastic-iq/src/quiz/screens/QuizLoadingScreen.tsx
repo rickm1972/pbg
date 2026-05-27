@@ -15,7 +15,7 @@ export function QuizLoadingScreen() {
 
   return (
     <QuizShell>
-      <QuizHeader compact />
+      <QuizHeader size="hero" />
       <div className="flex min-h-[70dvh] flex-col items-center justify-center px-4 pb-10">
         <QuizCard padding="lg" className="w-full text-center">
           <QuizEyebrow>Scoring</QuizEyebrow>

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { computeQuizScore, tierForScore } from '../quizModel'
-import { getResponseId, getScoredAnswers } from '../quizStorage'
+import { getResponseId, getScoredAnswers, setFirstName } from '../quizStorage'
 import {
   QuizCard,
   QuizEyebrow,
@@ -12,27 +12,45 @@ import {
   QuizShell,
 } from '../ui'
 
+const inputClassName =
+  'h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 text-base text-slate-900 outline-none ring-0 transition-colors focus:border-forest'
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
+
 export function QuizEmailCaptureScreen() {
   const navigate = useNavigate()
   const responseId = getResponseId()
   const scoredAnswers = useMemo(() => getScoredAnswers(), [])
+  const [firstName, setFirstNameField] = useState('')
   const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const canSubmit =
+    firstName.trim().length > 0 && isValidEmail(email) && !saving
 
   async function submit() {
     if (!responseId) {
       navigate('/', { replace: true })
       return
     }
-    if (saving) return
+    if (!canSubmit) {
+      setError('Please enter your first name and a valid email address.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
-      await patchQuizResponse(responseId, { user_email: email.trim() || null })
+      const trimmedName = firstName.trim()
+      const trimmedEmail = email.trim()
+      setFirstName(trimmedName)
       const score = computeQuizScore(scoredAnswers)
       const { tier, letterGrade } = tierForScore(score)
       await patchQuizResponse(responseId, {
+        first_name: trimmedName,
+        user_email: trimmedEmail,
         final_score: score,
         tier,
         letter_grade: letterGrade,
@@ -47,14 +65,8 @@ export function QuizEmailCaptureScreen() {
 
   return (
     <QuizShell>
-      <QuizHeader compact />
-      <QuizPage
-        footer={
-          <QuizPrimaryButton onClick={submit} disabled={saving}>
-            {saving ? 'Saving…' : 'Get my score'}
-          </QuizPrimaryButton>
-        }
-      >
+      <QuizHeader size="hero" />
+      <QuizPage>
         <QuizCard padding="lg">
           <QuizEyebrow>Almost done</QuizEyebrow>
           <h2 className="mt-3 font-display text-2xl font-semibold leading-snug text-ink-900">
@@ -64,15 +76,32 @@ export function QuizEmailCaptureScreen() {
             We&apos;ll email you your detailed results.
           </p>
           <label className="mt-6 block">
-            <span className="sr-only">Email</span>
+            <span className="mb-2 block text-sm font-medium text-slate-700">
+              First name <span className="text-red-600">*</span>
+            </span>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstNameField(e.target.value)}
+              placeholder="Jane"
+              required
+              autoComplete="given-name"
+              className={inputClassName}
+            />
+          </label>
+          <label className="mt-4 block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">
+              Email <span className="text-red-600">*</span>
+            </span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 text-base text-slate-900 outline-none ring-0 transition-colors focus:border-forest"
+              required
               autoComplete="email"
               inputMode="email"
+              className={inputClassName}
             />
           </label>
           {error ? (
@@ -81,6 +110,12 @@ export function QuizEmailCaptureScreen() {
             </div>
           ) : null}
         </QuizCard>
+
+        <div className="mt-6">
+          <QuizPrimaryButton onClick={submit} disabled={!canSubmit}>
+            {saving ? 'Saving…' : 'Get my score'}
+          </QuizPrimaryButton>
+        </div>
       </QuizPage>
     </QuizShell>
   )

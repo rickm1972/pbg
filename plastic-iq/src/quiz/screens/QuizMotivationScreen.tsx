@@ -8,10 +8,20 @@ import {
   QuizEyebrow,
   QuizHeader,
   QuizPage,
+  QuizProgressBar,
   QuizShell,
 } from '../ui'
 
 type Step = 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'
+
+const MOTIVATION_TOTAL = 4
+
+function motivationProgress(step: Step): number {
+  if (step === 'q18' || step === 'q18b') return 1
+  if (step === 'q19') return 2
+  if (step === 'q20') return 3
+  return 4
+}
 
 export function QuizMotivationScreen() {
   const navigate = useNavigate()
@@ -61,7 +71,7 @@ export function QuizMotivationScreen() {
         return
       }
       if (step === 'q21') {
-        navigate('/thanks', { replace: true })
+        navigate('/takeaway', { replace: true })
       }
     } finally {
       setSaving(false)
@@ -101,9 +111,38 @@ export function QuizMotivationScreen() {
             ? 'q20'
             : 'q21'
 
+  function goBack() {
+    setSelected(null)
+    if (step === 'q18') {
+      navigate('/result')
+      return
+    }
+    if (step === 'q18b') {
+      setStep('q18')
+      return
+    }
+    if (step === 'q19') {
+      const answers = getMotivationAnswers()
+      setStep(answers.q18 === 'Yes' ? 'q18b' : 'q18')
+      return
+    }
+    if (step === 'q20') {
+      setStep('q19')
+      return
+    }
+    if (step === 'q21') {
+      setStep('q20')
+    }
+  }
+
   return (
     <QuizShell>
-      <QuizHeader compact />
+      <QuizHeader size="hero" />
+      <QuizProgressBar
+        current={motivationProgress(step)}
+        total={MOTIVATION_TOTAL}
+        onBack={goBack}
+      />
       <QuizPage>
         <QuizCard padding="lg">
           <QuizEyebrow>Help us improve</QuizEyebrow>

@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Download, Trash2 } from 'lucide-react'
 import { formatSupabaseUnknownError, supabase } from '../../lib/supabaseClient'
 import { cn } from '../../lib/cn'
+import { AWARENESS_QUESTIONS, SCORED_QUESTIONS } from '../../quiz/quizModel'
 
 type QuizResponseRow = {
   response_id: string
   created_at: string
   completed_at: string | null
+  first_name: string | null
   user_email: string | null
   final_score: number | null
   letter_grade: string | null
@@ -80,6 +82,7 @@ function toCsv(rows: QuizResponseRow[]): string {
     'response_id',
     'created_at',
     'completed_at',
+    'first_name',
     'user_email',
     'final_score',
     'letter_grade',
@@ -114,6 +117,7 @@ function toCsv(rows: QuizResponseRow[]): string {
       r.response_id,
       r.created_at,
       r.completed_at ?? '',
+      r.first_name ?? '',
       r.user_email ?? '',
       r.final_score ?? '',
       r.letter_grade ?? '',
@@ -182,7 +186,7 @@ export function QuizAdminDashboard({
       let q = supabase
         .from('quiz_responses')
         .select(
-          'response_id,created_at,completed_at,user_email,final_score,letter_grade,tier,scored_answers,awareness_answers,motivation_answers',
+          'response_id,created_at,completed_at,first_name,user_email,final_score,letter_grade,tier,scored_answers,awareness_answers,motivation_answers',
         )
         .order('created_at', { ascending: false })
 
@@ -317,14 +321,18 @@ export function QuizAdminDashboard({
 
   const questionStats = useMemo(() => {
     const list = rows ?? []
-    const scored = Array.from({ length: 14 }, (_, i) => {
-      const q = `q${i + 1}`
-      return { id: q, yesRate: answerYesRate(list, 'scored_answers', q) }
-    }).sort((a, b) => b.yesRate - a.yesRate)
+    const scored = SCORED_QUESTIONS.map((q) => ({
+      id: q.id,
+      label: q.id.toUpperCase(),
+      text: q.text,
+      yesRate: answerYesRate(list, 'scored_answers', q.id),
+    })).sort((a, b) => b.yesRate - a.yesRate)
 
-    const awareness = ['q15', 'q16', 'q17'].map((q) => ({
-      id: q,
-      yesRate: answerYesRate(list, 'awareness_answers', q),
+    const awareness = AWARENESS_QUESTIONS.map((q) => ({
+      id: q.id,
+      label: q.id.toUpperCase(),
+      text: q.text,
+      yesRate: answerYesRate(list, 'awareness_answers', q.id),
     }))
 
     return { scored, awareness }
@@ -594,10 +602,12 @@ export function QuizAdminDashboard({
           <div className="mt-1 text-xs text-slate-600">Percent who answered Yes (sorted highest first).</div>
           <div className="mt-4 space-y-2">
             {questionStats.scored.map((q) => (
-              <div key={q.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <div className="text-sm font-semibold text-ink-900">{q.id.toUpperCase()}</div>
-                <div className="text-sm font-semibold text-slate-700">{Math.round(q.yesRate * 100)}%</div>
-              </div>
+              <QuestionStatRow
+                key={q.id}
+                label={q.label}
+                text={q.text}
+                yesRate={q.yesRate}
+              />
             ))}
           </div>
         </div>
@@ -607,10 +617,12 @@ export function QuizAdminDashboard({
           <div className="mt-1 text-xs text-slate-600">Percent who answered Yes.</div>
           <div className="mt-4 space-y-2">
             {questionStats.awareness.map((q) => (
-              <div key={q.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <div className="text-sm font-semibold text-ink-900">{q.id.toUpperCase()}</div>
-                <div className="text-sm font-semibold text-slate-700">{Math.round(q.yesRate * 100)}%</div>
-              </div>
+              <QuestionStatRow
+                key={q.id}
+                label={q.label}
+                text={q.text}
+                yesRate={q.yesRate}
+              />
             ))}
           </div>
         </div>
@@ -656,6 +668,7 @@ export function QuizAdminDashboard({
                     />
                   </th>
                   <th className="px-2 py-2">ID</th>
+                  <th className="px-2 py-2">First name</th>
                   <th className="px-2 py-2">Email</th>
                   <th className="px-2 py-2">Score</th>
                   <th className="px-2 py-2">Grade</th>
@@ -700,6 +713,7 @@ export function QuizAdminDashboard({
                           />
                         </td>
                         <td className="px-2 py-3 font-mono text-xs text-slate-700">{shortId(r.response_id)}</td>
+                        <td className="px-2 py-3">{r.first_name ?? '—'}</td>
                         <td className="px-2 py-3">{r.user_email ?? '—'}</td>
                         <td className="px-2 py-3">{r.final_score ?? '—'}</td>
                         <td className="px-2 py-3 font-semibold">{r.letter_grade ?? '—'}</td>
@@ -722,7 +736,7 @@ export function QuizAdminDashboard({
                       </tr>
                       {isExpanded ? (
                         <tr key={`${r.response_id}-details`}>
-                          <td colSpan={9} className="bg-slate-50 px-4 py-4">
+                          <td colSpan={10} className="bg-slate-50 px-4 py-4">
                             <ResponseDetails row={r} />
                           </td>
                         </tr>
@@ -835,21 +849,46 @@ function ConfirmModal({
   )
 }
 
+function QuestionStatRow({
+  label,
+  text,
+  yesRate,
+}: {
+  label: string
+  text: string
+  yesRate: number
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
+      <div className="w-10 shrink-0 text-sm font-semibold text-ink-900">{label}</div>
+      <div className="min-w-0 flex-1 text-sm leading-snug text-slate-700">{text}</div>
+      <div className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+        {Math.round(yesRate * 100)}%
+      </div>
+    </div>
+  )
+}
+
 function ResponseDetails({ row }: { row: QuizResponseRow }) {
   const scored = (row.scored_answers ?? {}) as Record<string, unknown>
   const awareness = (row.awareness_answers ?? {}) as Record<string, unknown>
   const motivation = (row.motivation_answers ?? {}) as Record<string, unknown>
 
-  const scoredLines = Array.from({ length: 14 }, (_, i) => {
-    const id = `q${i + 1}`
-    const v = asBool(scored[id])
-    const label = v === null ? '—' : v ? 'Yes' : 'No'
-    return `${id.toUpperCase()}: ${label}`
+  const scoredItems = SCORED_QUESTIONS.map((q) => {
+    const v = asBool(scored[q.id])
+    return {
+      id: q.id,
+      text: q.text,
+      answer: v === null ? '—' : v ? 'Yes' : 'No',
+    }
   })
-  const awarenessLines = ['q15', 'q16', 'q17'].map((id) => {
-    const v = asBool(awareness[id])
-    const label = v === null ? '—' : v ? 'Yes' : 'No'
-    return `${id.toUpperCase()}: ${label}`
+  const awarenessItems = AWARENESS_QUESTIONS.map((q) => {
+    const v = asBool(awareness[q.id])
+    return {
+      id: q.id,
+      text: q.text,
+      answer: v === null ? '—' : v ? 'Yes' : 'No',
+    }
   })
   const motivationLines = ['q18', 'q18b', 'q19', 'q20', 'q21'].map((id) => {
     const v = motivation[id]
@@ -858,24 +897,48 @@ function ResponseDetails({ row }: { row: QuizResponseRow }) {
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
-      <DetailBlock title="Scored answers" lines={scoredLines} />
-      <DetailBlock title="Awareness answers" lines={awarenessLines} />
+      <DetailBlock title="Scored answers" items={scoredItems} />
+      <DetailBlock title="Awareness answers" items={awarenessItems} />
       <DetailBlock title="Motivation answers" lines={motivationLines} />
     </div>
   )
 }
 
-function DetailBlock({ title, lines }: { title: string; lines: string[] }) {
+function DetailBlock({
+  title,
+  items,
+  lines,
+}: {
+  title: string
+  items?: Array<{ id: string; text: string; answer: string }>
+  lines?: string[]
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</div>
-      <ul className="mt-3 space-y-1 text-sm text-slate-700">
-        {lines.map((l) => (
-          <li key={l} className="font-mono text-xs">
-            {l}
-          </li>
-        ))}
-      </ul>
+      {items ? (
+        <ul className="mt-3 space-y-3">
+          {items.map((item) => (
+            <li key={item.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+              <div className="flex gap-2">
+                <span className="w-9 shrink-0 text-xs font-semibold text-ink-900">
+                  {item.id.toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1 text-xs leading-snug text-slate-700">{item.text}</span>
+              </div>
+              <div className="mt-1 pl-9 text-xs font-semibold text-slate-600">{item.answer}</div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="mt-3 space-y-1 text-sm text-slate-700">
+          {(lines ?? []).map((l) => (
+            <li key={l} className="font-mono text-xs">
+              {l}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
