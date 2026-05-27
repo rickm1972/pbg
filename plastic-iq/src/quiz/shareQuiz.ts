@@ -1,21 +1,17 @@
 import { generateQuizInviteShareCardPng } from './shareCard'
 
-export const QUIZ_PUBLIC_URL = 'https://quiz.plasticbegone.com'
-
-export const QUIZ_SHARE_MESSAGE =
-  'Found this quiz that shows how much plastic is in your kitchen. Took me 2 minutes — worth checking. quiz.plasticbegone.com'
-
 const SHARE_TITLE = 'Kitchen PAC Safety Quiz'
 
-/** URL used for share sheet link previews (production quiz domain). */
+const SHARE_MESSAGE_PREFIX =
+  'Found this quiz that shows how much plastic is in your kitchen. Took me 2 minutes — worth checking. '
+
+/** Quiz URL for share text and link previews (current deploy origin). */
 export function getQuizShareUrl(): string {
-  const fromEnv = import.meta.env.VITE_QUIZ_PUBLIC_URL as string | undefined
-  const trimmed = fromEnv?.trim()
-  return trimmed || QUIZ_PUBLIC_URL
+  return window.location.origin
 }
 
 export function buildQuizShareCaption(): string {
-  return QUIZ_SHARE_MESSAGE
+  return `${SHARE_MESSAGE_PREFIX}${getQuizShareUrl()}`
 }
 
 export async function shareQuizInvite(): Promise<'shared' | 'copied' | 'cancelled'> {
