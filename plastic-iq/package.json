@@ -15,6 +15,7 @@
     "db:migrate:agent3": "node scripts/apply-product-scores-migration.mjs",
     "db:migrate:agent3-status": "node scripts/apply-scoring-review-pending-migration.mjs",
     "db:migrate:agent4": "node scripts/apply-product-qa-migration.mjs",
+    "db:migrate:quiz": "node scripts/apply-quiz-responses-migration.mjs",
     "agent3": "node scripts/agent3-run.mjs",
     "agent4": "node scripts/agent4-run.mjs",
     "pipeline:validate-three": "node scripts/pipeline-validate-three.mjs",
