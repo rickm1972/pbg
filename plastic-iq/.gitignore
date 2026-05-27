@@ -1,3 +1,7 @@
+dist
+dist-quiz
+node_modules
+
 # Logs
 logs
 *.log
