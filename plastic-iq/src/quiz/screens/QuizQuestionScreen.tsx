@@ -3,8 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import {
   AWARENESS_QUESTIONS,
-  INTERSTITIAL_AFTER_Q14,
-  INTERSTITIAL_AFTER_Q9,
   SCORED_QUESTIONS,
 } from '../quizModel'
 import {
@@ -14,7 +12,14 @@ import {
   setAwarenessAnswer,
   setScoredAnswer,
 } from '../quizStorage'
-import { QuizOutlineButton, QuizShell } from '../ui'
+import {
+  QuizCard,
+  QuizChoiceButton,
+  QuizHeader,
+  QuizPage,
+  QuizProgressBar,
+  QuizShell,
+} from '../ui'
 
 const TOTAL_QUESTIONS = 17
 
@@ -56,7 +61,9 @@ export function QuizQuestionScreen() {
   }, [qId, scored, awareness, navigate])
 
   const idx = questionIndex(qId ?? '')
-  const progress = Math.round((idx / TOTAL_QUESTIONS) * 100)
+  const isFirst = qId === 'q1'
+  const questionText = scored?.text ?? awareness?.text ?? ''
+  const isAwareness = Boolean(awareness)
 
   async function answer(value: boolean) {
     const responseId = getResponseId()
@@ -69,16 +76,16 @@ export function QuizQuestionScreen() {
     try {
       if (scored) {
         setScoredAnswer(qId, value)
-        const answers = getScoredAnswers()
-        await patchQuizResponse(responseId, { scored_answers: answers as unknown as Record<string, unknown> })
+        await patchQuizResponse(responseId, {
+          scored_answers: getScoredAnswers() as unknown as Record<string, unknown>,
+        })
       } else if (awareness) {
         setAwarenessAnswer(qId, value)
-        const answers = getAwarenessAnswers()
-        await patchQuizResponse(responseId, { awareness_answers: answers as unknown as Record<string, unknown> })
+        await patchQuizResponse(responseId, {
+          awareness_answers: getAwarenessAnswers() as unknown as Record<string, unknown>,
+        })
       }
 
-      const next = nextQuestionId(qId)
-      // Interstitials after q9 and q14, but only if we're moving past those ids.
       if (qId === 'q9') {
         navigate('/i/heat', { replace: true })
         return
@@ -88,73 +95,60 @@ export function QuizQuestionScreen() {
         return
       }
 
+      const next = nextQuestionId(qId)
       if (!next) {
         navigate('/email', { replace: true })
         return
       }
-      // Small confirmation delay (~250ms)
-      window.setTimeout(() => navigate(`/q/${next}`), 250)
+      window.setTimeout(() => navigate(`/q/${next}`), 280)
     } finally {
-      window.setTimeout(() => setPulse(null), 300)
+      window.setTimeout(() => setPulse(null), 320)
       setSaving(false)
     }
   }
 
-  const questionText = scored?.text ?? awareness?.text ?? ''
-  const isFirst = qId === 'q1'
-
   return (
     <QuizShell>
-      <div className="px-4 pt-4">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
-          <div className="h-full bg-forest transition-[width] duration-300" style={{ width: `${progress}%` }} />
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`text-sm font-semibold text-slate-700 ${isFirst ? 'invisible' : ''}`}
-            aria-label="Back"
-          >
-            ←
-          </button>
-          <div className="text-sm font-semibold text-slate-700">
-            Question {idx} of {TOTAL_QUESTIONS}
+      <QuizHeader compact />
+      <QuizProgressBar
+        current={idx}
+        total={TOTAL_QUESTIONS}
+        showBack={!isFirst}
+        onBack={() => navigate(-1)}
+      />
+      <QuizPage
+        footer={
+          <div className="grid grid-cols-2 gap-3">
+            <QuizChoiceButton
+              variant="yes"
+              disabled={saving}
+              selected={pulse === 'yes'}
+              onClick={() => answer(true)}
+            >
+              Yes
+            </QuizChoiceButton>
+            <QuizChoiceButton
+              variant="no"
+              disabled={saving}
+              selected={pulse === 'no'}
+              onClick={() => answer(false)}
+            >
+              No
+            </QuizChoiceButton>
           </div>
-          <div className="w-8" />
-        </div>
-      </div>
-
-      <main className="flex flex-col px-4 pb-10 pt-8">
-        <div className="min-h-[32vh]">
-          <div className="text-2xl font-semibold leading-snug text-ink-900">{questionText}</div>
-        </div>
-
-        <div className="mt-auto grid gap-3 pb-2">
-          <QuizOutlineButton
-            disabled={saving}
-            onClick={() => answer(true)}
-            selected={pulse === 'yes'}
-            className="border-forest text-forest"
-          >
-            Yes
-          </QuizOutlineButton>
-          <QuizOutlineButton
-            disabled={saving}
-            onClick={() => answer(false)}
-            selected={pulse === 'no'}
-          >
-            No
-          </QuizOutlineButton>
-        </div>
-      </main>
-
-      {/* Preload interstitial copy so routes are deterministic */}
-      <div className="hidden" aria-hidden>
-        {INTERSTITIAL_AFTER_Q9}
-        {INTERSTITIAL_AFTER_Q14}
-      </div>
+        }
+      >
+        <QuizCard padding="lg" className="min-h-[40vh]">
+          {isAwareness ? (
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Quick check — not scored
+            </div>
+          ) : null}
+          <p className="text-xl font-semibold leading-snug text-ink-900 sm:text-[1.35rem] sm:leading-snug">
+            {questionText}
+          </p>
+        </QuizCard>
+      </QuizPage>
     </QuizShell>
   )
 }
-

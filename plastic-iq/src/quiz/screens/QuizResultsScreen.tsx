@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { generateShareCardPng } from '../shareCard'
-import { QuizCard, QuizOutlineButton, QuizPrimaryButton, QuizShell } from '../ui'
+import {
+  QuizCard,
+  QuizChoiceButton,
+  QuizHeader,
+  QuizPrimaryButton,
+  QuizShell,
+} from '../ui'
 import {
   BRIDGE_SENTENCE,
   computeQuizScore,
@@ -68,8 +74,12 @@ export function QuizResultsScreen() {
 
   return (
     <QuizShell>
-      <main className="px-4 pb-10 pt-8">
-        <div className="rounded-3xl p-6 shadow-card" style={{ backgroundColor: result.color }}>
+      <QuizHeader compact />
+      <main className="px-4 pb-10 pt-4">
+        <div
+          className="overflow-hidden rounded-3xl p-6 shadow-[0_10px_40px_-24px_rgba(15,61,38,0.35)] ring-1 ring-black/5"
+          style={{ backgroundColor: result.color }}
+        >
           <div className="text-center text-white">
             <div className="text-sm font-semibold uppercase tracking-wide opacity-95">
               Your kitchen PAC Safety Score
@@ -86,7 +96,7 @@ export function QuizResultsScreen() {
         </QuizCard>
 
         <div className="mt-5">
-          <QuizOutlineButton onClick={share}>Share my score</QuizOutlineButton>
+          <QuizChoiceButton onClick={share}>Share my score</QuizChoiceButton>
         </div>
 
         <QuizCard className="mt-8">

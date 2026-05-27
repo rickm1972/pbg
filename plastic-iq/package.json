@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:quiz": "vite --config vite.quiz.config.ts --port 5174",
     "build": "tsc -b && vite build",
     "build:quiz": "tsc -b && vite build --config vite.quiz.config.ts",
     "lint": "eslint .",

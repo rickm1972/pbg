@@ -3,7 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { computeQuizScore, tierForScore } from '../quizModel'
 import { getResponseId, getScoredAnswers } from '../quizStorage'
-import { QuizCard, QuizPrimaryButton, QuizShell } from '../ui'
+import {
+  QuizCard,
+  QuizEyebrow,
+  QuizHeader,
+  QuizPage,
+  QuizPrimaryButton,
+  QuizShell,
+} from '../ui'
 
 export function QuizEmailCaptureScreen() {
   const navigate = useNavigate()
@@ -23,8 +30,6 @@ export function QuizEmailCaptureScreen() {
     setError(null)
     try {
       await patchQuizResponse(responseId, { user_email: email.trim() || null })
-
-      // Precompute and persist score fields so results can render instantly.
       const score = computeQuizScore(scoredAnswers)
       const { tier, letterGrade } = tierForScore(score)
       await patchQuizResponse(responseId, {
@@ -32,7 +37,6 @@ export function QuizEmailCaptureScreen() {
         tier,
         letter_grade: letterGrade,
       })
-
       navigate('/loading', { replace: true })
     } catch {
       setError('Failed to save. Please try again.')
@@ -43,39 +47,41 @@ export function QuizEmailCaptureScreen() {
 
   return (
     <QuizShell>
-      <main className="flex min-h-dvh flex-col px-4 pb-10 pt-10">
-        <QuizCard>
-          <div className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Email capture
-          </div>
-          <div className="mt-2 font-display text-2xl font-semibold leading-snug text-ink-900">
+      <QuizHeader compact />
+      <QuizPage
+        footer={
+          <QuizPrimaryButton onClick={submit} disabled={saving}>
+            {saving ? 'Saving…' : 'Get my score'}
+          </QuizPrimaryButton>
+        }
+      >
+        <QuizCard padding="lg">
+          <QuizEyebrow>Almost done</QuizEyebrow>
+          <h2 className="mt-3 font-display text-2xl font-semibold leading-snug text-ink-900">
             Get my score
-          </div>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
             We&apos;ll email you your detailed results.
           </p>
-
-          <div className="mt-5">
+          <label className="mt-6 block">
+            <span className="sr-only">Email</span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 text-base text-slate-900 outline-none focus:border-forest"
+              className="h-14 w-full rounded-2xl border-2 border-slate-200 bg-white px-4 text-base text-slate-900 outline-none ring-0 transition-colors focus:border-forest"
               autoComplete="email"
               inputMode="email"
             />
-            {error ? <div className="mt-2 text-sm font-semibold text-red-700">{error}</div> : null}
-          </div>
+          </label>
+          {error ? (
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {error}
+            </div>
+          ) : null}
         </QuizCard>
-
-        <div className="mt-auto pt-6">
-          <QuizPrimaryButton onClick={submit} disabled={saving}>
-            {saving ? 'Saving…' : 'Get my score'}
-          </QuizPrimaryButton>
-        </div>
-      </main>
+      </QuizPage>
     </QuizShell>
   )
 }
-

@@ -1,14 +1,73 @@
 import type React from 'react'
+import { ChevronLeft } from 'lucide-react'
+import plasticBegoneLogo from '../assets/plastic-begone-logo-transparent.png'
 import { cn } from '../lib/cn'
 
-export function QuizShell({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export function QuizShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-[#fdfcf9] font-sans text-ink-900 antialiased">
-      <div className="mx-auto max-w-lg">{children}</div>
+    <div className="relative min-h-dvh overflow-x-hidden bg-[#fdfcf9] font-sans text-ink-900 antialiased">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-emerald-50/80 via-[#fdfcf9] to-transparent"
+        aria-hidden
+      />
+      <div className="relative mx-auto min-h-dvh w-full max-w-lg">{children}</div>
+    </div>
+  )
+}
+
+export function QuizHeader({ compact = false }: { compact?: boolean }) {
+  return (
+    <header className={cn('flex justify-center px-4', compact ? 'pt-4' : 'pt-6')}>
+      <img
+        src={plasticBegoneLogo}
+        alt="Plastic Begone"
+        className={cn(
+          'w-auto object-contain',
+          compact ? 'h-12 max-w-[14rem]' : 'h-[3.75rem] max-w-[min(78vw,22rem)]',
+        )}
+      />
+    </header>
+  )
+}
+
+export function QuizProgressBar({
+  current,
+  total,
+  onBack,
+  showBack = true,
+}: {
+  current: number
+  total: number
+  onBack?: () => void
+  showBack?: boolean
+}) {
+  const pct = Math.round((current / total) * 100)
+  return (
+    <div className="sticky top-0 z-20 border-b border-[#dfe6dd]/90 bg-[#fdfcf9]/95 px-4 pb-3 pt-3 backdrop-blur-md">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={!showBack}
+          className={cn(
+            'grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm',
+            !showBack && 'invisible pointer-events-none',
+          )}
+          aria-label="Back"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
+        </button>
+        <div className="text-center text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Question {current} of {total}
+        </div>
+        <div className="h-10 w-10" />
+      </div>
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
+        <div
+          className="h-full rounded-full bg-forest transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   )
 }
@@ -16,12 +75,20 @@ export function QuizShell({
 export function QuizCard({
   className,
   children,
+  padding = 'default',
 }: {
   className?: string
   children: React.ReactNode
+  padding?: 'default' | 'lg'
 }) {
   return (
-    <div className={cn('rounded-3xl border border-slate-200 bg-white p-5 shadow-card', className)}>
+    <div
+      className={cn(
+        'rounded-3xl border border-slate-200/90 bg-white shadow-[0_10px_40px_-24px_rgba(15,61,38,0.35)] ring-1 ring-slate-200/80',
+        padding === 'lg' ? 'p-6' : 'p-5',
+        className,
+      )}
+    >
       {children}
     </div>
   )
@@ -44,8 +111,9 @@ export function QuizPrimaryButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'h-16 w-full rounded-2xl bg-forest px-5 text-base font-semibold text-white shadow-[0_18px_40px_-26px_rgba(15,61,38,0.65)]',
-        'active:bg-forest-deep disabled:opacity-70',
+        'flex h-[4rem] min-h-[4rem] w-full items-center justify-center rounded-2xl bg-forest px-6 text-base font-semibold text-white',
+        'shadow-[0_18px_40px_-22px_rgba(15,61,38,0.55)] transition-transform active:scale-[0.99] active:bg-forest-deep',
+        'disabled:opacity-60 disabled:active:scale-100',
         className,
       )}
     >
@@ -54,18 +122,18 @@ export function QuizPrimaryButton({
   )
 }
 
-export function QuizOutlineButton({
+export function QuizChoiceButton({
   children,
   onClick,
   disabled,
   selected,
-  className,
+  variant = 'default',
 }: {
   children: React.ReactNode
   onClick?: () => void
   disabled?: boolean
   selected?: boolean
-  className?: string
+  variant?: 'default' | 'yes' | 'no'
 }) {
   return (
     <button
@@ -73,12 +141,13 @@ export function QuizOutlineButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'h-16 w-full rounded-2xl border-2 px-5 text-base font-semibold transition-colors',
+        'flex h-[4rem] min-h-[4rem] w-full items-center justify-center rounded-2xl border-2 px-6 text-lg font-semibold transition-all duration-200',
         selected
-          ? 'border-forest bg-forest text-white'
-          : 'border-slate-200 bg-white text-ink-900 active:border-forest active:bg-emerald-50',
-        disabled && 'opacity-80',
-        className,
+          ? 'border-forest bg-forest text-white shadow-[0_12px_28px_-18px_rgba(15,61,38,0.45)]'
+          : variant === 'yes'
+            ? 'border-forest/30 bg-white text-forest hover:border-forest hover:bg-emerald-50/80'
+            : 'border-slate-200 bg-white text-ink-900 hover:border-slate-300 hover:bg-slate-50',
+        disabled && 'opacity-70',
       )}
     >
       {children}
@@ -86,3 +155,29 @@ export function QuizOutlineButton({
   )
 }
 
+export function QuizPage({
+  children,
+  footer,
+}: {
+  children: React.ReactNode
+  footer?: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <div className="flex-1 px-4 py-6">{children}</div>
+      {footer ? (
+        <div className="sticky bottom-0 border-t border-[#dfe6dd]/90 bg-[#fdfcf9]/95 px-4 py-4 backdrop-blur-md">
+          {footer}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function QuizEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-forest-muted">
+      {children}
+    </div>
+  )
+}

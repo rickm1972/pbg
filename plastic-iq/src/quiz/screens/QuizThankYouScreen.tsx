@@ -1,19 +1,18 @@
-import { QuizCard, QuizShell } from '../ui'
+import { QuizCard, QuizEyebrow, QuizHeader, QuizPage, QuizShell } from '../ui'
 
 export function QuizThankYouScreen() {
   return (
     <QuizShell>
-      <main className="flex min-h-dvh flex-col px-4 pb-10 pt-10">
-        <div className="mt-16">
-          <QuizCard>
-            <div className="font-display text-3xl font-semibold leading-tight text-ink-900">
-              Thanks for taking the quiz.
-            </div>
-            <p className="mt-3 text-base leading-relaxed text-slate-700">We&apos;ll be in touch.</p>
-          </QuizCard>
-        </div>
-      </main>
+      <QuizHeader />
+      <QuizPage>
+        <QuizCard padding="lg" className="mt-8 text-center">
+          <QuizEyebrow>All set</QuizEyebrow>
+          <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-ink-900">
+            Thanks for taking the quiz.
+          </h1>
+          <p className="mt-4 text-base leading-relaxed text-slate-700">We&apos;ll be in touch.</p>
+        </QuizCard>
+      </QuizPage>
     </QuizShell>
   )
 }
-

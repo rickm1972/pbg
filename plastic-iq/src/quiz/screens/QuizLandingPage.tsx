@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import plasticBegoneLogo from '../../assets/plastic-begone-logo-transparent.png'
 import { createQuizResponse } from '../../lib/quizResponsesApi'
-import { QuizPrimaryButton, QuizShell } from '../ui'
+import {
+  QuizCard,
+  QuizEyebrow,
+  QuizHeader,
+  QuizPage,
+  QuizPrimaryButton,
+  QuizShell,
+} from '../ui'
 
 export function QuizLandingPage() {
   const navigate = useNavigate()
@@ -20,7 +26,7 @@ export function QuizLandingPage() {
       sessionStorage.setItem('quiz_awareness_answers', JSON.stringify({}))
       sessionStorage.setItem('quiz_motivation_answers', JSON.stringify({}))
       navigate('/q/q1')
-    } catch (e: unknown) {
+    } catch {
       setError('Failed to start quiz. Please try again.')
     } finally {
       setStarting(false)
@@ -29,34 +35,34 @@ export function QuizLandingPage() {
 
   return (
     <QuizShell>
-      <header className="flex items-center justify-center px-4 pt-6">
-        <img
-          src={plasticBegoneLogo}
-          alt="Plastic Begone"
-          className="h-[4.25rem] w-auto max-w-[min(86vw,28rem)] object-contain"
-        />
-      </header>
-
-      <main className="px-4 pb-10 pt-6">
-        <h1 className="font-display text-3xl font-semibold leading-tight text-ink-900">
-          How safe is your kitchen?
-        </h1>
-        <p className="mt-3 text-base leading-relaxed text-slate-700">
-          Take the PAC Safety quiz — see how your kitchen scores.
-        </p>
-        <p className="mt-2 text-sm font-semibold text-slate-600">Takes 2 minutes.</p>
-
-        <div className="mt-8">
+      <QuizHeader />
+      <QuizPage
+        footer={
           <QuizPrimaryButton onClick={start} disabled={starting}>
-          {starting ? 'Starting…' : 'Start quiz'}
+            {starting ? 'Starting…' : 'Start quiz'}
           </QuizPrimaryButton>
-        </div>
+        }
+      >
+        <QuizCard padding="lg" className="mt-2">
+          <QuizEyebrow>Kitchen PAC Safety Quiz</QuizEyebrow>
+          <h1 className="mt-3 font-display text-[2rem] font-semibold leading-[1.15] text-ink-900">
+            How safe is your kitchen?
+          </h1>
+          <p className="mt-4 text-base leading-relaxed text-slate-700">
+            Take the PAC Safety quiz — see how your kitchen scores on the same 0–100 scale we use
+            for every product on PlasticBegone.
+          </p>
+          <p className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-forest ring-1 ring-emerald-200/80">
+            Takes 2 minutes
+          </p>
+        </QuizCard>
 
         {error ? (
-          <div className="mt-3 text-sm font-semibold text-red-700">{error}</div>
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+            {error}
+          </div>
         ) : null}
-      </main>
+      </QuizPage>
     </QuizShell>
   )
 }
-

@@ -2,46 +2,61 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { getResponseId, getMotivationAnswers, setMotivationAnswer } from '../quizStorage'
-import { QuizCard, QuizOutlineButton, QuizShell } from '../ui'
+import {
+  QuizCard,
+  QuizChoiceButton,
+  QuizEyebrow,
+  QuizHeader,
+  QuizPage,
+  QuizShell,
+} from '../ui'
 
 type Step = 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'
 
 export function QuizMotivationScreen() {
   const navigate = useNavigate()
   const responseId = getResponseId()
-  // Eager parse to keep storage format consistent (no-op).
   getMotivationAnswers()
 
   const [step, setStep] = useState<Step>('q18')
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
 
   async function persist() {
     if (!responseId) return
-    const answers = getMotivationAnswers()
-    await patchQuizResponse(responseId, { motivation_answers: answers as Record<string, unknown> })
+    await patchQuizResponse(responseId, {
+      motivation_answers: getMotivationAnswers() as Record<string, unknown>,
+    })
   }
 
   async function pick(id: string, value: unknown) {
     if (saving) return
     setSaving(true)
+    setSelected(String(value))
     try {
       setMotivationAnswer(id, value)
       await persist()
 
+      await new Promise((r) => window.setTimeout(r, 220))
+
       if (step === 'q18') {
+        setSelected(null)
         if (value === 'Yes') setStep('q18b')
         else setStep('q19')
         return
       }
       if (step === 'q18b') {
+        setSelected(null)
         setStep('q19')
         return
       }
       if (step === 'q19') {
+        setSelected(null)
         setStep('q20')
         return
       }
       if (step === 'q20') {
+        setSelected(null)
         setStep('q21')
         return
       }
@@ -88,28 +103,26 @@ export function QuizMotivationScreen() {
 
   return (
     <QuizShell>
-      <main className="flex min-h-dvh flex-col px-4 pb-10 pt-10">
-        <QuizCard>
-          <div className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            A few more questions to help us improve
-          </div>
-          <div className="mt-3 text-2xl font-semibold leading-snug text-ink-900">{prompt}</div>
+      <QuizHeader compact />
+      <QuizPage>
+        <QuizCard padding="lg">
+          <QuizEyebrow>Help us improve</QuizEyebrow>
+          <p className="mt-3 text-xl font-semibold leading-snug text-ink-900">{prompt}</p>
         </QuizCard>
 
-        <div className="mt-auto grid gap-3 pt-6 pb-2">
+        <div className="mt-4 grid gap-3">
           {options.map((opt) => (
-            <QuizOutlineButton
+            <QuizChoiceButton
               key={opt}
               disabled={saving}
+              selected={selected === opt}
               onClick={() => pick(storageKey, opt)}
-              className="text-left"
             >
-              <span className="flex w-full justify-start">{opt}</span>
-            </QuizOutlineButton>
+              {opt}
+            </QuizChoiceButton>
           ))}
         </div>
-      </main>
+      </QuizPage>
     </QuizShell>
   )
 }
-
