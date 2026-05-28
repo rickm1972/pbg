@@ -1,3 +1,6 @@
+import type { ScoredAnswerValue } from './quizModel'
+import { normalizeScoredAnswer } from './quizModel'
+
 export function getResponseId(): string | null {
   const fromSession = sessionStorage.getItem('quiz_response_id')
   if (fromSession && fromSession.trim()) return fromSession.trim()
@@ -26,6 +29,33 @@ export function setFirstName(name: string) {
   sessionStorage.setItem('quiz_first_name', name.trim())
 }
 
+function parseScoredMap(raw: string | null): Record<string, ScoredAnswerValue> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+    const obj = parsed as Record<string, unknown>
+    const out: Record<string, ScoredAnswerValue> = {}
+    for (const [k, v] of Object.entries(obj)) {
+      const norm = normalizeScoredAnswer(v)
+      if (norm) out[k] = norm
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+export function getScoredAnswers(): Record<string, ScoredAnswerValue> {
+  return parseScoredMap(sessionStorage.getItem('quiz_scored_answers'))
+}
+
+export function setScoredAnswer(id: string, value: ScoredAnswerValue) {
+  const current = getScoredAnswers()
+  current[id] = value
+  sessionStorage.setItem('quiz_scored_answers', JSON.stringify(current))
+}
+
 function parseBoolMap(key: string): Record<string, boolean> {
   const raw = sessionStorage.getItem(key)
   if (!raw) return {}
@@ -39,16 +69,6 @@ function parseBoolMap(key: string): Record<string, boolean> {
   } catch {
     return {}
   }
-}
-
-export function getScoredAnswers(): Record<string, boolean> {
-  return parseBoolMap('quiz_scored_answers')
-}
-
-export function setScoredAnswer(id: string, value: boolean) {
-  const current = getScoredAnswers()
-  current[id] = value
-  sessionStorage.setItem('quiz_scored_answers', JSON.stringify(current))
 }
 
 export function getAwarenessAnswers(): Record<string, boolean> {
@@ -78,4 +98,3 @@ export function setMotivationAnswer(id: string, value: unknown) {
   current[id] = value
   sessionStorage.setItem('quiz_motivation_answers', JSON.stringify(current))
 }
-

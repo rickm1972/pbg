@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
-import { getResponseId, getMotivationAnswers, setMotivationAnswer } from '../quizStorage'
+import { POST_CONCERN_OPTIONS, POST_CONCERN_PROMPT } from '../quizModel'
+import { getMotivationAnswers, getResponseId, setMotivationAnswer } from '../quizStorage'
 import {
   QuizCard,
   QuizChoiceButton,
@@ -12,23 +13,22 @@ import {
   QuizShell,
 } from '../ui'
 
-type Step = 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'
+type Step = 'q20' | 'q18' | 'q18b' | 'q21'
 
 const MOTIVATION_TOTAL = 4
 
 function motivationProgress(step: Step): number {
-  if (step === 'q18' || step === 'q18b') return 1
-  if (step === 'q19') return 2
-  if (step === 'q20') return 3
+  if (step === 'q20') return 1
+  if (step === 'q18' || step === 'q18b') return 2
+  if (step === 'q21') return 3
   return 4
 }
 
 export function QuizMotivationScreen() {
   const navigate = useNavigate()
   const responseId = getResponseId()
-  getMotivationAnswers()
 
-  const [step, setStep] = useState<Step>('q18')
+  const [step, setStep] = useState<Step>('q20')
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -53,29 +53,24 @@ export function QuizMotivationScreen() {
 
       await new Promise((r) => window.setTimeout(r, 220))
 
+      if (step === 'q20') {
+        setSelected(null)
+        setStep('q18')
+        return
+      }
       if (step === 'q18') {
         setSelected(null)
         if (value === 'Yes') setStep('q18b')
-        else setStep('q19')
+        else setStep('q21')
         return
       }
       if (step === 'q18b') {
-        setSelected(null)
-        setStep('q19')
-        return
-      }
-      if (step === 'q19') {
-        setSelected(null)
-        setStep('q20')
-        return
-      }
-      if (step === 'q20') {
         setSelected(null)
         setStep('q21')
         return
       }
       if (step === 'q21') {
-        navigate('/takeaway', { replace: true })
+        navigate('/email', { replace: true })
       }
     } finally {
       setSaving(false)
@@ -83,59 +78,43 @@ export function QuizMotivationScreen() {
   }
 
   const prompt =
-    step === 'q18'
-      ? 'Do you have children under 12 in your household?'
-      : step === 'q18b'
-        ? 'How old are your children?'
-        : step === 'q19'
-          ? 'Before this quiz, how concerned were you about chemicals in your kitchen?'
-          : step === 'q20'
-            ? 'After your score, how concerned are you?'
-            : 'When buying or replacing kitchen products, would you choose safer alternatives if you knew what they were?'
+    step === 'q20'
+      ? POST_CONCERN_PROMPT
+      : step === 'q18'
+        ? 'Do you have children under 12 in your household?'
+        : step === 'q18b'
+          ? 'How old are your children?'
+          : 'When buying or replacing kitchen products, would you choose safer alternatives if you knew what they were?'
 
   const options =
-    step === 'q18'
-      ? ['Yes', 'No']
-      : step === 'q18b'
-        ? ['Under 5', '5-12', 'Both']
-        : step === 'q19'
-          ? ['Very concerned', 'Somewhat concerned', 'Not concerned']
-          : step === 'q20'
-            ? ['More concerned', 'About the same', 'Less concerned']
-            : ['Yes', 'No', 'Maybe']
+    step === 'q20'
+      ? [...POST_CONCERN_OPTIONS]
+      : step === 'q18'
+        ? ['Yes', 'No']
+        : step === 'q18b'
+          ? ['Under 5', '5-12', 'Both']
+          : ['Yes', 'No', 'Maybe']
 
   const storageKey =
-    step === 'q18'
-      ? 'q18'
-      : step === 'q18b'
-        ? 'q18b'
-        : step === 'q19'
-          ? 'q19'
-          : step === 'q20'
-            ? 'q20'
-            : 'q21'
+    step === 'q20' ? 'q20' : step === 'q18' ? 'q18' : step === 'q18b' ? 'q18b' : 'q21'
 
   function goBack() {
     setSelected(null)
+    if (step === 'q20') {
+      navigate('/q/q17')
+      return
+    }
     if (step === 'q18') {
-      navigate('/result')
+      setStep('q20')
       return
     }
     if (step === 'q18b') {
       setStep('q18')
       return
     }
-    if (step === 'q19') {
+    if (step === 'q21') {
       const answers = getMotivationAnswers()
       setStep(answers.q18 === 'Yes' ? 'q18b' : 'q18')
-      return
-    }
-    if (step === 'q20') {
-      setStep('q19')
-      return
-    }
-    if (step === 'q21') {
-      setStep('q20')
     }
   }
 

@@ -16,6 +16,9 @@ export type QuizScoredId =
 
 export type QuizAwarenessId = 'q15' | 'q16' | 'q17'
 
+/** Stored in scored_answers JSONB (lowercase). */
+export type ScoredAnswerValue = 'yes' | 'no' | 'sometimes'
+
 export type QuizScoredQuestion = {
   id: QuizScoredId
   text: string
@@ -122,16 +125,29 @@ export const SCORED_QUESTIONS: QuizScoredQuestion[] = [
   },
 ]
 
-export function countScoredYesAnswers(scoredAnswers: Record<string, boolean>): number {
-  return SCORED_QUESTIONS.filter((q) => scoredAnswers[q.id] === true).length
+export function normalizeScoredAnswer(value: unknown): ScoredAnswerValue | null {
+  if (value === true || value === 'yes' || value === 'Yes') return 'yes'
+  if (value === false || value === 'no' || value === 'No') return 'no'
+  if (value === 'sometimes' || value === 'Sometimes') return 'sometimes'
+  return null
 }
 
-/** Top yes answers from Q1–Q14 by point value (for personalized takeaway). */
+/** Yes and Sometimes both apply full point deduction when scoring. */
+export function scoredAnswerDeducts(value: unknown): boolean {
+  const v = normalizeScoredAnswer(value)
+  return v === 'yes' || v === 'sometimes'
+}
+
+export function countScoredYesAnswers(scoredAnswers: Record<string, unknown>): number {
+  return SCORED_QUESTIONS.filter((q) => scoredAnswerDeducts(scoredAnswers[q.id])).length
+}
+
+/** Top yes/sometimes answers from Q1–Q14 by point value (for personalized takeaway). */
 export function topScoredYesItems(
-  scoredAnswers: Record<string, boolean>,
+  scoredAnswers: Record<string, unknown>,
   limit = 3,
 ): TopScoredYesItem[] {
-  return SCORED_QUESTIONS.filter((q) => scoredAnswers[q.id] === true)
+  return SCORED_QUESTIONS.filter((q) => scoredAnswerDeducts(scoredAnswers[q.id]))
     .sort((a, b) => b.deductionIfYes - a.deductionIfYes)
     .slice(0, limit)
     .map((q) => ({
@@ -144,11 +160,11 @@ export function topScoredYesItems(
 export const AWARENESS_QUESTIONS: QuizAwarenessQuestion[] = [
   {
     id: 'q15',
-    text: 'Did you know that PFAS — the chemicals in nonstick coatings, food packaging, and waterproof products — have been linked to cancer, thyroid problems, and weakened immune systems?',
+    text: 'Did you know that nanoplastics — plastic particles small enough to enter your bloodstream — can act like a Trojan horse, carrying other toxic chemicals into your body?',
   },
   {
     id: 'q16',
-    text: "Did you know that chemicals in everyday plastic can mess with your hormones — lowering testosterone, disrupting estrogen, and affecting fertility, metabolism, mood, and children's development?",
+    text: 'Did you know that the shiny paper receipts you handle every day are often coated with BPA — a hormone-disrupting chemical that absorbs right through your skin?',
   },
   {
     id: 'q17',
@@ -163,10 +179,10 @@ export const QUIZ_QUESTION_TEXT: Record<string, string> = Object.fromEntries(
 
 export type QuizTier = 'A' | 'B' | 'C' | 'D' | 'F'
 
-export function computeQuizScore(scoredAnswers: Record<string, boolean>): number {
+export function computeQuizScore(scoredAnswers: Record<string, unknown>): number {
   let score = 100
   for (const q of SCORED_QUESTIONS) {
-    if (scoredAnswers[q.id] === true) score -= q.deductionIfYes
+    if (scoredAnswerDeducts(scoredAnswers[q.id])) score -= q.deductionIfYes
   }
   if (score < 17) score = 17
   if (score > 100) score = 100
@@ -230,9 +246,28 @@ export function tierForScore(score: number): {
   }
 }
 
-export const INTERSTITIAL_AFTER_Q9 =
-  "'Microwave-safe' only means the plastic won't melt. It doesn't mean it's safe to eat from. Heat makes plastic release more chemicals into your food."
+export const INTERSTITIAL_NATURE_STUDY =
+  'A 2026 study in Nature Medicine tested healthy adults and found that 100% of them had at least six different plastic chemicals in their body — every single day.'
 
 export const INTERSTITIAL_AFTER_Q14 =
   'Kids absorb more PACs than adults relative to body weight. Their developing systems are especially sensitive.'
 
+/** Pre-quiz baseline (q19) — wording unchanged. */
+export const PRE_CONCERN_PROMPT =
+  "How concerned are you about your kitchen's exposure to plastic chemicals?"
+
+export const PRE_CONCERN_OPTIONS = [
+  'Very concerned',
+  'Somewhat concerned',
+  'Not concerned',
+] as const
+
+/** Post-quiz concern (q20) — options unchanged; prompt updated in flow. */
+export const POST_CONCERN_PROMPT =
+  'How concerned are you now, after taking this quiz?'
+
+export const POST_CONCERN_OPTIONS = [
+  'More concerned',
+  'About the same',
+  'Less concerned',
+] as const

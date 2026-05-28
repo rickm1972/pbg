@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Download, Trash2 } from 'lucide-react'
 import { formatSupabaseUnknownError, supabase } from '../../lib/supabaseClient'
 import { cn } from '../../lib/cn'
-import { AWARENESS_QUESTIONS, SCORED_QUESTIONS } from '../../quiz/quizModel'
+import {
+  AWARENESS_QUESTIONS,
+  normalizeScoredAnswer,
+  SCORED_QUESTIONS,
+} from '../../quiz/quizModel'
 
 type QuizResponseRow = {
   response_id: string
@@ -22,7 +26,10 @@ const MOTIVATION_QUESTIONS: Array<{ id: 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'; 
   { id: 'q18', text: 'Do you have children under 12 in your household?' },
   { id: 'q18b', text: 'How old are your children?' },
   { id: 'q19', text: 'Before this quiz, how concerned were you about chemicals in your kitchen?' },
-  { id: 'q20', text: 'After your score, how concerned are you?' },
+  {
+    id: 'q20',
+    text: 'How concerned are you now, after taking this quiz?',
+  },
   {
     id: 'q21',
     text: 'When buying or replacing kitchen products, would you choose safer alternatives if you knew what they were?',
@@ -70,14 +77,37 @@ function motivationText(row: QuizResponseRow, key: string): string | null {
   return s.length ? s : null
 }
 
-function answerYesRate(rows: QuizResponseRow[], blobKey: 'scored_answers' | 'awareness_answers', qId: string): number {
+function answerYesRate(rows: QuizResponseRow[], qId: string): number {
   const answered = rows
-    .map((r) => (r[blobKey] ?? {}) as Record<string, unknown>)
+    .map((r) => (r.awareness_answers ?? {}) as Record<string, unknown>)
     .map((obj) => asBool(obj[qId]))
     .filter((v): v is boolean => v !== null)
   if (!answered.length) return 0
   const yes = answered.filter((v) => v === true).length
   return yes / answered.length
+}
+
+function scoredAnswerRates(
+  rows: QuizResponseRow[],
+  qId: string,
+): { yes: number; sometimes: number; no: number; deduction: number } {
+  const answered = rows
+    .map((r) => normalizeScoredAnswer((r.scored_answers ?? {})[qId]))
+    .filter((v): v is NonNullable<ReturnType<typeof normalizeScoredAnswer>> => v !== null)
+  if (!answered.length) return { yes: 0, sometimes: 0, no: 0, deduction: 0 }
+  const n = answered.length
+  const yes = answered.filter((v) => v === 'yes').length / n
+  const sometimes = answered.filter((v) => v === 'sometimes').length / n
+  const no = answered.filter((v) => v === 'no').length / n
+  return { yes, sometimes, no, deduction: yes + sometimes }
+}
+
+function formatScoredAnswerLabel(value: unknown): string {
+  const v = normalizeScoredAnswer(value)
+  if (!v) return '—'
+  if (v === 'yes') return 'Yes'
+  if (v === 'no') return 'No'
+  return 'Sometimes'
 }
 
 function median(nums: number[]): number | null {
@@ -134,8 +164,8 @@ function toCsv(rows: QuizResponseRow[]): string {
       r.letter_grade ?? '',
       r.tier ?? '',
       ...Array.from({ length: 14 }, (_, i) => {
-        const v = asBool(scored[`q${i + 1}`])
-        return v === null ? '' : v ? 'Yes' : 'No'
+        const v = normalizeScoredAnswer(scored[`q${i + 1}`])
+        return v ?? ''
       }),
       ...(['q15', 'q16', 'q17'] as const).map((k) => {
         const v = asBool(aware[k])
@@ -388,14 +418,14 @@ export function QuizAdminDashboard({
       id: q.id,
       label: q.id.toUpperCase(),
       text: q.text,
-      yesRate: answerYesRate(list, 'scored_answers', q.id),
-    })).sort((a, b) => b.yesRate - a.yesRate)
+      rates: scoredAnswerRates(list, q.id),
+    })).sort((a, b) => b.rates.deduction - a.rates.deduction)
 
     const awareness = AWARENESS_QUESTIONS.map((q) => ({
       id: q.id,
       label: q.id.toUpperCase(),
       text: q.text,
-      yesRate: answerYesRate(list, 'awareness_answers', q.id),
+      yesRate: answerYesRate(list, q.id),
     }))
 
     return { scored, awareness }
@@ -697,14 +727,14 @@ export function QuizAdminDashboard({
       <div className="mt-6 grid gap-3 md:grid-cols-12">
         <div className="md:col-span-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
           <div className="text-sm font-semibold text-ink-900">Question-level (scored)</div>
-          <div className="mt-1 text-xs text-slate-600">Percent who answered Yes (sorted highest first).</div>
+          <div className="mt-1 text-xs text-slate-600">Percent who answered Yes, Sometimes, or No.</div>
           <div className="mt-4 space-y-2">
             {questionStats.scored.map((q) => (
-              <QuestionStatRow
+              <ScoredQuestionStatRow
                 key={q.id}
                 label={q.label}
                 text={q.text}
-                yesRate={q.yesRate}
+                rates={q.rates}
               />
             ))}
           </div>
@@ -1012,19 +1042,38 @@ function QuestionStatRow({
   )
 }
 
+function ScoredQuestionStatRow({
+  label,
+  text,
+  rates,
+}: {
+  label: string
+  text: string
+  rates: { yes: number; sometimes: number; no: number; deduction: number }
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
+      <div className="w-10 shrink-0 text-sm font-semibold text-ink-900">{label}</div>
+      <div className="min-w-0 flex-1 text-sm leading-snug text-slate-700">{text}</div>
+      <div className="shrink-0 text-right text-xs font-semibold leading-relaxed text-slate-700">
+        <div>Yes {Math.round(rates.yes * 100)}%</div>
+        <div>Sometimes {Math.round(rates.sometimes * 100)}%</div>
+        <div>No {Math.round(rates.no * 100)}%</div>
+      </div>
+    </div>
+  )
+}
+
 function ResponseDetails({ row }: { row: QuizResponseRow }) {
   const scored = (row.scored_answers ?? {}) as Record<string, unknown>
   const awareness = (row.awareness_answers ?? {}) as Record<string, unknown>
   const motivation = (row.motivation_answers ?? {}) as Record<string, unknown>
 
-  const scoredItems = SCORED_QUESTIONS.map((q) => {
-    const v = asBool(scored[q.id])
-    return {
-      id: q.id,
-      text: q.text,
-      answer: v === null ? '—' : v ? 'Yes' : 'No',
-    }
-  })
+  const scoredItems = SCORED_QUESTIONS.map((q) => ({
+    id: q.id,
+    text: q.text,
+    answer: formatScoredAnswerLabel(scored[q.id]),
+  }))
   const awarenessItems = AWARENESS_QUESTIONS.map((q) => {
     const v = asBool(awareness[q.id])
     return {

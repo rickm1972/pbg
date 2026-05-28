@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
-import { computeQuizScore, tierForScore } from '../quizModel'
-import { getResponseId, getScoredAnswers, setFirstName } from '../quizStorage'
+import { getResponseId, setFirstName } from '../quizStorage'
 import {
   QuizCard,
   QuizEyebrow,
@@ -22,11 +21,14 @@ function isValidEmail(value: string): boolean {
 export function QuizEmailCaptureScreen() {
   const navigate = useNavigate()
   const responseId = getResponseId()
-  const scoredAnswers = useMemo(() => getScoredAnswers(), [])
   const [firstName, setFirstNameField] = useState('')
   const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!responseId) navigate('/', { replace: true })
+  }, [responseId, navigate])
 
   const canSubmit =
     firstName.trim().length > 0 && isValidEmail(email) && !saving
@@ -46,14 +48,9 @@ export function QuizEmailCaptureScreen() {
       const trimmedName = firstName.trim()
       const trimmedEmail = email.trim()
       setFirstName(trimmedName)
-      const score = computeQuizScore(scoredAnswers)
-      const { tier, letterGrade } = tierForScore(score)
       await patchQuizResponse(responseId, {
         first_name: trimmedName,
         user_email: trimmedEmail,
-        final_score: score,
-        tier,
-        letter_grade: letterGrade,
       })
       navigate('/loading', { replace: true })
     } catch {

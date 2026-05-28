@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QuizLandingPage } from './screens/QuizLandingPage'
+import { QuizPreConcernScreen } from './screens/QuizPreConcernScreen'
 import { QuizQuestionScreen } from './screens/QuizQuestionScreen'
 import { QuizInterstitialScreen } from './screens/QuizInterstitialScreen'
 import { QuizEmailCaptureScreen } from './screens/QuizEmailCaptureScreen'
@@ -13,16 +14,17 @@ export function QuizApp() {
     <BrowserRouter>
       <Routes>
         <Route index element={<QuizLandingPage />} />
+        <Route path="/concern/pre" element={<QuizPreConcernScreen />} />
         <Route path="/q/:qId" element={<QuizQuestionScreen />} />
         <Route path="/i/:which" element={<QuizInterstitialScreen />} />
+        <Route path="/motivation" element={<QuizMotivationScreen />} />
         <Route path="/email" element={<QuizEmailCaptureScreen />} />
         <Route path="/loading" element={<QuizLoadingScreen />} />
         <Route path="/result" element={<QuizResultsScreen />} />
-        <Route path="/motivation" element={<QuizMotivationScreen />} />
         <Route path="/takeaway" element={<QuizTakeawayScreen />} />
-        <Route path="/closing" element={<Navigate to="/takeaway" replace />} />
-        <Route path="/learn" element={<Navigate to="/takeaway" replace />} />
-        <Route path="/thanks" element={<Navigate to="/takeaway" replace />} />
+        <Route path="/closing" element={<Navigate to="/result" replace />} />
+        <Route path="/learn" element={<Navigate to="/result" replace />} />
+        <Route path="/thanks" element={<Navigate to="/result" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

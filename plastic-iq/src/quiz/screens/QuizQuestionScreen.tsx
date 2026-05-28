@@ -4,7 +4,14 @@ import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import {
   AWARENESS_QUESTIONS,
   SCORED_QUESTIONS,
+  type ScoredAnswerValue,
 } from '../quizModel'
+import {
+  nextRouteAfterQuestion,
+  questionProgressIndex,
+  QUIZ_QUESTION_COUNT,
+  routeBeforeQuestion,
+} from '../quizFlow'
 import {
   getAwarenessAnswers,
   getResponseId,
@@ -21,32 +28,6 @@ import {
   QuizShell,
 } from '../ui'
 
-const TOTAL_QUESTIONS = 17
-
-function allQuestionIds(): string[] {
-  return [...SCORED_QUESTIONS.map((q) => q.id), ...AWARENESS_QUESTIONS.map((q) => q.id)]
-}
-
-function nextQuestionId(currentId: string): string | null {
-  const ids = allQuestionIds()
-  const idx = ids.indexOf(currentId)
-  if (idx < 0) return null
-  return ids[idx + 1] ?? null
-}
-
-function previousQuestionId(currentId: string): string | null {
-  const ids = allQuestionIds()
-  const idx = ids.indexOf(currentId)
-  if (idx <= 0) return null
-  return ids[idx - 1] ?? null
-}
-
-function questionIndex(currentId: string): number {
-  const ids = allQuestionIds()
-  const idx = ids.indexOf(currentId)
-  return idx >= 0 ? idx + 1 : 1
-}
-
 export function QuizQuestionScreen() {
   const { qId } = useParams()
   const navigate = useNavigate()
@@ -55,7 +36,8 @@ export function QuizQuestionScreen() {
   const awareness = useMemo(() => AWARENESS_QUESTIONS.find((q) => q.id === qId), [qId])
 
   const [saving, setSaving] = useState(false)
-  const [pulse, setPulse] = useState<'yes' | 'no' | null>(null)
+  const [pulse, setPulse] = useState<ScoredAnswerValue | null>(null)
+  const [awarenessPulse, setAwarenessPulse] = useState<'yes' | 'no' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -68,56 +50,38 @@ export function QuizQuestionScreen() {
     }
   }, [qId, scored, awareness, navigate])
 
-  const idx = questionIndex(qId ?? '')
+  const idx = questionProgressIndex(qId ?? '')
   const questionText = scored?.text ?? awareness?.text ?? ''
 
   function goBack() {
-    if (!qId || qId === 'q1') {
+    if (!qId) {
       navigate('/')
       return
     }
-    const prev = previousQuestionId(qId)
-    if (prev) navigate(`/q/${prev}`)
-    else navigate('/')
+    navigate(routeBeforeQuestion(qId))
   }
 
-  async function answer(value: boolean) {
+  async function answerScored(value: ScoredAnswerValue) {
     const responseId = getResponseId()
     if (!responseId || !qId) return
     if (saving) return
 
     setSaving(true)
-    setPulse(value ? 'yes' : 'no')
+    setPulse(value)
     setError(null)
 
     try {
-      if (scored) {
-        setScoredAnswer(qId, value)
-        await patchQuizResponse(responseId, {
-          scored_answers: getScoredAnswers() as unknown as Record<string, unknown>,
-        })
-      } else if (awareness) {
-        setAwarenessAnswer(qId, value)
-        await patchQuizResponse(responseId, {
-          awareness_answers: getAwarenessAnswers() as unknown as Record<string, unknown>,
-        })
-      }
+      setScoredAnswer(qId, value)
+      await patchQuizResponse(responseId, {
+        scored_answers: getScoredAnswers() as unknown as Record<string, unknown>,
+      })
 
-      if (qId === 'q9') {
-        navigate('/i/heat', { replace: true })
+      const dest = nextRouteAfterQuestion(qId)
+      if (dest.startsWith('/i/')) {
+        navigate(dest, { replace: true })
         return
       }
-      if (qId === 'q14') {
-        navigate('/i/kids', { replace: true })
-        return
-      }
-
-      const next = nextQuestionId(qId)
-      if (!next) {
-        navigate('/email', { replace: true })
-        return
-      }
-      window.setTimeout(() => navigate(`/q/${next}`), 280)
+      window.setTimeout(() => navigate(dest), 280)
     } catch {
       setError('Could not save your answer. Please try again.')
     } finally {
@@ -126,14 +90,35 @@ export function QuizQuestionScreen() {
     }
   }
 
+  async function answerAwareness(value: boolean) {
+    const responseId = getResponseId()
+    if (!responseId || !qId) return
+    if (saving) return
+
+    setSaving(true)
+    setAwarenessPulse(value ? 'yes' : 'no')
+    setError(null)
+
+    try {
+      setAwarenessAnswer(qId, value)
+      await patchQuizResponse(responseId, {
+        awareness_answers: getAwarenessAnswers() as unknown as Record<string, unknown>,
+      })
+
+      const dest = nextRouteAfterQuestion(qId)
+      window.setTimeout(() => navigate(dest), 280)
+    } catch {
+      setError('Could not save your answer. Please try again.')
+    } finally {
+      window.setTimeout(() => setAwarenessPulse(null), 320)
+      setSaving(false)
+    }
+  }
+
   return (
     <QuizShell>
       <QuizHeader size="hero" />
-      <QuizProgressBar
-        current={idx}
-        total={TOTAL_QUESTIONS}
-        onBack={goBack}
-      />
+      <QuizProgressBar current={idx} total={QUIZ_QUESTION_COUNT} onBack={goBack} />
       <QuizPage>
         <QuizCard padding="lg">
           <p className="text-xl font-semibold leading-snug text-ink-900 sm:text-[1.35rem] sm:leading-snug">
@@ -147,22 +132,48 @@ export function QuizQuestionScreen() {
           </div>
         ) : null}
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <QuizChoiceButton
-            disabled={saving}
-            selected={pulse === 'yes'}
-            onClick={() => answer(true)}
-          >
-            Yes
-          </QuizChoiceButton>
-          <QuizChoiceButton
-            disabled={saving}
-            selected={pulse === 'no'}
-            onClick={() => answer(false)}
-          >
-            No
-          </QuizChoiceButton>
-        </div>
+        {scored ? (
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <QuizChoiceButton
+              disabled={saving}
+              selected={pulse === 'yes'}
+              onClick={() => answerScored('yes')}
+            >
+              Yes
+            </QuizChoiceButton>
+            <QuizChoiceButton
+              disabled={saving}
+              selected={pulse === 'no'}
+              onClick={() => answerScored('no')}
+            >
+              No
+            </QuizChoiceButton>
+            <QuizChoiceButton
+              disabled={saving}
+              selected={pulse === 'sometimes'}
+              onClick={() => answerScored('sometimes')}
+            >
+              Sometimes
+            </QuizChoiceButton>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <QuizChoiceButton
+              disabled={saving}
+              selected={awarenessPulse === 'yes'}
+              onClick={() => answerAwareness(true)}
+            >
+              Yes
+            </QuizChoiceButton>
+            <QuizChoiceButton
+              disabled={saving}
+              selected={awarenessPulse === 'no'}
+              onClick={() => answerAwareness(false)}
+            >
+              No
+            </QuizChoiceButton>
+          </div>
+        )}
       </QuizPage>
     </QuizShell>
   )

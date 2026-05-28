@@ -3,14 +3,46 @@ import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { shareQuizInvite } from '../shareQuiz'
 import {
+  computeQuizScore,
+  countScoredYesAnswers,
+  tierForScore,
+  topScoredYesItems,
+} from '../quizModel'
+import { getFirstName, getResponseId, getScoredAnswers } from '../quizStorage'
+import {
+  QuizCard,
   QuizHeader,
   QuizPage,
-  QuizPrimaryButton,
   QuizShareButton,
   QuizShell,
 } from '../ui'
-import { computeQuizScore, tierForScore } from '../quizModel'
-import { getFirstName, getResponseId, getScoredAnswers } from '../quizStorage'
+
+const SUPPORTING_TAIL =
+  " PlasticBegone is building the safer alternatives — we'll share them when ready."
+
+function takeawayHeader(firstName: string | null, deductionCount: number): string {
+  if (deductionCount === 0) {
+    return firstName
+      ? `${firstName}, your kitchen is in great shape.`
+      : 'Your kitchen is in great shape.'
+  }
+  return firstName
+    ? `${firstName}, here's what's pulling your score down the most.`
+    : "Here's what's pulling your score down the most."
+}
+
+function takeawaySupportingLine(deductionCount: number): string {
+  if (deductionCount === 0) {
+    return `You're already doing what most people aren't.${SUPPORTING_TAIL}`
+  }
+  if (deductionCount === 1) {
+    return `Swapping this one would raise your score the most.${SUPPORTING_TAIL}`
+  }
+  if (deductionCount === 2) {
+    return `Swapping these two would raise your score the most.${SUPPORTING_TAIL}`
+  }
+  return `Swapping these three would raise your score the most.${SUPPORTING_TAIL}`
+}
 
 export function QuizResultsScreen() {
   const navigate = useNavigate()
@@ -19,7 +51,8 @@ export function QuizResultsScreen() {
   const score = useMemo(() => computeQuizScore(scoredAnswers), [scoredAnswers])
   const result = useMemo(() => tierForScore(score), [score])
   const firstName = getFirstName()
-  const [saving, setSaving] = useState(false)
+  const deductionCount = useMemo(() => countScoredYesAnswers(scoredAnswers), [scoredAnswers])
+  const topItems = useMemo(() => topScoredYesItems(scoredAnswers, 3), [scoredAnswers])
   const [sharing, setSharing] = useState(false)
 
   const scoreEyebrow = firstName
@@ -32,15 +65,14 @@ export function QuizResultsScreen() {
 
   useEffect(() => {
     if (!responseId) return
-    if (saving) return
-    setSaving(true)
-    patchQuizResponse(responseId, {
+    void patchQuizResponse(responseId, {
       completed_at: new Date().toISOString(),
       final_score: score,
       tier: result.tier,
       letter_grade: result.letterGrade,
-    }).finally(() => setSaving(false))
-  }, [responseId, score, result.tier, result.letterGrade, saving])
+      scored_answers: scoredAnswers as unknown as Record<string, unknown>,
+    })
+  }, [responseId, score, result.tier, result.letterGrade, scoredAnswers])
 
   async function share() {
     if (sharing) return
@@ -56,6 +88,9 @@ export function QuizResultsScreen() {
       setSharing(false)
     }
   }
+
+  const header = takeawayHeader(firstName, deductionCount)
+  const supportingLine = takeawaySupportingLine(deductionCount)
 
   return (
     <QuizShell>
@@ -88,11 +123,63 @@ export function QuizResultsScreen() {
           <QuizShareButton onClick={share} busy={sharing} />
         </div>
 
-        <div className="mt-6">
-          <QuizPrimaryButton onClick={() => navigate('/motivation')}>
-            A few quick questions to help us
-          </QuizPrimaryButton>
-        </div>
+        <QuizCard padding="lg" className="mt-6 overflow-hidden">
+          <section>
+            <h2 className="font-display text-[1.65rem] font-semibold leading-snug text-ink-900 sm:text-[1.85rem]">
+              {header}
+            </h2>
+
+            {deductionCount > 0 ? (
+              <ol className="mt-6 space-y-3">
+                {topItems.map((item, index) => (
+                  <li
+                    key={item.id}
+                    className="flex items-start gap-4 rounded-2xl border border-slate-200/90 bg-[#fdfcf9] px-4 py-3.5 shadow-sm"
+                  >
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-forest text-sm font-bold text-white"
+                      aria-hidden
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <p className="text-base font-semibold leading-snug text-ink-900">
+                        {item.itemName}
+                      </p>
+                      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-forest-muted">
+                        High-impact swap
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+
+            <p
+              className={
+                deductionCount > 0
+                  ? 'mt-6 text-sm leading-relaxed text-slate-600 sm:text-[0.95rem]'
+                  : 'mt-6 text-sm leading-relaxed text-slate-600 sm:text-base'
+              }
+            >
+              {supportingLine}
+            </p>
+          </section>
+
+          <section className="mt-5 rounded-2xl border border-emerald-200/90 bg-emerald-50 px-4 py-5 sm:px-5">
+            <div className="space-y-4 text-base leading-relaxed text-slate-700">
+              <p className="font-display text-xl font-semibold leading-snug text-ink-900">
+                You&apos;re now ahead of most people on this.
+              </p>
+              <p>The hardest part is knowing. Every swap from here moves the needle.</p>
+              <p className="text-ink-900">
+                {firstName
+                  ? `Thanks for taking the quiz, ${firstName} — talk soon.`
+                  : 'Thanks for taking the quiz — talk soon.'}
+              </p>
+            </div>
+          </section>
+        </QuizCard>
       </QuizPage>
     </QuizShell>
   )

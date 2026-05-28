@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { INTERSTITIAL_AFTER_Q14, INTERSTITIAL_AFTER_Q9 } from '../quizModel'
+import { INTERSTITIAL_AFTER_Q14, INTERSTITIAL_NATURE_STUDY } from '../quizModel'
 import {
   QuizBackButton,
   QuizCard,
@@ -16,8 +16,8 @@ export function QuizInterstitialScreen() {
   const navigate = useNavigate()
 
   const text =
-    which === 'heat'
-      ? INTERSTITIAL_AFTER_Q9
+    which === 'nature'
+      ? INTERSTITIAL_NATURE_STUDY
       : which === 'kids'
         ? INTERSTITIAL_AFTER_Q14
         : null
@@ -27,12 +27,12 @@ export function QuizInterstitialScreen() {
   }, [text, navigate])
 
   function continueNext() {
-    if (which === 'heat') navigate('/q/q10', { replace: true })
+    if (which === 'nature') navigate('/q/q8', { replace: true })
     else if (which === 'kids') navigate('/q/q15', { replace: true })
   }
 
   function goBack() {
-    if (which === 'heat') navigate('/q/q9')
+    if (which === 'nature') navigate('/q/q7')
     else if (which === 'kids') navigate('/q/q14')
     else navigate('/')
   }

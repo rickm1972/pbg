@@ -27,7 +27,7 @@ export function QuizLandingPage() {
       sessionStorage.setItem('quiz_awareness_answers', JSON.stringify({}))
       sessionStorage.setItem('quiz_motivation_answers', JSON.stringify({}))
       sessionStorage.removeItem('quiz_first_name')
-      navigate('/q/q1')
+      navigate('/concern/pre')
     } catch {
       setError('Failed to start quiz. Please try again.')
     } finally {
