@@ -18,6 +18,17 @@ type QuizResponseRow = {
   motivation_answers: Record<string, unknown> | null
 }
 
+const MOTIVATION_QUESTIONS: Array<{ id: 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'; text: string }> = [
+  { id: 'q18', text: 'Do you have children under 12 in your household?' },
+  { id: 'q18b', text: 'How old are your children?' },
+  { id: 'q19', text: 'Before this quiz, how concerned were you about chemicals in your kitchen?' },
+  { id: 'q20', text: 'After your score, how concerned are you?' },
+  {
+    id: 'q21',
+    text: 'When buying or replacing kitchen products, would you choose safer alternatives if you knew what they were?',
+  },
+]
+
 type Filters = {
   createdFrom: string
   createdTo: string
@@ -947,9 +958,9 @@ function ResponseDetails({ row }: { row: QuizResponseRow }) {
       answer: v === null ? '—' : v ? 'Yes' : 'No',
     }
   })
-  const motivationLines = ['q18', 'q18b', 'q19', 'q20', 'q21'].map((id) => {
-    const v = motivation[id]
-    return `${id.toUpperCase()}: ${v == null ? '—' : String(v)}`
+  const motivationLines = MOTIVATION_QUESTIONS.map((q) => {
+    const v = motivation[q.id]
+    return `${q.id.toUpperCase()} ${q.text} — ${v == null ? '—' : String(v)}`
   })
 
   return (
