@@ -276,10 +276,22 @@ export function QuizAdminDashboard({
     const combos: Record<string, number> = {}
     let moved = 0
     let movedDenom = 0
+    let motivationAnswered = 0
+    let motivationEligible = 0
 
     for (const r of list) {
       const pre = motivationText(r, 'q19')
       const post = motivationText(r, 'q20')
+      const hasAnyMotivation =
+        motivationText(r, 'q18') ||
+        motivationText(r, 'q18b') ||
+        pre ||
+        post ||
+        motivationText(r, 'q21')
+      if (r.completed_at) {
+        motivationEligible++
+        if (hasAnyMotivation) motivationAnswered++
+      }
       if (pre && post) {
         const key = `${pre} → ${post}`
         combos[key] = (combos[key] ?? 0) + 1
@@ -292,29 +304,39 @@ export function QuizAdminDashboard({
     }
 
     const wouldBuyCounts: Record<string, number> = { Yes: 0, No: 0, Maybe: 0 }
+    let wouldBuyAnswered = 0
     for (const r of list) {
       const v = motivationText(r, 'q21')
-      if (v && v in wouldBuyCounts) wouldBuyCounts[v]++
+      if (v && v in wouldBuyCounts) {
+        wouldBuyCounts[v]++
+        wouldBuyAnswered++
+      }
     }
 
     const kidsCounts: Record<string, number> = { Yes: 0, No: 0 }
+    let kidsAnswered = 0
     const kidAges: Record<string, number> = { 'Under 5': 0, '5-12': 0, Both: 0 }
     for (const r of list) {
       const k = motivationText(r, 'q18')
       if (k === 'Yes') {
         kidsCounts.Yes++
+        kidsAnswered++
         const age = motivationText(r, 'q18b')
         if (age && age in kidAges) kidAges[age]++
       } else if (k === 'No') {
         kidsCounts.No++
+        kidsAnswered++
       }
     }
 
     return {
       concernCombos: combos,
       movedMoreConcernedPct: movedDenom ? moved / movedDenom : 0,
+      motivationAnswerRate: motivationEligible ? motivationAnswered / motivationEligible : 0,
       wouldBuyCounts,
+      wouldBuyAnswered,
       kidsCounts,
+      kidsAnswered,
       kidAges,
     }
   }, [rows])
@@ -537,6 +559,41 @@ export function QuizAdminDashboard({
           className="md:col-span-2"
           title="Median score"
           value={metrics.medianScore == null ? '—' : String(metrics.medianScore)}
+        />
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-12">
+        <SummaryCard
+          className="md:col-span-3"
+          title="Motivation answered"
+          value={`${Math.round(voc.motivationAnswerRate * 100)}%`}
+          subtitle="Of completed responses"
+        />
+        <SummaryCard
+          className="md:col-span-3"
+          title="Has kids (Yes)"
+          value={
+            voc.kidsAnswered
+              ? `${Math.round((voc.kidsCounts.Yes / voc.kidsAnswered) * 100)}%`
+              : '—'
+          }
+          subtitle={voc.kidsAnswered ? `${voc.kidsCounts.Yes}/${voc.kidsAnswered}` : 'No answers'}
+        />
+        <SummaryCard
+          className="md:col-span-3"
+          title="Would buy safer (Yes)"
+          value={
+            voc.wouldBuyAnswered
+              ? `${Math.round((voc.wouldBuyCounts.Yes / voc.wouldBuyAnswered) * 100)}%`
+              : '—'
+          }
+          subtitle={voc.wouldBuyAnswered ? `${voc.wouldBuyCounts.Yes}/${voc.wouldBuyAnswered}` : 'No answers'}
+        />
+        <SummaryCard
+          className="md:col-span-3"
+          title="Concern shift"
+          value={`${Math.round(voc.movedMoreConcernedPct * 100)}%`}
+          subtitle="Not/somewhat → more concerned"
         />
       </div>
 
