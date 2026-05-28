@@ -1,6 +1,20 @@
 export function getResponseId(): string | null {
-  const id = sessionStorage.getItem('quiz_response_id')
-  return id && id.trim() ? id : null
+  const fromSession = sessionStorage.getItem('quiz_response_id')
+  if (fromSession && fromSession.trim()) return fromSession.trim()
+  const fromLocal = localStorage.getItem('quiz_response_id')
+  if (fromLocal && fromLocal.trim()) return fromLocal.trim()
+  return null
+}
+
+export function setResponseId(id: string) {
+  const trimmed = id.trim()
+  sessionStorage.setItem('quiz_response_id', trimmed)
+  localStorage.setItem('quiz_response_id', trimmed)
+}
+
+export function clearResponseId() {
+  sessionStorage.removeItem('quiz_response_id')
+  localStorage.removeItem('quiz_response_id')
 }
 
 export function getFirstName(): string | null {

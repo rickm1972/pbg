@@ -8,6 +8,7 @@ import {
   QuizPrimaryButton,
   QuizShell,
 } from '../ui'
+import { clearResponseId, setResponseId } from '../quizStorage'
 
 export function QuizLandingPage() {
   const navigate = useNavigate()
@@ -20,7 +21,8 @@ export function QuizLandingPage() {
     setError(null)
     try {
       const id = await createQuizResponse(navigator.userAgent ?? null)
-      sessionStorage.setItem('quiz_response_id', id)
+      clearResponseId()
+      setResponseId(id)
       sessionStorage.setItem('quiz_scored_answers', JSON.stringify({}))
       sessionStorage.setItem('quiz_awareness_answers', JSON.stringify({}))
       sessionStorage.setItem('quiz_motivation_answers', JSON.stringify({}))

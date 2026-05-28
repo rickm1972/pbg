@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
 import { getResponseId, getMotivationAnswers, setMotivationAnswer } from '../quizStorage'
@@ -31,6 +31,10 @@ export function QuizMotivationScreen() {
   const [step, setStep] = useState<Step>('q18')
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!responseId) navigate('/', { replace: true })
+  }, [responseId, navigate])
 
   async function persist() {
     if (!responseId) return
