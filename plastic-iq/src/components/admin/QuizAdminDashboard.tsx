@@ -340,6 +340,32 @@ export function QuizAdminDashboard({
       }
     }
 
+    // Distributions for motivation questions
+    const preConcernCounts: Record<string, number> = {
+      'Very concerned': 0,
+      'Somewhat concerned': 0,
+      'Not concerned': 0,
+    }
+    const postConcernCounts: Record<string, number> = {
+      'More concerned': 0,
+      'About the same': 0,
+      'Less concerned': 0,
+    }
+    let preConcernAnswered = 0
+    let postConcernAnswered = 0
+    for (const r of list) {
+      const pre = motivationText(r, 'q19')
+      if (pre && pre in preConcernCounts) {
+        preConcernCounts[pre]++
+        preConcernAnswered++
+      }
+      const post = motivationText(r, 'q20')
+      if (post && post in postConcernCounts) {
+        postConcernCounts[post]++
+        postConcernAnswered++
+      }
+    }
+
     return {
       concernCombos: combos,
       movedMoreConcernedPct: movedDenom ? moved / movedDenom : 0,
@@ -349,6 +375,10 @@ export function QuizAdminDashboard({
       kidsCounts,
       kidsAnswered,
       kidAges,
+      preConcernCounts,
+      preConcernAnswered,
+      postConcernCounts,
+      postConcernAnswered,
     }
   }, [rows])
 
@@ -692,6 +722,51 @@ export function QuizAdminDashboard({
                 yesRate={q.yesRate}
               />
             ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-12">
+        <div className="md:col-span-12 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="text-sm font-semibold text-ink-900">Question-level (motivation)</div>
+          <div className="mt-1 text-xs text-slate-600">Distributions for Q18–Q21 (non-boolean).</div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <InsightBlock
+              title="Q18 Has kids"
+              lines={[
+                `Yes: ${voc.kidsCounts.Yes}`,
+                `No: ${voc.kidsCounts.No}`,
+                `Answered: ${voc.kidsAnswered}`,
+              ]}
+            />
+            <InsightBlock
+              title="Q21 Would buy safer"
+              lines={[
+                `Yes: ${voc.wouldBuyCounts.Yes}`,
+                `Maybe: ${voc.wouldBuyCounts.Maybe}`,
+                `No: ${voc.wouldBuyCounts.No}`,
+                `Answered: ${voc.wouldBuyAnswered}`,
+              ]}
+            />
+            <InsightBlock
+              title="Q19 Before quiz concern"
+              lines={[
+                `Very: ${voc.preConcernCounts['Very concerned']}`,
+                `Somewhat: ${voc.preConcernCounts['Somewhat concerned']}`,
+                `Not: ${voc.preConcernCounts['Not concerned']}`,
+                `Answered: ${voc.preConcernAnswered}`,
+              ]}
+            />
+            <InsightBlock
+              title="Q20 After score concern"
+              lines={[
+                `More: ${voc.postConcernCounts['More concerned']}`,
+                `Same: ${voc.postConcernCounts['About the same']}`,
+                `Less: ${voc.postConcernCounts['Less concerned']}`,
+                `Answered: ${voc.postConcernAnswered}`,
+              ]}
+            />
           </div>
         </div>
       </div>
