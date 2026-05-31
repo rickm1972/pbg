@@ -45,19 +45,22 @@ export function agentsApiPlugin() {
       const secret = env.VITE_ADMIN_PASSWORD
 
       const syncViteDevBaseUrl = async () => {
+        const url =
+          server.resolvedUrls?.local?.[0] ??
+          (() => {
+            const httpServer = server.httpServer
+            if (!httpServer?.listening) return null
+            const addr = httpServer.address()
+            if (!addr || typeof addr !== 'object') return null
+            let host = addr.address
+            if (host === '::' || host === '0.0.0.0' || host === '::1') host = '127.0.0.1'
+            return `http://${host}:${addr.port}`
+          })()
+        if (!url) return
         const { setViteDevBaseUrl } = await import('./persona/export-pdf.mjs')
-        if (server.resolvedUrls?.local?.[0]) {
-          setViteDevBaseUrl(server.resolvedUrls.local[0])
-          return
-        }
-        const httpServer = server.httpServer
-        if (!httpServer?.listening) return
-        const addr = httpServer.address()
-        if (addr && typeof addr === 'object') {
-          let host = addr.address
-          if (host === '::' || host === '0.0.0.0' || host === '::1') host = '127.0.0.1'
-          setViteDevBaseUrl(`http://${host}:${addr.port}`)
-        }
+        const { setChannelViteDevBaseUrl } = await import('./channel/export-pdf.mjs')
+        setViteDevBaseUrl(url)
+        setChannelViteDevBaseUrl(url)
       }
 
       server.httpServer?.once('listening', () => {
@@ -71,13 +74,14 @@ export function agentsApiPlugin() {
         const pathname = req.url?.split('?')[0] ?? ''
 
         const isPersonaApi = pathname.startsWith('/api/persona')
+        const isChannelApi = pathname.startsWith('/api/channel')
         const isAgentApi =
           pathname.startsWith('/api/agent1') ||
           pathname.startsWith('/api/agent2') ||
           pathname.startsWith('/api/agent3') ||
           pathname.startsWith('/api/agent4')
 
-        if (!isPersonaApi && !isAgentApi) {
+        if (!isPersonaApi && !isChannelApi && !isAgentApi) {
           next()
           return
         }
@@ -201,6 +205,97 @@ export function agentsApiPlugin() {
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err)
               console.error('[persona-api] /export-pdf:', message)
+              sendJson(res, 500, { error: message })
+            }
+            return
+          }
+
+          sendJson(res, 404, { error: 'Not found' })
+          return
+        }
+
+        if (isChannelApi) {
+          if (req.method === 'POST' && pathname === '/api/channel/run') {
+            try {
+              const body = await readJsonBody(req)
+              const topic = String(body.topic ?? '').trim()
+              if (!topic) {
+                sendJson(res, 400, { error: 'topic is required' })
+                return
+              }
+              const { startChannelMapRun, executeChannelMapRun } = await import(
+                './channel/runner.mjs'
+              )
+              const row = await startChannelMapRun({
+                topic,
+                channelMapId: body.channel_map_id ?? null,
+              })
+              sendJson(res, 202, {
+                ok: true,
+                channel_map_id: row.channel_map_id,
+                run_status: row.run_metadata?.run_status ?? 'running',
+              })
+              void executeChannelMapRun(row.channel_map_id).catch((err) => {
+                console.error('[channel-api] background run failed:', err)
+              })
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              console.error('[channel-api] /run:', message)
+              sendJson(res, 500, { ok: false, error: message })
+            }
+            return
+          }
+
+          if (req.method === 'GET' && pathname === '/api/channel/export-data') {
+            try {
+              const q = new URL(req.url ?? '', 'http://localhost').searchParams
+              const channelMapId = q.get('channel_map_id') ?? ''
+              const token = q.get('token') ?? ''
+              const { validateChannelExportToken } = await import('./channel/export-tokens.mjs')
+              if (!validateChannelExportToken(token, channelMapId)) {
+                sendJson(res, 401, { error: 'Invalid or expired export token' })
+                return
+              }
+              const { fetchChannelMapById, createChannelServiceClient } = await import(
+                './channel/supabase.mjs'
+              )
+              const supabase = createChannelServiceClient()
+              const row = await fetchChannelMapById(supabase, channelMapId)
+              sendJson(res, 200, row)
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              sendJson(res, 500, { error: message })
+            }
+            return
+          }
+
+          if (req.method === 'POST' && pathname === '/api/channel/export-pdf') {
+            if (!secret || provided !== secret) {
+              sendJson(res, 401, { error: 'Unauthorized' })
+              return
+            }
+            try {
+              const body = await readJsonBody(req)
+              const channelMapId = String(body.channel_map_id ?? '').trim()
+              if (!channelMapId) {
+                sendJson(res, 400, { error: 'channel_map_id is required' })
+                return
+              }
+              const { captureChannelMapPdf } = await import('./channel/export-pdf.mjs')
+              const { fetchChannelMapById, createChannelServiceClient } = await import(
+                './channel/supabase.mjs'
+              )
+              const supabase = createChannelServiceClient()
+              const row = await fetchChannelMapById(supabase, channelMapId)
+              const pdf = await captureChannelMapPdf({ channelMapId, req })
+              const filename = `${row.topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'channel-map'}-channels.pdf`
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'application/pdf')
+              res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+              res.end(Buffer.from(pdf))
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              console.error('[channel-api] /export-pdf:', message)
               sendJson(res, 500, { error: message })
             }
             return

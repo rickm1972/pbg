@@ -4,6 +4,7 @@ import { Agent2ReviewDashboard } from '../components/admin/Agent2ReviewDashboard
 import { Agent3ReviewDashboard } from '../components/admin/Agent3ReviewDashboard'
 import { Agent4ReviewDashboard } from '../components/admin/Agent4ReviewDashboard'
 import { QuizAdminDashboard } from '../components/admin/QuizAdminDashboard'
+import { ChannelDashboard } from '../components/admin/ChannelDashboard'
 import { PersonaDashboard } from '../components/admin/PersonaDashboard'
 import { saveAdminProduct } from '../lib/adminProductSave'
 import { formatSupabaseUnknownError, supabase } from '../lib/supabaseClient'
@@ -14,7 +15,15 @@ import {
 } from '../lib/retailerLinksSidecar'
 import type { Product } from '../types'
 
-type AdminTab = 'products' | 'agent1' | 'agent2' | 'agent3' | 'agent4' | 'quiz' | 'personas'
+type AdminTab =
+  | 'products'
+  | 'agent1'
+  | 'agent2'
+  | 'agent3'
+  | 'agent4'
+  | 'quiz'
+  | 'personas'
+  | 'channels'
 
 export function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('products')
@@ -212,6 +221,17 @@ export function AdminPage() {
             >
               Personas
             </button>
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                tab === 'channels'
+                  ? 'bg-white text-ink-900 shadow-sm'
+                  : 'text-slate-600 hover:text-ink-900'
+              }`}
+              onClick={() => setTab('channels')}
+            >
+              Channels
+            </button>
           </div>
           <button
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -388,6 +408,14 @@ export function AdminPage() {
 
       {tab === 'personas' ? (
         <PersonaDashboard
+          authUserEmail={authUserEmail}
+          onNotice={setMessage}
+          onError={setError}
+        />
+      ) : null}
+
+      {tab === 'channels' ? (
+        <ChannelDashboard
           authUserEmail={authUserEmail}
           onNotice={setMessage}
           onError={setError}

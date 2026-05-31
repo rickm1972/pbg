@@ -8,6 +8,7 @@ import { ProductPage } from './pages/ProductPage'
 import { AboutPage } from './pages/AboutPage'
 import { WhyPlasticBegonePage } from './pages/WhyPlasticBegonePage'
 import { AdminPage } from './pages/AdminPage'
+import { ChannelMapExportPage } from './pages/ChannelMapExportPage'
 import { PersonaExportPage } from './pages/PersonaExportPage'
 
 export default function App() {
@@ -18,6 +19,10 @@ export default function App() {
         <Route
           path="/admin/persona/:personaId/export"
           element={<PersonaExportPage />}
+        />
+        <Route
+          path="/admin/channel-map/:channelMapId/export"
+          element={<ChannelMapExportPage />}
         />
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
