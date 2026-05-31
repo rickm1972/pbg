@@ -8,12 +8,17 @@ import { ProductPage } from './pages/ProductPage'
 import { AboutPage } from './pages/AboutPage'
 import { WhyPlasticBegonePage } from './pages/WhyPlasticBegonePage'
 import { AdminPage } from './pages/AdminPage'
+import { PersonaExportPage } from './pages/PersonaExportPage'
 
 export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
+        <Route
+          path="/admin/persona/:personaId/export"
+          element={<PersonaExportPage />}
+        />
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="/categories" element={<CategoriesPage />} />

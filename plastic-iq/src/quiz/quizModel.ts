@@ -246,6 +246,9 @@ export function tierForScore(score: number): {
   }
 }
 
+/** Primary button on Did You Know interstitial screens (not source-grounded). */
+export const INTERSTITIAL_CONTINUE_LABEL = 'Continue Quiz'
+
 export const INTERSTITIAL_NATURE_STUDY =
   'A 2026 study in Nature Medicine tested healthy adults and found that 100% of them had at least six different plastic chemicals in their body — every single day.'
 

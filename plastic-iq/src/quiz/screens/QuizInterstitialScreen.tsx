@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { INTERSTITIAL_AFTER_Q14, INTERSTITIAL_NATURE_STUDY } from '../quizModel'
+import {
+  INTERSTITIAL_AFTER_Q14,
+  INTERSTITIAL_CONTINUE_LABEL,
+  INTERSTITIAL_NATURE_STUDY,
+} from '../quizModel'
 import {
   QuizBackButton,
   QuizCard,
@@ -52,7 +56,7 @@ export function QuizInterstitialScreen() {
         </QuizCard>
 
         <div className="mt-6">
-          <QuizPrimaryButton onClick={continueNext}>Continue</QuizPrimaryButton>
+          <QuizPrimaryButton onClick={continueNext}>{INTERSTITIAL_CONTINUE_LABEL}</QuizPrimaryButton>
         </div>
       </QuizPage>
     </QuizShell>

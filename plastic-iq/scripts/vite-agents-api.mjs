@@ -1,6 +1,6 @@
 /**
- * Vite dev middleware: Agent 1 + Agent 2 run from the dashboard with only `npm run dev`.
- * No separate port, no agent1:serve / agent2:serve terminal.
+ * Vite dev middleware: product agents (1–4) + Persona agent from the admin UI (`npm run dev`).
+ * Persona runs are async (202 + background job); product agents remain synchronous.
  */
 import { loadEnv } from './lib/env.mjs'
 
@@ -44,15 +44,40 @@ export function agentsApiPlugin() {
       const env = loadEnv()
       const secret = env.VITE_ADMIN_PASSWORD
 
+      const syncViteDevBaseUrl = async () => {
+        const { setViteDevBaseUrl } = await import('./persona/export-pdf.mjs')
+        if (server.resolvedUrls?.local?.[0]) {
+          setViteDevBaseUrl(server.resolvedUrls.local[0])
+          return
+        }
+        const httpServer = server.httpServer
+        if (!httpServer?.listening) return
+        const addr = httpServer.address()
+        if (addr && typeof addr === 'object') {
+          let host = addr.address
+          if (host === '::' || host === '0.0.0.0' || host === '::1') host = '127.0.0.1'
+          setViteDevBaseUrl(`http://${host}:${addr.port}`)
+        }
+      }
+
+      server.httpServer?.once('listening', () => {
+        void syncViteDevBaseUrl()
+      })
+      if (server.httpServer?.listening) {
+        void syncViteDevBaseUrl()
+      }
+
       server.middlewares.use(async (req, res, next) => {
         const pathname = req.url?.split('?')[0] ?? ''
 
-        if (
-          !pathname.startsWith('/api/agent1') &&
-          !pathname.startsWith('/api/agent2') &&
-          !pathname.startsWith('/api/agent3') &&
-          !pathname.startsWith('/api/agent4')
-        ) {
+        const isPersonaApi = pathname.startsWith('/api/persona')
+        const isAgentApi =
+          pathname.startsWith('/api/agent1') ||
+          pathname.startsWith('/api/agent2') ||
+          pathname.startsWith('/api/agent3') ||
+          pathname.startsWith('/api/agent4')
+
+        if (!isPersonaApi && !isAgentApi) {
           next()
           return
         }
@@ -73,7 +98,10 @@ export function agentsApiPlugin() {
         const provided = req.headers['x-agent-secret']
         const needsSecret =
           pathname === '/api/agent1/dashboard' ||
-          (req.method === 'POST' && pathname.endsWith('/run'))
+          (req.method === 'POST' &&
+            (pathname === '/api/persona/run' ||
+              pathname === '/api/persona/export-pdf' ||
+              (isAgentApi && pathname.endsWith('/run'))))
         if (needsSecret) {
           if (!secret || provided !== secret) {
             sendJson(res, 401, { error: 'Unauthorized' })
@@ -85,6 +113,100 @@ export function agentsApiPlugin() {
           const { fetchAgent1DashboardData } = await import('./agent1/dashboard-fetch.mjs')
           const dashboard = await fetchAgent1DashboardData()
           sendJson(res, 200, dashboard)
+          return
+        }
+
+        if (isPersonaApi) {
+          if (req.method === 'POST' && pathname === '/api/persona/run') {
+            try {
+              const body = await readJsonBody(req)
+              const targetSegment = String(body.target_segment ?? '').trim()
+              if (!targetSegment) {
+                sendJson(res, 400, { error: 'target_segment is required' })
+                return
+              }
+              const { startPersonaRun, executePersonaRun } = await import('./persona/runner.mjs')
+              const row = await startPersonaRun({
+                targetSegment,
+                personaId: body.persona_id ?? null,
+              })
+              sendJson(res, 202, {
+                ok: true,
+                persona_id: row.persona_id,
+                run_status: row.run_metadata?.run_status ?? 'running',
+              })
+              void executePersonaRun(row.persona_id).catch((err) => {
+                console.error('[persona-api] background run failed:', err)
+              })
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              console.error('[persona-api] /run:', message)
+              sendJson(res, 500, { ok: false, error: message })
+            }
+            return
+          }
+
+          if (req.method === 'GET' && pathname === '/api/persona/export-data') {
+            try {
+              const q = new URL(req.url ?? '', 'http://localhost').searchParams
+              const personaId = q.get('persona_id') ?? ''
+              const token = q.get('token') ?? ''
+              const { validateExportToken } = await import('./persona/export-tokens.mjs')
+              if (!validateExportToken(token, personaId)) {
+                sendJson(res, 401, { error: 'Invalid or expired export token' })
+                return
+              }
+              const { fetchPersonaById, createPersonaServiceClient } = await import(
+                './persona/supabase.mjs'
+              )
+              const supabase = createPersonaServiceClient()
+              const row = await fetchPersonaById(supabase, personaId)
+              sendJson(res, 200, row)
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              sendJson(res, 500, { error: message })
+            }
+            return
+          }
+
+          if (req.method === 'POST' && pathname === '/api/persona/export-pdf') {
+            if (!secret || provided !== secret) {
+              sendJson(res, 401, { error: 'Unauthorized' })
+              return
+            }
+            try {
+              const body = await readJsonBody(req)
+              const personaId = String(body.persona_id ?? '').trim()
+              if (!personaId) {
+                sendJson(res, 400, { error: 'persona_id is required' })
+                return
+              }
+              const { capturePersonaPdf } = await import('./persona/export-pdf.mjs')
+              const { formatPersonaDisplayName } = await import('./persona/persona-labels.mjs')
+              const { fetchPersonaById, createPersonaServiceClient } = await import(
+                './persona/supabase.mjs'
+              )
+              const supabase = createPersonaServiceClient()
+              const row = await fetchPersonaById(supabase, personaId)
+              const pdf = await capturePersonaPdf({ personaId, req })
+              const label =
+                row.persona_name ||
+                formatPersonaDisplayName(row.persona_content ?? {}) ||
+                'persona'
+              const filename = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'persona'}.pdf`
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'application/pdf')
+              res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+              res.end(Buffer.from(pdf))
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              console.error('[persona-api] /export-pdf:', message)
+              sendJson(res, 500, { error: message })
+            }
+            return
+          }
+
+          sendJson(res, 404, { error: 'Not found' })
           return
         }
 
