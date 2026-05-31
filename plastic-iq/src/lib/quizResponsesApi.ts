@@ -21,6 +21,36 @@ export type QuizResponsePatch = {
   motivation_answers?: Record<string, unknown> | null
 }
 
+export type QuizResponseSnapshot = {
+  response_id?: string
+  scored_answers?: Record<string, unknown>
+  awareness_answers?: Record<string, unknown>
+  motivation_answers?: Record<string, unknown>
+  final_score?: number | null
+  letter_grade?: string | null
+  tier?: string | null
+  completed_at?: string | null
+}
+
+/** Empty {} must not be sent — RPC would replace stored answers and wipe prior saves. */
+function jsonbPatchValue(
+  value: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (value == null) return null
+  if (typeof value !== 'object' || Array.isArray(value)) return null
+  if (Object.keys(value).length === 0) return null
+  return value
+}
+
+export async function fetchQuizResponse(responseId: string): Promise<QuizResponseSnapshot | null> {
+  const { data, error } = await supabase.rpc('quiz_response_get', {
+    p_response_id: responseId,
+  })
+  if (error) throw error
+  if (!data || typeof data !== 'object') return null
+  return data as QuizResponseSnapshot
+}
+
 export async function patchQuizResponse(
   responseId: string,
   patch: QuizResponsePatch,
@@ -33,10 +63,9 @@ export async function patchQuizResponse(
     p_final_score: patch.final_score ?? null,
     p_letter_grade: patch.letter_grade ?? null,
     p_tier: patch.tier ?? null,
-    p_scored_answers: patch.scored_answers ?? null,
-    p_awareness_answers: patch.awareness_answers ?? null,
-    p_motivation_answers: patch.motivation_answers ?? null,
+    p_scored_answers: jsonbPatchValue(patch.scored_answers),
+    p_awareness_answers: jsonbPatchValue(patch.awareness_answers),
+    p_motivation_answers: jsonbPatchValue(patch.motivation_answers),
   })
   if (error) throw error
 }
-

@@ -1064,10 +1064,20 @@ function ScoredQuestionStatRow({
   )
 }
 
+function countStoredScoredAnswers(scored: Record<string, unknown>): number {
+  return SCORED_QUESTIONS.filter((q) => normalizeScoredAnswer(scored[q.id]) !== null).length
+}
+
 function ResponseDetails({ row }: { row: QuizResponseRow }) {
   const scored = (row.scored_answers ?? {}) as Record<string, unknown>
   const awareness = (row.awareness_answers ?? {}) as Record<string, unknown>
   const motivation = (row.motivation_answers ?? {}) as Record<string, unknown>
+  const scoredCount = countStoredScoredAnswers(scored)
+  const scoreMismatch =
+    row.completed_at != null &&
+    typeof row.final_score === 'number' &&
+    row.final_score >= 90 &&
+    scoredCount < 5
 
   const scoredItems = SCORED_QUESTIONS.map((q) => ({
     id: q.id,
@@ -1088,10 +1098,20 @@ function ResponseDetails({ row }: { row: QuizResponseRow }) {
   })
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3">
+      {scoreMismatch ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <strong>Data issue:</strong> This row shows a high score ({row.final_score}) but only{' '}
+          {scoredCount} of 14 scored answers are stored. Answers may have been wiped when the results
+          page loaded with an empty browser session (fixed in the latest quiz build). Re-take or
+          treat score as unreliable.
+        </div>
+      ) : null}
+      <div className="grid gap-3 md:grid-cols-3">
       <DetailBlock title="Scored answers" items={scoredItems} />
       <DetailBlock title="Awareness answers" items={awarenessItems} />
       <DetailBlock title="Motivation answers" lines={motivationLines} />
+      </div>
     </div>
   )
 }

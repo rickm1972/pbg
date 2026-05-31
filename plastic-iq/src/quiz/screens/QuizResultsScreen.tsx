@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { patchQuizResponse } from '../../lib/quizResponsesApi'
+import { fetchQuizResponse, patchQuizResponse } from '../../lib/quizResponsesApi'
 import { shareQuizInvite } from '../shareQuiz'
 import {
   computeQuizScore,
   countScoredYesAnswers,
   tierForScore,
   topScoredYesItems,
+  type ScoredAnswerValue,
 } from '../quizModel'
-import { getFirstName, getResponseId, getScoredAnswers } from '../quizStorage'
+import {
+  getFirstName,
+  getResponseId,
+  restoreScoredAnswersFromServer,
+} from '../quizStorage'
 import {
   QuizCard,
   QuizHeader,
@@ -47,17 +52,12 @@ function takeawaySupportingLine(deductionCount: number): string {
 export function QuizResultsScreen() {
   const navigate = useNavigate()
   const responseId = getResponseId()
-  const scoredAnswers = useMemo(() => getScoredAnswers(), [])
-  const score = useMemo(() => computeQuizScore(scoredAnswers), [scoredAnswers])
-  const result = useMemo(() => tierForScore(score), [score])
   const firstName = getFirstName()
-  const deductionCount = useMemo(() => countScoredYesAnswers(scoredAnswers), [scoredAnswers])
-  const topItems = useMemo(() => topScoredYesItems(scoredAnswers, 3), [scoredAnswers])
+  const [scoredAnswers, setScoredAnswers] = useState<Record<string, ScoredAnswerValue> | null>(
+    null,
+  )
+  const [hydrated, setHydrated] = useState(false)
   const [sharing, setSharing] = useState(false)
-
-  const scoreEyebrow = firstName
-    ? `${firstName}, your kitchen scored:`
-    : 'Your kitchen scored:'
 
   useEffect(() => {
     if (!responseId) navigate('/', { replace: true })
@@ -65,6 +65,50 @@ export function QuizResultsScreen() {
 
   useEffect(() => {
     if (!responseId) return
+    let cancelled = false
+
+    void (async () => {
+      let merged: Record<string, ScoredAnswerValue> = {}
+      try {
+        const row = await fetchQuizResponse(responseId)
+        merged = restoreScoredAnswersFromServer(row?.scored_answers ?? {})
+      } catch {
+        merged = restoreScoredAnswersFromServer({})
+      }
+      if (!cancelled) {
+        setScoredAnswers(merged)
+        setHydrated(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [responseId])
+
+  const answeredCount = scoredAnswers ? Object.keys(scoredAnswers).length : 0
+  const missingAnswers = hydrated && answeredCount === 0
+
+  const score = useMemo(
+    () => (scoredAnswers && answeredCount > 0 ? computeQuizScore(scoredAnswers) : 0),
+    [scoredAnswers, answeredCount],
+  )
+  const result = useMemo(() => tierForScore(score), [score])
+  const deductionCount = useMemo(
+    () => (scoredAnswers ? countScoredYesAnswers(scoredAnswers) : 0),
+    [scoredAnswers],
+  )
+  const topItems = useMemo(
+    () => (scoredAnswers ? topScoredYesItems(scoredAnswers, 3) : []),
+    [scoredAnswers],
+  )
+
+  const scoreEyebrow = firstName
+    ? `${firstName}, your kitchen scored:`
+    : 'Your kitchen scored:'
+
+  useEffect(() => {
+    if (!responseId || !hydrated || !scoredAnswers || answeredCount === 0) return
     void patchQuizResponse(responseId, {
       completed_at: new Date().toISOString(),
       final_score: score,
@@ -72,7 +116,15 @@ export function QuizResultsScreen() {
       letter_grade: result.letterGrade,
       scored_answers: scoredAnswers as unknown as Record<string, unknown>,
     })
-  }, [responseId, score, result.tier, result.letterGrade, scoredAnswers])
+  }, [
+    responseId,
+    hydrated,
+    scoredAnswers,
+    answeredCount,
+    score,
+    result.tier,
+    result.letterGrade,
+  ])
 
   async function share() {
     if (sharing) return
@@ -87,6 +139,43 @@ export function QuizResultsScreen() {
     } finally {
       setSharing(false)
     }
+  }
+
+  if (!hydrated || !scoredAnswers) {
+    return (
+      <QuizShell>
+        <QuizHeader size="hero" />
+        <div className="flex min-h-[50dvh] items-center justify-center px-4 text-sm text-slate-600">
+          Loading your score…
+        </div>
+      </QuizShell>
+    )
+  }
+
+  if (missingAnswers) {
+    return (
+      <QuizShell>
+        <QuizHeader size="hero" />
+        <QuizPage>
+          <QuizCard padding="lg">
+            <h2 className="font-display text-xl font-semibold text-ink-900">
+              We couldn&apos;t load your answers
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              Your session may have expired before we could save your results. Please start the quiz
+              again so we can record your score correctly.
+            </p>
+            <button
+              type="button"
+              className="mt-6 rounded-full bg-forest px-6 py-3 text-sm font-semibold text-white"
+              onClick={() => navigate('/', { replace: true })}
+            >
+              Back to start
+            </button>
+          </QuizCard>
+        </QuizPage>
+      </QuizShell>
+    )
   }
 
   const header = takeawayHeader(firstName, deductionCount)

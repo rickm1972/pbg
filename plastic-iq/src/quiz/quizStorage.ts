@@ -1,6 +1,10 @@
 import type { ScoredAnswerValue } from './quizModel'
 import { normalizeScoredAnswer } from './quizModel'
 
+const SCORED_KEY = 'quiz_scored_answers'
+const AWARENESS_KEY = 'quiz_awareness_answers'
+const MOTIVATION_KEY = 'quiz_motivation_answers'
+
 export function getResponseId(): string | null {
   const fromSession = sessionStorage.getItem('quiz_response_id')
   if (fromSession && fromSession.trim()) return fromSession.trim()
@@ -46,18 +50,43 @@ function parseScoredMap(raw: string | null): Record<string, ScoredAnswerValue> {
   }
 }
 
+export function mergeScoredAnswerMaps(
+  ...sources: Array<Record<string, unknown> | Record<string, ScoredAnswerValue>>
+): Record<string, ScoredAnswerValue> {
+  const out: Record<string, ScoredAnswerValue> = {}
+  for (const src of sources) {
+    for (const [k, v] of Object.entries(src ?? {})) {
+      const norm = normalizeScoredAnswer(v)
+      if (norm) out[k] = norm
+    }
+  }
+  return out
+}
+
+function persistScoredMap(map: Record<string, ScoredAnswerValue>) {
+  const json = JSON.stringify(map)
+  sessionStorage.setItem(SCORED_KEY, json)
+  localStorage.setItem(SCORED_KEY, json)
+}
+
 export function getScoredAnswers(): Record<string, ScoredAnswerValue> {
-  return parseScoredMap(sessionStorage.getItem('quiz_scored_answers'))
+  const fromSession = parseScoredMap(sessionStorage.getItem(SCORED_KEY))
+  if (Object.keys(fromSession).length > 0) return fromSession
+  const fromLocal = parseScoredMap(localStorage.getItem(SCORED_KEY))
+  if (Object.keys(fromLocal).length > 0) {
+    sessionStorage.setItem(SCORED_KEY, JSON.stringify(fromLocal))
+    return fromLocal
+  }
+  return {}
 }
 
 export function setScoredAnswer(id: string, value: ScoredAnswerValue) {
   const current = getScoredAnswers()
   current[id] = value
-  sessionStorage.setItem('quiz_scored_answers', JSON.stringify(current))
+  persistScoredMap(current)
 }
 
-function parseBoolMap(key: string): Record<string, boolean> {
-  const raw = sessionStorage.getItem(key)
+function parseBoolMap(raw: string | null): Record<string, boolean> {
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw) as unknown
@@ -71,18 +100,32 @@ function parseBoolMap(key: string): Record<string, boolean> {
   }
 }
 
+function persistAwarenessMap(map: Record<string, boolean>) {
+  const json = JSON.stringify(map)
+  sessionStorage.setItem(AWARENESS_KEY, json)
+  localStorage.setItem(AWARENESS_KEY, json)
+}
+
 export function getAwarenessAnswers(): Record<string, boolean> {
-  return parseBoolMap('quiz_awareness_answers')
+  const fromSession = parseBoolMap(sessionStorage.getItem(AWARENESS_KEY))
+  if (Object.keys(fromSession).length > 0) return fromSession
+  const fromLocal = parseBoolMap(localStorage.getItem(AWARENESS_KEY))
+  if (Object.keys(fromLocal).length > 0) {
+    sessionStorage.setItem(AWARENESS_KEY, JSON.stringify(fromLocal))
+    return fromLocal
+  }
+  return {}
 }
 
 export function setAwarenessAnswer(id: string, value: boolean) {
   const current = getAwarenessAnswers()
   current[id] = value
-  sessionStorage.setItem('quiz_awareness_answers', JSON.stringify(current))
+  persistAwarenessMap(current)
 }
 
 export function getMotivationAnswers(): Record<string, unknown> {
-  const raw = sessionStorage.getItem('quiz_motivation_answers')
+  const raw =
+    sessionStorage.getItem(MOTIVATION_KEY) ?? localStorage.getItem(MOTIVATION_KEY)
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw) as unknown
@@ -96,5 +139,20 @@ export function getMotivationAnswers(): Record<string, unknown> {
 export function setMotivationAnswer(id: string, value: unknown) {
   const current = getMotivationAnswers()
   current[id] = value
-  sessionStorage.setItem('quiz_motivation_answers', JSON.stringify(current))
+  const json = JSON.stringify(current)
+  sessionStorage.setItem(MOTIVATION_KEY, json)
+  localStorage.setItem(MOTIVATION_KEY, json)
+}
+
+export function clearQuizAnswerStorage() {
+  for (const key of [SCORED_KEY, AWARENESS_KEY, MOTIVATION_KEY]) {
+    sessionStorage.removeItem(key)
+    localStorage.removeItem(key)
+  }
+}
+
+export function restoreScoredAnswersFromServer(server: Record<string, unknown> | undefined) {
+  const merged = mergeScoredAnswerMaps(server ?? {}, getScoredAnswers())
+  persistScoredMap(merged)
+  return merged
 }
