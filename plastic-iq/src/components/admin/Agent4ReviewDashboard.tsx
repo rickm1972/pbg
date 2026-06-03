@@ -27,7 +27,7 @@ type Props = {
   onError: (message: string | null) => void
 }
 
-type ListFilter = 'review' | 'run' | 'history'
+type ListFilter = 'review' | 'run'
 
 const CHECK_META: Array<{
   key: keyof ProductQaChecks
@@ -75,7 +75,6 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   const reviewQueue = useMemo(() => data?.pendingReview.map((x) => x.product) ?? [], [data])
   const runnableProducts = useMemo(() => data?.runnable ?? [], [data])
-  const historyProducts = useMemo(() => data?.withQaHistory ?? [], [data])
 
   const selectedRunnable = useMemo(() => {
     if (!data) return []
@@ -87,38 +86,13 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   const listProducts = useMemo(() => {
     if (!data) return []
     if (listFilter === 'review') return reviewQueue
-    if (listFilter === 'run') return runnableProducts
-    return historyProducts
-  }, [data, listFilter, reviewQueue, runnableProducts, historyProducts])
+    return runnableProducts
+  }, [data, listFilter, reviewQueue, runnableProducts])
 
   const selectedReviewItem = useMemo(() => {
     if (!data || !selectedId) return null
     return data.pendingReview.find((x) => x.product.product_id === selectedId) ?? null
   }, [data, selectedId])
-
-  const selectedHistoryView = useMemo(() => {
-    if (!data || !selectedId || listFilter !== 'history') return null
-    const product = data.products.find((p) => p.product_id === selectedId)
-    if (!product) return null
-    const qa = data.latestQaByProductId[selectedId]
-    if (!qa) return { product, qa: null, score: null, readOnly: true, reviewLabel: null }
-    const score =
-      data.scoreById[qa.score_id] ??
-      data.approvedScoreByProductId[selectedId] ??
-      null
-    return {
-      product,
-      qa,
-      score,
-      readOnly: true,
-      reviewLabel:
-        qa.review_status === 'approved'
-          ? 'Approved'
-          : qa.review_status === 'rejected'
-            ? 'Rejected'
-            : qa.review_status,
-    }
-  }, [data, selectedId, listFilter])
 
   const selectedProduct = useMemo(() => {
     if (!data || !selectedId) return null
@@ -134,16 +108,6 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
         overall: item.qa.overall_status,
         flagged,
       })
-    }
-    for (const p of data.withQaHistory) {
-      if (map.has(p.product_id)) continue
-      const qa = data.latestQaByProductId[p.product_id]
-      if (qa) {
-        map.set(p.product_id, {
-          overall: qa.overall_status,
-          flagged: countFlaggedChecks(qa.checks),
-        })
-      }
     }
     return map
   }, [data])
@@ -303,8 +267,8 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
           <div>
             <h2 className="text-lg font-semibold text-ink-900">Agent 4 — QA Review</h2>
             <p className="mt-1 text-sm text-slate-600">
-              {reviewQueue.length} awaiting review · {runnableProducts.length} ready to run ·{' '}
-              {historyProducts.length} with QA history
+              {reviewQueue.length} awaiting QA review · {runnableProducts.length} ready to run Agent
+              4. Finished catalog (<strong>qa approved</strong>) does not appear here.
             </p>
           </div>
           <button
@@ -327,7 +291,6 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   [
                     ['review', `Awaiting review (${reviewQueue.length})`],
                     ['run', `Run Agent 4 (${runnableProducts.length})`],
-                    ['history', `All with QA (${historyProducts.length})`],
                   ] as const
                 ).map(([filter, label]) => (
                   <button
@@ -345,15 +308,16 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    Products need an approved (or pending) score. Runs use replace if a QA report
-                    already exists for that score.
+                    Only <strong>scoring approved</strong> (Agent 3 done) or <strong>qa rejected</strong>
+                    . After Agent 4 runs, use <strong>Awaiting review</strong>; after approval the
+                    product leaves Agent 4.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       disabled={batchBusy || runnableProducts.length === 0}
                       onClick={selectAllRunnable}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
                     >
                       Select all ({runnableProducts.length})
                     </button>
@@ -385,10 +349,8 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               {listProducts.length === 0 ? (
                 <li className="p-4 text-sm text-slate-600">
                   {listFilter === 'review'
-                    ? 'Nothing awaiting QA review. Run Agent 4 from the Run tab.'
-                    : listFilter === 'run'
-                      ? 'Nothing ready — approve Agent 3 scores first.'
-                      : 'No QA reports yet.'}
+                    ? 'Nothing awaiting QA review. Approve Agent 3 scores, run Agent 4, then review here.'
+                    : 'Nothing ready — approve Agent 3 scores first (status scoring approved).'}
                 </li>
               ) : (
                 listProducts.map((p) => {
@@ -470,22 +432,6 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                 setRejectNotes('')
               }}
               onRejectConfirm={handleReject}
-            />
-          ) : selectedHistoryView?.qa ? (
-            <QaReviewPanel
-              product={selectedHistoryView.product}
-              qa={selectedHistoryView.qa}
-              score={selectedHistoryView.score}
-              readOnly
-              reviewLabel={selectedHistoryView.reviewLabel ?? undefined}
-              busy={false}
-              rejecting={false}
-              rejectNotes=""
-              onRejectNotesChange={() => {}}
-              onApprove={() => {}}
-              onRejectOpen={() => {}}
-              onRejectCancel={() => {}}
-              onRejectConfirm={() => {}}
             />
           ) : (
             <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">

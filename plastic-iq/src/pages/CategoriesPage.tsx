@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, CookingPot, FlaskConical, ShieldCheck, Users } from 'lucide-react'
 import type { Product } from '../types'
 import { fetchAllProducts } from '../lib/productsApi'
+import { filterPublicListProducts } from '../lib/publicProductDisplay'
 import categoriesHero from '../assets/categories-hero.png'
 import { TopNav } from '../components/nav/TopNav'
 import categoryFoodStorage from '../assets/category-food-storage.png'
@@ -20,10 +21,10 @@ export function CategoriesPage() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load categories'))
   }, [])
 
-  const kitchenProducts = useMemo(
-    () => (allProducts ?? []).filter((p) => (p.category ?? '') === 'Kitchen'),
-    [allProducts],
-  )
+  const kitchenProducts = useMemo(() => {
+    const scored = filterPublicListProducts(allProducts ?? [])
+    return scored.filter((p) => (p.category ?? '') === 'Kitchen')
+  }, [allProducts])
 
   const countsBySubcategory = useMemo(() => {
     const out: Record<string, number> = {}

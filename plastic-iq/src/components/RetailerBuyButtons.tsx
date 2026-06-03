@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react'
+import { isBelowGoodTier } from '../lib/score'
 import type { Product, ProductTier } from '../types'
 
 export type RetailerId = 'amazon' | 'target' | 'walmart' | 'other'
@@ -103,23 +104,27 @@ const mutedByRetailer: Record<RetailerId, string> = {
   other: 'border border-slate-200 bg-slate-100 text-slate-800 hover:bg-slate-200',
 }
 
-function isCautionOrHighRisk(tier: ProductTier) {
+function useMutedRetailStyle(tier: ProductTier, pacScore?: number) {
+  if (pacScore != null && Number.isFinite(pacScore)) return isBelowGoodTier(pacScore)
   return tier === 'Caution' || tier === 'Concern' || tier === 'High Risk'
 }
 
 export function RetailerBuyButtons({
   tier,
+  pacScore,
   links,
   className,
   size = 'default',
 }: {
   tier: ProductTier
+  /** When set, muted CTA style uses score &lt; 75 instead of tier name only. */
+  pacScore?: number
   links: RetailerLink[]
   className?: string
   size?: 'default' | 'compact'
 }) {
   if (links.length === 0) return null
-  const muted = isCautionOrHighRisk(tier)
+  const muted = useMutedRetailStyle(tier, pacScore)
   const btnPad =
     size === 'compact'
       ? 'rounded-2xl px-3 py-2 text-xs font-semibold'

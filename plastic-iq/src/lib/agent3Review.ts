@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { humanizeAgentStatus } from './agent1Review'
+import { canRunAgent3Sequential, onlyActivePipelineProducts } from './pipelineCatalog'
 import type {
   Agent3DashboardData,
   NormalizationLayer4a,
@@ -13,10 +14,9 @@ const PRODUCT_PIPELINE_SELECT =
   'product_id, product_name, brand, category, subcategory, agent_status, score_basis, testing_queue_reason'
 
 export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select(PRODUCT_PIPELINE_SELECT)
-    .order('product_name', { ascending: true })
+  const { data: products, error: productsError } = await onlyActivePipelineProducts(
+    supabase.from('products').select(PRODUCT_PIPELINE_SELECT),
+  ).order('product_name', { ascending: true })
 
   if (productsError) throw productsError
 
@@ -54,10 +54,6 @@ export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
       if (productScore) pendingReview.push({ product, productScore })
     }
     if (!canRunAgent3(product.agent_status)) continue
-    if (isAgent3ValidationRerunProduct(product.product_id)) {
-      runnable.push(product)
-      continue
-    }
     if (product.agent_status === 'scoring_approved') continue
     if (!latestApproved.has(product.product_id)) {
       runnable.push(product)
@@ -116,22 +112,19 @@ export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
   }
 }
 
-/** Lodge + HexClad — materials-science validation duo (V2.3.4). */
+/** Lodge + HexClad + T-Fal — materials-science validation trio (V2.3.4; matches Agent 2). */
 export const AGENT3_VALIDATION_RERUN_PRODUCT_IDS: readonly string[] = [
   '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8', // Lodge cast iron skillet
   'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5', // HexClad frying pan
+  '7a457a86-ab62-4cbf-90b9-ccaeafe06896', // T-Fal fry pan set
 ] as const
 
 export function isAgent3ValidationRerunProduct(productId: string): boolean {
   return AGENT3_VALIDATION_RERUN_PRODUCT_IDS.includes(productId)
 }
 
-export function canRunAgent3(status: string): boolean {
-  return (
-    status === 'normalization_approved' ||
-    status === 'scoring_review_pending' ||
-    status === 'scoring_approved'
-  )
+export function canRunAgent3(status: string, _productId?: string): boolean {
+  return canRunAgent3Sequential(status)
 }
 
 export function agent3ApiBase(): string {
@@ -230,34 +223,22 @@ export async function runAgent3Batch(
 export async function approveProductScore(
   scoreId: string,
   productId: string,
-  score: ProductScoreRow,
+  _score: ProductScoreRow,
   reviewedBy?: string | null,
   reviewNotes?: string | null,
 ) {
-  const now = new Date().toISOString()
+  const { data, error } = await supabase.rpc('approve_product_score', {
+    p_score_id: scoreId,
+    p_reviewed_by: reviewedBy ?? null,
+    p_review_notes: reviewNotes?.trim() || null,
+  })
 
-  const { error: scoreError } = await supabase
-    .from('product_scores')
-    .update({
-      review_status: 'approved',
-      review_timestamp: now,
-      reviewer: reviewedBy ?? null,
-      review_notes: reviewNotes?.trim() || null,
-    })
-    .eq('score_id', scoreId)
+  if (error) throw error
 
-  if (scoreError) throw scoreError
-
-  const { error: productError } = await supabase
-    .from('products')
-    .update({
-      pac_safety_score: score.pac_safety_score,
-      tier: score.tier,
-      agent_status: 'scoring_approved',
-    })
-    .eq('product_id', productId)
-
-  if (productError) throw productError
+  const row = data as { product_id?: string } | null
+  if (row?.product_id && row.product_id !== productId) {
+    throw new Error(`product_scores ${scoreId} belongs to product ${row.product_id}, not ${productId}`)
+  }
 }
 
 export async function rejectProductScore(
@@ -266,24 +247,16 @@ export async function rejectProductScore(
   reviewNotes: string,
   reviewedBy?: string | null,
 ) {
-  const now = new Date().toISOString()
+  const { data, error } = await supabase.rpc('reject_product_score', {
+    p_score_id: scoreId,
+    p_review_notes: reviewNotes.trim() || null,
+    p_reviewed_by: reviewedBy ?? null,
+  })
 
-  const { error: scoreError } = await supabase
-    .from('product_scores')
-    .update({
-      review_status: 'rejected',
-      review_timestamp: now,
-      reviewer: reviewedBy ?? null,
-      review_notes: reviewNotes.trim() || null,
-    })
-    .eq('score_id', scoreId)
+  if (error) throw error
 
-  if (scoreError) throw scoreError
-
-  const { error: productError } = await supabase
-    .from('products')
-    .update({ agent_status: 'scoring_rejected' })
-    .eq('product_id', productId)
-
-  if (productError) throw productError
+  const row = data as { product_id?: string } | null
+  if (row?.product_id && row.product_id !== productId) {
+    throw new Error(`product_scores ${scoreId} belongs to product ${row.product_id}, not ${productId}`)
+  }
 }

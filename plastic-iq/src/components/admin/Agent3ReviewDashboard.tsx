@@ -3,30 +3,30 @@ import { formatSupabaseUnknownError } from '../../lib/supabaseClient'
 import {
   approveProductScore,
   canRunAgent3,
-  isAgent3ValidationRerunProduct,
   fetchAgent3Dashboard,
   humanizeAgentStatus,
   rejectProductScore,
   runAgent3Batch,
   runAgent3Remote,
 } from '../../lib/agent3Review'
-import { colorForTier } from '../../lib/score'
-import type { ProductTier } from '../../types'
-import type {
-  Agent3DashboardData,
-  NormalizationLayer4a,
-  ProductPipelineRow,
-  ProductScoreRow,
-} from '../../types/agent'
-import { Layer4aBreakdown } from './Layer4aBreakdown'
+import type { Agent3DashboardData, ProductPipelineRow } from '../../types/agent'
+import { Gate3ScoreReviewPanel } from './Gate3ScoreReviewPanel'
 
 type Props = {
   authUserEmail: string | null
+  initialProductId?: string | null
+  onNavigateToGate?: (tab: 'agent1' | 'agent2' | 'agent3', productId: string) => void
   onNotice: (message: string | null) => void
   onError: (message: string | null) => void
 }
 
-export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Props) {
+export function Agent3ReviewDashboard({
+  authUserEmail,
+  initialProductId,
+  onNavigateToGate,
+  onNotice,
+  onError,
+}: Props) {
   const [data, setData] = useState<Agent3DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [listFilter, setListFilter] = useState<'review' | 'run' | 'all'>('review')
@@ -114,6 +114,10 @@ export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     if (!data || !selectedId) return null
     return data.products.find((p) => p.product_id === selectedId) ?? null
   }, [data, selectedId])
+
+  useEffect(() => {
+    if (initialProductId) setSelectedId(initialProductId)
+  }, [initialProductId])
 
   useEffect(() => {
     if (!data || selectedId) return
@@ -312,15 +316,14 @@ export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    Normalization must be approved first. Select products, then run scoring in
-                    sequence.
+                    Only <strong>normalization approved</strong> products appear here. Approve Agent 2 first.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       disabled={batchBusy || runnableProducts.length === 0}
                       onClick={selectAllRunnable}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
                     >
                       Select all
                     </button>
@@ -418,7 +421,7 @@ export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               onRunSingle={handleRun}
             />
           ) : selectedScoreView?.productScore ? (
-            <ScoreReviewPanel
+            <Gate3ScoreReviewPanel
               product={selectedScoreView.product}
               score={selectedScoreView.productScore}
               layer4a={
@@ -426,12 +429,8 @@ export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   ? data?.layer4aByInputId[selectedScoreView.productScore.input_id]
                   : undefined
               }
-              readOnly={selectedScoreView.readOnly}
-              reviewLabel={selectedScoreView.reviewLabel ?? undefined}
               busy={busyId === selectedScoreView.product.product_id}
-              canRerun={canRunAgent3(selectedScoreView.product.agent_status)}
-              onRerun={() => handleRun(selectedScoreView.product.product_id)}
-              rejecting={rejecting}
+              showRejectNotes={rejecting}
               rejectNotes={rejectNotes}
               onRejectNotesChange={setRejectNotes}
               onApprove={handleApprove}
@@ -441,6 +440,17 @@ export function Agent3ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                 setRejectNotes('')
               }}
               onRejectConfirm={handleReject}
+              onRerun={
+                canRunAgent3(selectedScoreView.product.agent_status)
+                  ? () => handleRun(selectedScoreView.product.product_id)
+                  : undefined
+              }
+              onNavigateToGate2={
+                onNavigateToGate
+                  ? (productId) => onNavigateToGate('agent2', productId)
+                  : undefined
+              }
+              onRefresh={() => void load()}
             />
           ) : selectedScoreView?.product ? (
             <div className="flex min-h-[320px] flex-col justify-center rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
@@ -506,9 +516,6 @@ function Agent3RunTabPanel({
         <p className="mt-4 text-sm text-slate-700">
           Runs V2.3.4 scoring on the approved normalization packet and saves to{' '}
           <strong>product_scores</strong>. Review under <strong>Awaiting review</strong>.
-          {isAgent3ValidationRerunProduct(selectedProduct.product_id)
-            ? ' (Session 2 validation product — safe to re-run for explanation refresh.)'
-            : ''}
         </p>
         <button
           type="button"
@@ -549,218 +556,6 @@ function Agent3RunTabPanel({
           <strong>Awaiting review</strong> tab.
         </p>
       </div>
-    </div>
-  )
-}
-
-function ScoreReviewPanel({
-  product,
-  score,
-  layer4a,
-  readOnly = false,
-  reviewLabel,
-  busy,
-  canRerun = false,
-  onRerun,
-  rejecting,
-  rejectNotes,
-  onRejectNotesChange,
-  onApprove,
-  onRejectOpen,
-  onRejectCancel,
-  onRejectConfirm,
-}: {
-  product: ProductPipelineRow
-  score: ProductScoreRow
-  layer4a?: NormalizationLayer4a
-  readOnly?: boolean
-  reviewLabel?: string
-  busy: boolean
-  canRerun?: boolean
-  onRerun?: () => void
-  rejecting: boolean
-  rejectNotes: string
-  onRejectNotesChange: (v: string) => void
-  onApprove: () => void
-  onRejectOpen: () => void
-  onRejectCancel: () => void
-  onRejectConfirm: () => void
-}) {
-  const tierStyles = colorForTier(score.tier as ProductTier)
-  const components = score.component_nprs?.components ?? []
-
-  return (
-    <article className="max-h-[75dvh] overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-card md:p-6">
-      <header className="border-b border-slate-100 pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="text-lg font-semibold text-ink-900">{product.product_name}</h3>
-          {readOnly && reviewLabel ? (
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                reviewLabel === 'Approved'
-                  ? 'bg-emerald-100 text-emerald-900'
-                  : reviewLabel === 'Rejected'
-                    ? 'bg-red-100 text-red-900'
-                    : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              {reviewLabel}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1 text-sm text-slate-600">
-          {product.brand ?? '—'} · {product.category ?? '—'}
-        </p>
-      </header>
-
-      <section className="mt-6 grid gap-4 sm:grid-cols-2">
-        <MetricCard label="PAC Safety Score" value={String(score.pac_safety_score)} large />
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tier</p>
-          <p className={`mt-1 text-xl font-semibold ${tierStyles.text}`}>{score.tier}</p>
-        </div>
-        <MetricCard label="Confidence range" value={score.displayed_confidence_range ?? '—'} />
-        <MetricCard label="Transparency badge" value={score.transparency_badge ?? '—'} />
-        <MetricCard label="Weighted NPR" value={String(score.weighted_npr)} />
-        {score.ingredient_transparency_score != null ? (
-          <MetricCard label="ITS (formulation)" value={String(score.ingredient_transparency_score)} />
-        ) : null}
-        {score.escalator_applied ? (
-          <MetricCard label="Escalator applied" value={score.escalator_applied} />
-        ) : null}
-      </section>
-
-      {layer4a ? (
-        <Layer4aBreakdown layer4a={layer4a} />
-      ) : score.input_id ? (
-        <section className="mt-6">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Layer 4A adjustments
-          </h4>
-          <p className="mt-2 text-sm text-slate-600">
-            No normalization packet linked, or Layer 4A not found on scoring_inputs.
-          </p>
-          <p className="mt-2 text-sm text-slate-700">
-            Net from score run: <strong className="tabular-nums">{score.layer_4a_net}</strong>
-          </p>
-        </section>
-      ) : (
-        <section className="mt-6">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Layer 4A adjustments
-          </h4>
-          <p className="mt-2 text-sm text-slate-700">
-            Net adjustment: <strong className="tabular-nums">{score.layer_4a_net}</strong>
-          </p>
-        </section>
-      )}
-
-      <section className="mt-6">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Component NPRs</h4>
-        <ul className="mt-2 space-y-2">
-          {components.map((c, i) => (
-            <li
-              key={`${c.component_name}-${i}`}
-              className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm text-slate-700"
-            >
-              <p className="font-semibold text-ink-900">{String(c.component_name)}</p>
-              <p className="mt-1 tabular-nums">
-                NPR {Number(c.final_npr).toFixed(4)} · CI {Number(c.contact_intimacy)} · hazard{' '}
-                {Number(c.material_hazard)} · migration {Number(c.adjusted_migration_potential)}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {score.explanation_draft ? (
-        <section className="mt-6">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Explanation draft
-          </h4>
-          <p className="mt-2 text-sm text-slate-700">{score.explanation_draft}</p>
-        </section>
-      ) : null}
-
-      {!readOnly && rejecting ? (
-        <div className="mt-6 rounded-xl border-2 border-red-300 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-900">Reject score</p>
-          <textarea
-            value={rejectNotes}
-            onChange={(e) => onRejectNotesChange(e.target.value)}
-            rows={4}
-            className="mt-2 w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm"
-          />
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onRejectConfirm}
-              className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Confirm reject
-            </button>
-            <button type="button" onClick={onRejectCancel} className="rounded-xl border px-4 py-2 text-sm">
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {!readOnly ? (
-        <footer className="sticky bottom-0 mt-6 flex gap-2 border-t border-slate-100 bg-white pt-4">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onApprove}
-            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            Approve score
-          </button>
-          <button
-            type="button"
-            disabled={busy || rejecting}
-            onClick={onRejectOpen}
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800"
-          >
-            Reject
-          </button>
-        </footer>
-      ) : canRerun && onRerun ? (
-        <footer className="sticky bottom-0 mt-6 border-t border-slate-100 bg-white pt-4">
-          <p className="mb-2 text-xs text-slate-600">
-            Re-run Agent 3 to refresh the explanation draft (scores recalculated from the same approved
-            normalization).
-          </p>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onRerun}
-            className="rounded-xl bg-ink-900 px-4 py-2 text-sm font-semibold text-white hover:bg-ink-700 disabled:opacity-60"
-          >
-            {busy ? 'Running Agent 3…' : 'Re-run Agent 3'}
-          </button>
-        </footer>
-      ) : null}
-    </article>
-  )
-}
-
-function MetricCard({
-  label,
-  value,
-  large,
-}: {
-  label: string
-  value: string
-  large?: boolean
-}) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 font-semibold text-ink-900 ${large ? 'text-3xl tabular-nums' : 'text-sm'}`}>
-        {value}
-      </p>
     </div>
   )
 }

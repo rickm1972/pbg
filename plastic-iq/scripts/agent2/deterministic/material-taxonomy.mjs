@@ -20,6 +20,7 @@
  * @property {boolean} [inertProtection]
  * @property {boolean} [unknownFoodContactCoating]
  * @property {boolean} [riskDashboardDominant] — cap-dominant Material/Migration bars (UI)
+ * @property {string} [categoryForDescription] — plain-language category for product description copy
  */
 
 /** @type {Record<string, MaterialEntry>} */
@@ -534,14 +535,34 @@ export function detectMaterialId(text, opts = {}) {
   return null
 }
 
+/** Agent 1 schema ids that map to canonical taxonomy keys. */
+export const MATERIAL_ID_ALIASES = {
+  ptfe: 'ptfe_nonstick',
+  pfoa: 'ptfe_nonstick',
+  teflon: 'ptfe_nonstick',
+  stainless_steel_interior_graphite_aluminum_core_5ply: 'stainless_steel_unspecified',
+}
+
+/** @param {string} materialId */
+export function resolveMaterialId(materialId) {
+  const raw = String(materialId ?? '').trim()
+  if (!raw) return raw
+  if (MATERIAL_ID_ALIASES[raw]) return MATERIAL_ID_ALIASES[raw]
+  if (MATERIAL_TAXONOMY[raw]) return raw
+  const detected = detectMaterialId(raw.replace(/_/g, ' '))
+  return detected ?? raw
+}
+
 /** @param {string} materialId */
 export function getMaterial(materialId) {
-  return MATERIAL_TAXONOMY[materialId] ?? null
+  const id = resolveMaterialId(materialId)
+  return MATERIAL_TAXONOMY[id] ?? null
 }
 
 /** @param {string} materialId */
 export function requireMaterial(materialId) {
-  const m = getMaterial(materialId)
+  const id = resolveMaterialId(materialId)
+  const m = MATERIAL_TAXONOMY[id]
   if (!m) throw new Error(`Unknown material_id: ${materialId}`)
   return m
 }
@@ -555,4 +576,78 @@ export function isUnknownFoodContactCoatingMaterial(materialId) {
 export function isRiskDashboardDominantMaterial(materialId) {
   const m = MATERIAL_TAXONOMY[materialId]
   return Boolean(m?.unknownFoodContactCoating || m?.riskDashboardDominant)
+}
+
+/** Explicit overrides — required for product description generation. */
+const CATEGORY_FOR_DESCRIPTION_BY_ID = {
+  cast_iron: 'inert material',
+  cast_iron_seasoned: 'inert material',
+  cast_iron_integrated_handle: 'inert material',
+  stainless_steel_304: 'inert material',
+  stainless_steel_316: 'inert material',
+  stainless_steel_unspecified: 'inert material',
+  stainless_steel_handle: 'inert material',
+  stainless_steel_rivets: 'inert material',
+  magnetic_stainless_base: 'inert material',
+  laser_etched_stainless_surface: 'inert material',
+  borosilicate_glass: 'inert material',
+  tempered_glass: 'inert material',
+  tempered_glass_lid: 'inert material',
+  vitreous_enamel: 'inert material',
+  ptfe: 'PFAS',
+  ptfe_coating: 'PFAS',
+  ptfe_nonstick: 'PFAS',
+  ptfe_nonstick_titanium_reinforced: 'PFAS',
+  aluminum_core: 'reactive metal',
+  hard_anodized_aluminum: 'reactive metal',
+  proprietary_named_food_contact: 'undisclosed coating',
+  terrabond_proprietary: 'undisclosed coating',
+  plant_mineral_formulation: 'plant-based formulation',
+  plant_based_formulation: 'plant-based formulation',
+}
+
+/**
+ * @param {string} materialId
+ * @param {MaterialEntry} entry
+ */
+function inferCategoryForDescription(materialId, entry) {
+  if (CATEGORY_FOR_DESCRIPTION_BY_ID[materialId]) {
+    return CATEGORY_FOR_DESCRIPTION_BY_ID[materialId]
+  }
+  if (entry.inertProtection || entry.tier === 'Inert') return 'inert material'
+  if (entry.unknownFoodContactCoating) return 'undisclosed coating'
+  if (/^ptfe|pfa|fep/i.test(materialId)) return 'PFAS'
+  if (/aluminum|aluminium/i.test(materialId)) return 'reactive metal'
+  if (/plant/i.test(materialId)) return 'plant-based formulation'
+  if (/glass|enamel/i.test(materialId)) return 'inert material'
+  if (entry.hazard < 0.1) return 'inert material'
+  if (entry.hazard >= 0.5) return 'high-hazard food-contact material'
+  return 'food-contact material'
+}
+
+for (const [id, entry] of Object.entries(MATERIAL_TAXONOMY)) {
+  if (!entry.categoryForDescription) {
+    entry.categoryForDescription = inferCategoryForDescription(id, entry)
+  }
+}
+
+/**
+ * @param {string} materialId
+ */
+export function getCategoryForDescription(materialId) {
+  const id = resolveMaterialId(materialId)
+  const entry = MATERIAL_TAXONOMY[id]
+  if (!entry) return null
+  return entry.categoryForDescription ?? inferCategoryForDescription(id, entry)
+}
+
+/**
+ * @param {string} materialId
+ */
+export function requireCategoryForDescription(materialId) {
+  const category = getCategoryForDescription(materialId)
+  if (!category) {
+    throw new Error(`Missing category_for_description in taxonomy: ${materialId}`)
+  }
+  return category
 }

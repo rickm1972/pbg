@@ -1,0 +1,141 @@
+import {
+  baseCanonicalCookwareMaterials,
+  baseProductIdentityFields,
+  baseRetailerLinks,
+} from './_shared.mjs'
+
+/** @type {import('../types.mjs').SubcategoryMatrix} */
+export const COOKWARE_MATRIX = {
+  subcategory_key: 'cookware',
+  display_label: 'Cookware',
+  product_identity_fields: [...baseProductIdentityFields(), ...baseRetailerLinks()],
+  material_component_fields: [
+    {
+      id: 'material.primary_contact_raw',
+      label: 'Primary contact material (raw)',
+      category: 'material_component',
+      field_path: 'primary_contact_material.material_identity',
+      required: true,
+      score_driving: true,
+    },
+    {
+      id: 'material.primary_contact_source',
+      label: 'Primary contact source URL or undisclosed code',
+      category: 'material_component',
+      field_path: 'primary_contact_material.source_url',
+      required: true,
+      score_driving: true,
+    },
+    ...baseCanonicalCookwareMaterials(),
+    {
+      id: 'material.secondary_components',
+      label: 'Secondary components (handles, lids, etc.)',
+      category: 'material_component',
+      field_path: 'secondary_components',
+      required: true,
+      score_driving: true,
+    },
+    {
+      id: 'material.coatings_and_finishes',
+      label: 'Coatings and finishes disclosed',
+      category: 'material_component',
+      field_path: 'coatings_and_finishes',
+      required: true,
+      score_driving: true,
+    },
+  ],
+  safety_claim_fields: [
+    {
+      id: 'safety.safety_claims_block',
+      label: 'Safety claims block populated',
+      category: 'safety_claim',
+      field_path: 'safety_claims',
+      required: true,
+      score_driving: true,
+    },
+  ],
+  use_care_fields: [
+    {
+      id: 'use.product_use_case',
+      label: 'Product use case',
+      category: 'use_care',
+      field_path: 'product_use_case',
+      required: true,
+      score_driving: false,
+    },
+    {
+      id: 'use.care_and_use_instructions',
+      label: 'Care and use instructions',
+      category: 'use_care',
+      field_path: 'care_and_use_instructions',
+      required: false,
+      score_driving: false,
+    },
+  ],
+  optional_fields: [
+    {
+      id: 'optional.certifications',
+      label: 'Certifications (verified or claimed)',
+      category: 'material_component',
+      field_path: 'certifications',
+      required: false,
+      score_driving: false,
+    },
+    {
+      id: 'optional.ingredient_list',
+      label: 'Ingredient / coating composition list',
+      category: 'material_component',
+      field_path: 'ingredient_list',
+      required: false,
+      score_driving: false,
+    },
+  ],
+  non_score_fields: [
+    'conflict_and_review',
+    'care_and_use_instructions',
+    'certifications.claimed_certifications',
+  ],
+  external_checks: [
+    {
+      id: 'external.sources_documented',
+      label: 'At least one evidence source URL on file',
+      category: 'external_check',
+      score_driving: false,
+    },
+    {
+      id: 'external.pfas_nonstick_disclosure',
+      label: 'PFAS / nonstick coating disclosure documented',
+      category: 'external_check',
+      pattern_trigger: 'ptfe_primary_contact',
+      score_driving: true,
+    },
+    {
+      id: 'external.pfoa_vs_pfas_free_distinction',
+      label: 'PFOA-free vs PFAS-free marketing distinguished (no PFAS-free inferred from PFOA-only)',
+      category: 'external_check',
+      pattern_trigger: 'pfoa_pfas_distinction',
+      score_driving: true,
+    },
+    {
+      id: 'external.regulatory_pfas_minnesota_review',
+      label: 'Regulatory PFAS check — Minnesota 2025 ban applicability documented',
+      category: 'external_check',
+      pattern_trigger: 'ptfe_primary_contact',
+      score_driving: true,
+    },
+    {
+      id: 'external.silicone_food_contact_grade',
+      label: 'Silicone food-contact grade / platinum-cured disclosure',
+      category: 'external_check',
+      pattern_trigger: 'silicone_food_contact',
+      score_driving: false,
+    },
+    {
+      id: 'external.proprietary_coating_warning',
+      label: 'Proprietary / undisclosed coating flagged for review',
+      category: 'external_check',
+      pattern_trigger: 'proprietary_coating',
+      score_driving: true,
+    },
+  ],
+}

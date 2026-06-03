@@ -8,17 +8,23 @@
  * 4. layer4a-step.mjs
  * 5. why-this-score-map.mjs
  * 6. layer4b-step.mjs
+ * 7. product-description-generate.mjs
  */
 
 import { AGENT_VERSION, ALGORITHM_VERSION } from '../version.mjs'
 import { buildWhyThisScoreOptions } from '../why-this-score-map.mjs'
 import { applyServerInferenceRules } from '../normalize-enforce.mjs'
+import { assertCanonicalMappingsReady } from './canonical-gate.mjs'
 import { extractComponents } from './component-extract.mjs'
 import { deriveForeseeableUse, deriveIntendedUse, deriveProductCategory } from './category.mjs'
 import { runLayer4bStep } from './layer4b-step.mjs'
 import { runLayer4aStep } from './layer4a-step.mjs'
 import { enrichComponentsFromTaxonomy } from './taxonomy-lookup.mjs'
 import { buildFormulationPathway } from './scoring-fields.mjs'
+import {
+  runProductDescriptionStep,
+  PRODUCT_DESCRIPTION_GENERATOR_VERSION,
+} from './product-description-generate.mjs'
 
 /**
  * @param {object} product
@@ -27,6 +33,8 @@ import { buildFormulationPathway } from './scoring-fields.mjs'
 export function runAgent2NormalizationPipeline(product, evidence) {
   const runTimestamp = new Date().toISOString()
   const category = deriveProductCategory(evidence, product)
+
+  assertCanonicalMappingsReady(evidence, product)
 
   const step1 = extractComponents(evidence, product)
   const step2 = enrichComponentsFromTaxonomy(step1.components, {
@@ -62,6 +70,7 @@ export function runAgent2NormalizationPipeline(product, evidence) {
         'layer4a',
         'why-this-score',
         'layer4b',
+        'product-description',
       ],
     },
     is_formulation_product: step1.isFormulation,
@@ -87,6 +96,35 @@ export function runAgent2NormalizationPipeline(product, evidence) {
   }
 
   const whyThisScore = buildWhyThisScoreOptions(evidence, inputs)
+
+  const descResult = runProductDescriptionStep({
+    product,
+    evidence,
+    inputs,
+    whyThisScore,
+  })
+
+  if (!descResult.ok) {
+    inputs.status = descResult.status
+    inputs.flagged_missing_fields = descResult.flagged_missing_fields
+    inputs.product_description = null
+    inputs.human_review_required = true
+    inputs.human_review_reason = descResult.human_review_reason
+    inputs.normalization_notes = [
+      inputs.normalization_notes,
+      `product_description: ${descResult.human_review_reason}`,
+    ]
+      .filter(Boolean)
+      .join(' ')
+    return { inputs, whyThisScore }
+  }
+
+  inputs.product_description = descResult.product_description
+  if (descResult.description_word_count != null) {
+    inputs.description_word_count = descResult.description_word_count
+  }
+  inputs.normalization_metadata.description_generator_version =
+    descResult.description_generator_version ?? PRODUCT_DESCRIPTION_GENERATOR_VERSION
 
   return { inputs, whyThisScore }
 }

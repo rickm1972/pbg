@@ -3,6 +3,8 @@ import { Agent1ReviewDashboard } from '../components/admin/Agent1ReviewDashboard
 import { Agent2ReviewDashboard } from '../components/admin/Agent2ReviewDashboard'
 import { Agent3ReviewDashboard } from '../components/admin/Agent3ReviewDashboard'
 import { Agent4ReviewDashboard } from '../components/admin/Agent4ReviewDashboard'
+import { BatchPublishDashboard } from '../components/admin/BatchPublishDashboard'
+import { consumePipelineFocus } from '../lib/adminPipelineNav'
 import { QuizAdminDashboard } from '../components/admin/QuizAdminDashboard'
 import { ChannelDashboard } from '../components/admin/ChannelDashboard'
 import { PersonaDashboard } from '../components/admin/PersonaDashboard'
@@ -21,6 +23,7 @@ type AdminTab =
   | 'agent2'
   | 'agent3'
   | 'agent4'
+  | 'publish'
   | 'quiz'
   | 'personas'
   | 'channels'
@@ -40,12 +43,23 @@ export function AdminPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [pipelineFocusProductId, setPipelineFocusProductId] = useState<string | null>(null)
 
   const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
+
+  function navigateToGate(gateTab: 'agent1' | 'agent2' | 'agent3', productId: string) {
+    setPipelineFocusProductId(productId)
+    setTab(gateTab)
+  }
 
   useEffect(() => {
     const ok = localStorage.getItem('pacscore_admin_ok') === '1'
     setAuthorized(ok)
+    const focus = consumePipelineFocus()
+    if (focus) {
+      setTab(focus.tab === 'publish' ? 'publish' : focus.tab)
+      setPipelineFocusProductId(focus.productId)
+    }
   }, [])
 
   useEffect(() => {
@@ -198,6 +212,20 @@ export function AdminPage() {
               onClick={() => setTab('agent4')}
             >
               Agent 4 QA
+            </button>
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                tab === 'publish'
+                  ? 'bg-white text-ink-900 shadow-sm'
+                  : 'text-slate-600 hover:text-ink-900'
+              }`}
+              onClick={() => {
+                setTab('publish')
+                setPipelineFocusProductId(null)
+              }}
+            >
+              Publish (Gate 4)
             </button>
             <button
               type="button"
@@ -369,6 +397,7 @@ export function AdminPage() {
       {tab === 'agent1' ? (
         <Agent1ReviewDashboard
           authUserEmail={authUserEmail}
+          initialProductId={pipelineFocusProductId}
           onNotice={setMessage}
           onError={setError}
         />
@@ -377,6 +406,8 @@ export function AdminPage() {
       {tab === 'agent2' ? (
         <Agent2ReviewDashboard
           authUserEmail={authUserEmail}
+          initialProductId={pipelineFocusProductId}
+          onNavigateToGate={navigateToGate}
           onNotice={setMessage}
           onError={setError}
         />
@@ -385,9 +416,15 @@ export function AdminPage() {
       {tab === 'agent3' ? (
         <Agent3ReviewDashboard
           authUserEmail={authUserEmail}
+          initialProductId={pipelineFocusProductId}
+          onNavigateToGate={navigateToGate}
           onNotice={setMessage}
           onError={setError}
         />
+      ) : null}
+
+      {tab === 'publish' ? (
+        <BatchPublishDashboard onNotice={setMessage} onError={setError} />
       ) : null}
 
       {tab === 'agent4' ? (

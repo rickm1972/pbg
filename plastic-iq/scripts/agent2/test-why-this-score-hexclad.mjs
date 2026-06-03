@@ -54,6 +54,18 @@ console.log('Coatings & finishes:', coatings.join(', '))
 
 let failed = false
 
+const hexCeramic = 'Proprietary ceramic coating (undisclosed)'
+if (primary.includes(hexCeramic) && primary.includes(laser)) {
+  if (primary.indexOf(hexCeramic) >= primary.indexOf(laser)) {
+    console.error(
+      `✗ Primary material hazard order: "${hexCeramic}" must appear before "${laser}"`,
+    )
+    failed = true
+  } else {
+    console.log(`✓ Primary material hazard order: ceramic before laser-etched`)
+  }
+}
+
 try {
   assertExclusiveAcrossFields(whyThisScore)
   console.log('✓ Each vocabulary option appears in at most one field')

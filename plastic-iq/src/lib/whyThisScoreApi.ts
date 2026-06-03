@@ -21,7 +21,7 @@ export function displayOptions(options: string[]): string[] {
   return options.filter((o) => o !== 'None')
 }
 
-/** Primary contact material label for Risk Dashboard (first scored primary material). */
+/** Fallback when normalization components are unavailable (Why This Score option order). */
 export function primaryContactMaterialDisplay(
   primaryMaterialOptions: string[] | undefined,
 ): string | null {

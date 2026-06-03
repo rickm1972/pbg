@@ -3,6 +3,7 @@
  */
 
 import { CONFIDENCE_TO_LEGACY } from '../../agent1/schema.mjs'
+import { isExpansionRequired } from '../../../src/shared/canonical-taxonomy/constants.mjs'
 import { detectMaterialId, getMaterial } from './material-taxonomy.mjs'
 
 export function getStructuredEvidence(evidence) {
@@ -58,19 +59,57 @@ export function getIngredientList(evidence) {
   }
 }
 
+/**
+ * Phase 3.5: prefer Gate 1 canonical primary_contact_material_id → Agent 2 material_id.
+ * @param {object} pcm
+ * @param {object | null} canonicalRow
+ */
+function resolvePrimaryMaterialId(pcm, canonicalRow) {
+  if (canonicalRow?.canonical_id && !isExpansionRequired(canonicalRow.canonical_id)) {
+    if (canonicalRow.agent2_material_id && getMaterial(canonicalRow.agent2_material_id)) {
+      return canonicalRow.agent2_material_id
+    }
+    if (getMaterial(canonicalRow.canonical_id)) return canonicalRow.canonical_id
+  }
+  return mapMaterialId(pcm)
+}
+
+export function getCanonicalMappings(evidence) {
+  return getStructuredEvidence(evidence)?.canonical_mappings ?? null
+}
+
 export function getPrimaryContact(evidence) {
   const s = getStructuredEvidence(evidence)
   if (!s) return null
   const pcm = s.primary_contact_material
+  const canonical = s.canonical_mappings?.primary_contact_material_id
+  const material_id = resolvePrimaryMaterialId(pcm, canonical)
+  if (canonical?.canonical_id && isExpansionRequired(canonical.canonical_id)) {
+    throw new Error(
+      `primary_contact_material_id is ${canonical.canonical_id}; Gate 1 must resolve taxonomy before Agent 2.`,
+    )
+  }
+  if (!material_id || !getMaterial(material_id)) {
+    throw new Error(
+      `Invalid or missing canonical primary_contact_material_id for Agent 2 (got ${material_id ?? 'null'}).`,
+    )
+  }
   return {
     material_identity: pcm.material_identity,
     undisclosed_code: pcm.undisclosed_code ?? null,
-    material_id: mapMaterialId(pcm),
+    material_id,
+    canonical_id: canonical?.canonical_id ?? null,
+    mapping_rule_id: canonical?.mapping_rule_id ?? null,
     source_url: pcm.source_url,
     confidence: legacyConfidence(pcm.confidence_label),
     specs_disclosed: pcm.material_specs_disclosed,
     excerpt: pcm.source_url ? `Primary contact per ${pcm.source_url}` : '',
   }
+}
+
+/** Substrate canonical row for logging / description (not a separate component by default). */
+export function getSubstrateCanonical(evidence) {
+  return getStructuredEvidence(evidence)?.canonical_mappings?.substrate_material_id ?? null
 }
 
 export function getSecondaryComponentsFromSchema(evidence) {
@@ -79,7 +118,8 @@ export function getSecondaryComponentsFromSchema(evidence) {
   return (s.secondary_components ?? []).map((c) => {
     const material_identity = c.material_identity ?? c.null_code ?? 'undisclosed'
     const mapped = mapSecondaryMaterialId({ ...c, material_identity })
-    const material_id = getMaterial(mapped) ? mapped : material_identity
+    const resolved = getMaterial(mapped) ? mapped : getMaterial(material_identity) ? material_identity : null
+    const material_id = resolved ?? material_identity
     return {
       component_role: c.component_role,
       material_identity,
@@ -119,7 +159,7 @@ export function tokensFromStructuredVerifiedCerts(evidence) {
 }
 
 function mapMaterialId(pcm) {
-  const id = pcm.material_identity
+  const id = String(pcm.material_identity ?? '').trim()
   if (pcm.undisclosed_code === 'PROPRIETARY_NAMED') {
     return id === 'terrabond_proprietary' ? 'terrabond_proprietary' : 'proprietary_named_food_contact'
   }
@@ -127,6 +167,10 @@ function mapMaterialId(pcm) {
   if (id === 'terrabond_proprietary') return 'terrabond_proprietary'
   if (/^cast_iron/.test(id)) return /season/.test(id) ? 'cast_iron_seasoned' : 'cast_iron'
   if (id === 'UNKNOWN' || id === 'CONFLICTING') return 'cast_iron'
+  if (/stainless_steel_interior|graphite_aluminum_core|_5ply|5-ply/i.test(id)) {
+    return 'stainless_steel_unspecified'
+  }
+  if (id === 'ptfe') return 'ptfe_nonstick'
   return id
 }
 

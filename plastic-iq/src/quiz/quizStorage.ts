@@ -33,6 +33,20 @@ export function setFirstName(name: string) {
   sessionStorage.setItem('quiz_first_name', name.trim())
 }
 
+const EMAIL_CAPTURED_KEY = 'quiz_email_captured'
+
+export function setEmailCaptured() {
+  sessionStorage.setItem(EMAIL_CAPTURED_KEY, '1')
+}
+
+export function hasEmailCaptured(): boolean {
+  return sessionStorage.getItem(EMAIL_CAPTURED_KEY) === '1'
+}
+
+export function clearEmailCaptured() {
+  sessionStorage.removeItem(EMAIL_CAPTURED_KEY)
+}
+
 function parseScoredMap(raw: string | null): Record<string, ScoredAnswerValue> {
   if (!raw) return {}
   try {

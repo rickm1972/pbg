@@ -26,30 +26,18 @@ async function approveLatestEvidence(supabase, productId) {
     .from('product_evidence')
     .select('evidence_id, bundle_version')
     .eq('product_id', productId)
-    .eq('review_status', 'submitted')
+    .eq('review_status', 'pending_review')
     .order('bundle_version', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (fetchErr) throw fetchErr
-  if (!row) throw new Error(`No submitted evidence to approve for ${productId}`)
+  if (!row) throw new Error(`No pending_review evidence to approve for ${productId}`)
 
-  const now = new Date().toISOString()
-  const { error } = await supabase
-    .from('product_evidence')
-    .update({
-      review_status: 'approved',
-      reviewed_at: now,
-      approved_at: now,
-      reviewed_by: REVIEWED_BY,
-      reviewer_notes: 'Pipeline validation V2.3.4 — auto-approved',
-    })
-    .eq('evidence_id', row.evidence_id)
+  const { error } = await supabase.rpc('approve_product_evidence', {
+    p_evidence_id: row.evidence_id,
+    p_reviewed_by: REVIEWED_BY,
+  })
   if (error) throw error
-
-  await supabase
-    .from('products')
-    .update({ agent_status: 'evidence_approved' })
-    .eq('product_id', productId)
 
   return row
 }
@@ -59,30 +47,19 @@ async function approveLatestScoringInputs(supabase, productId) {
     .from('scoring_inputs')
     .select('input_id')
     .eq('product_id', productId)
-    .eq('review_status', 'submitted')
+    .eq('review_status', 'pending_review')
     .order('run_timestamp', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (fetchErr) throw fetchErr
-  if (!row) throw new Error(`No submitted scoring_inputs to approve for ${productId}`)
+  if (!row) throw new Error(`No pending_review scoring_inputs to approve for ${productId}`)
 
-  const now = new Date().toISOString()
-  const { error } = await supabase
-    .from('scoring_inputs')
-    .update({
-      review_status: 'approved',
-      reviewed_at: now,
-      approved_at: now,
-      reviewed_by: REVIEWED_BY,
-      reviewer_notes: 'Pipeline validation V2.3.4 — auto-approved',
-    })
-    .eq('input_id', row.input_id)
+  const { error } = await supabase.rpc('approve_scoring_inputs', {
+    p_input_id: row.input_id,
+    p_reviewed_by: REVIEWED_BY,
+    p_review_notes: 'Pipeline validation V2.3.4 — auto-approved',
+  })
   if (error) throw error
-
-  await supabase
-    .from('products')
-    .update({ agent_status: 'normalization_approved' })
-    .eq('product_id', productId)
 
   return row
 }

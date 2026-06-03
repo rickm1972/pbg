@@ -12,6 +12,13 @@ import { researchProduct } from './research.mjs'
 import { partitionCertificationsAndSafetyClaims } from './certification-classify.mjs'
 import { enforceStructuredCertificationVerification } from './certification-verify-structured.mjs'
 import { evaluateStructuredThreshold } from './threshold-structured.mjs'
+import { buildFieldProvenance } from './field-provenance.mjs'
+import { applyCanonicalMappings } from '../../src/shared/canonical-taxonomy/map-structured-evidence.mjs'
+import { detectPatternTriggers } from '../../src/shared/required-evidence-matrix/pattern-triggers.mjs'
+import {
+  assertRequiredExternalRetrievalComplete,
+  invokeRequiredCheckRetrieval,
+} from './required-check-retrieval/invoke.mjs'
 
 export async function runAgent1({ productId, productName, dryRun = false }) {
   const supabase = createServiceClient()
@@ -20,6 +27,12 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
     : await fetchProductByName(supabase, productName)
 
   const id = product.product_id
+  if (product.active === false) {
+    const reason = 'Product is archived (inactive) and is not in the pipeline catalog.'
+    console.log(`Stopped: ${reason}`)
+    return { ok: false, product, reason }
+  }
+
   console.log(`\n=== Agent 1: ${product.product_name} (${id}) ===\n`)
 
   if (!dryRun) {
@@ -33,7 +46,7 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   try {
     console.log('Steps 2–4: researching product (web search + extraction)…')
     const rawPacket = await researchProduct(product)
-    const structured =
+    let structured =
       rawPacket.structured_evidence ?? rawPacket.agent_metadata?.structured_evidence
     const partition = partitionCertificationsAndSafetyClaims(structured, rawPacket.sources)
     if (partition.routed_marketing.length) {
@@ -65,8 +78,46 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
     console.log(
       `  certifications_verified: ${verified.verified_count} kept, ${verified.removed_count} removed`,
     )
+
+    structured = packet.agent_metadata.structured_evidence
+    applyCanonicalMappings(structured, packet.sources, { facts: packet.facts })
+    console.log('Step 4b: required-check retrieval (Phase 3.7)…')
+    console.log(
+      `  retrieval module reload=${process.env.AGENT1_RELOAD_MODULES === '1' ? 'yes' : 'no (set AGENT1_RELOAD_MODULES=1 in dev API)'}`,
+    )
+    const retrieval = await invokeRequiredCheckRetrieval({
+      structured,
+      sources: packet.sources,
+      facts: packet.facts,
+      product,
+    })
+    packet.sources = retrieval.sources
+    packet.facts = bridgeLegacyFacts(structured, packet.sources)
+    packet.agent_metadata.structured_evidence = structured
+    packet.agent_metadata.retrieval_runner_keys = retrieval.runner_keys ?? []
+    packet.agent_metadata.retrieval_execute_module = retrieval.module_id ?? null
+    packet.agent_metadata.retrieval_tasks_executed = retrieval.tasks_executed ?? []
+    const triggers = detectPatternTriggers(
+      structured,
+      structured.canonical_mappings,
+      packet.sources,
+    )
+    assertRequiredExternalRetrievalComplete(structured, triggers)
+    if (retrieval.pending_count > 0) {
+      console.log(
+        `  Ran ${retrieval.results?.length ?? 0} retrieval task(s); approval_blocked=${retrieval.validation?.summary?.approval_blocked ?? 'unknown'}`,
+      )
+    } else {
+      console.log('  No pending required-check retrieval tasks')
+    }
   } catch (err) {
-    if (!dryRun) await updateAgentStatus(supabase, id, 'evidence_pending')
+    if (!dryRun) {
+      await updateAgentStatus(supabase, id, 'evidence_pending')
+      const message = err instanceof Error ? err.message : String(err)
+      if (/retrieval pipeline error|No retrieval runner registered/i.test(message)) {
+        console.error(`Agent 1 retrieval failure — not submitting pending_review: ${message}`)
+      }
+    }
     throw err
   }
 
@@ -115,6 +166,10 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
       sources: packet.sources,
       facts: packet.facts,
       agent_metadata: packet.agent_metadata,
+      field_provenance: buildFieldProvenance(
+        packet.agent_metadata.structured_evidence,
+        packet.sources,
+      ),
     })
 
     await updateAgentStatus(supabase, id, 'evidence_pending')
@@ -131,20 +186,27 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   }
 
   // Steps 6–7
-  const submittedAt = new Date().toISOString()
+  const pendingReviewAt = new Date().toISOString()
+  const fieldProvenance = buildFieldProvenance(
+    packet.agent_metadata.structured_evidence,
+    packet.sources,
+  )
   const evidence = await insertEvidence(supabase, {
     product_id: id,
     bundle_version: bundleVersion,
-    review_status: 'submitted',
+    review_status: 'pending_review',
     algorithm_version: ALGORITHM_VERSION,
     sources: packet.sources,
     facts: packet.facts,
     agent_metadata: packet.agent_metadata,
-    submitted_at: submittedAt,
+    field_provenance: fieldProvenance,
+    pending_review_at: pendingReviewAt,
   })
 
   await updateAgentStatus(supabase, id, 'evidence_awaiting_review')
-  console.log('Steps 6–7: evidence saved, review_status → submitted, agent_status → evidence_awaiting_review')
+  console.log(
+    'Steps 6–7: evidence saved, review_status → pending_review, agent_status → evidence_awaiting_review',
+  )
 
   return {
     ok: true,

@@ -28,6 +28,48 @@ export const AGENT_STATUSES = [
 
 export type AgentStatus = (typeof AGENT_STATUSES)[number]
 
+/** Phase 1 public visibility gate (independent of evidence approval). */
+export const PUBLISH_STATUSES = [
+  'draft',
+  'ready_to_publish',
+  'published',
+  'unpublished',
+] as const
+
+export type PublishStatus = (typeof PUBLISH_STATUSES)[number]
+
+/** product_evidence.review_status (evidence version lifecycle). */
+export const EVIDENCE_REVIEW_STATUSES = [
+  'draft',
+  'pending_review',
+  'approved',
+  'rejected',
+  'superseded',
+] as const
+
+export type EvidenceReviewStatus = (typeof EVIDENCE_REVIEW_STATUSES)[number]
+
+/** scoring_inputs.review_status (normalization version lifecycle). */
+export const SCORING_INPUT_REVIEW_STATUSES = [
+  'draft',
+  'pending_review',
+  'approved',
+  'rejected',
+  'superseded',
+] as const
+
+export type ScoringInputReviewStatus = (typeof SCORING_INPUT_REVIEW_STATUSES)[number]
+
+/** Per-field provenance entry (Phase 1 JSONB map on product_evidence.field_provenance). */
+export type EvidenceFieldProvenanceEntry = {
+  value: string
+  source_url: string | null
+  source_quote: string | null
+  confidence_label: string | null
+  source_fetch_date: string | null
+  content_hash: string | null
+}
+
 export type ConfidenceLabel =
   | 'manufacturer confirmed'
   | 'retailer confirmed'
@@ -43,6 +85,7 @@ export type EvidenceSource = {
   url: string
   title: string
   fetched_at: string
+  page_excerpt?: string
 }
 
 export type EvidenceFact = {
@@ -98,8 +141,22 @@ export type StructuredUnverifiedCert = {
   claim_source_url?: string | null
 }
 
+export type StructuredProductIdentity = {
+  product_name?: string
+  brand?: string
+  subcategory?: string
+  sku_or_model?: string | null
+}
+
+export type StructuredRetailerLinks = {
+  amazon_url?: string
+  manufacturer_direct_url?: string
+}
+
 export type StructuredEvidencePayload = {
   schema_version?: string
+  product_identity?: StructuredProductIdentity
+  retailer_links?: StructuredRetailerLinks
   primary_contact_material?: {
     material_identity?: string
     undisclosed_code?: string | null
@@ -113,9 +170,108 @@ export type StructuredEvidencePayload = {
   }
   safety_claims?: Record<string, { claimed?: boolean; source_url?: string | null; structural_guarantee?: boolean }>
   ingredient_list?: { ingredients?: string[]; source_url?: string | null } | null
-  secondary_components?: Array<{ component_role: string; material_identity?: string | null; source_url?: string | null }>
+  secondary_components?: Array<{
+    component_role: string
+    material_identity?: string | null
+    source_url?: string | null
+    confidence_label?: string
+  }>
   coatings_and_finishes?: Array<{ coating_name: string; coating_type: string; source_url?: string | null }>
   product_use_case?: string
+  /** Phase 3.5: deterministic canonical IDs for score-driving fields (Agent 2 input). */
+  canonical_mappings?: CanonicalMappingsPayload
+  /** Phase 3.6: required evidence matrix validation for Gate 1 approval. */
+  required_evidence_validation?: RequiredEvidenceValidationPayload
+  /** Phase 3.7: Agent 1 targeted retrieval results for required external checks. */
+  required_check_results?: RequiredCheckResult[]
+}
+
+export type RequiredCheckResult = {
+  check_id: string
+  status: 'passed' | 'missing' | 'not_applicable' | 'failed'
+  source_url: string | null
+  source_quote: string | null
+  canonical_ids_added: string[]
+  retrieval_attempts: Array<{
+    goal?: string
+    query?: string
+    result_count?: number
+    urls?: string[]
+    error?: string
+  }>
+  timestamp: string
+  detail?: string | null
+}
+
+export type RequiredEvidenceCheckStatus = 'passed' | 'missing' | 'not_applicable' | 'review_required'
+export type RequiredEvidenceSeverity = 'blocker' | 'warning' | 'info'
+
+export type RequiredEvidenceChecklistItem = {
+  id: string
+  label: string
+  category: string
+  status: RequiredEvidenceCheckStatus
+  severity: RequiredEvidenceSeverity
+  score_driving: boolean
+  field_path?: string
+  pattern_trigger?: string | null
+  source_url?: string | null
+  source_quote?: string | null
+  detail?: string | null
+}
+
+export type RequiredEvidenceValidationPayload = {
+  schema_version: string
+  subcategory_key: string
+  matrix_display_label?: string
+  evaluated_at: string
+  summary: {
+    required_fields_complete: boolean
+    required_external_checks_complete: boolean
+    missing_fields: string[]
+    score_blocking_gaps: number
+    non_score_gaps: number
+    product_identity_verified: boolean
+    approval_blocked: boolean
+    active_triggers?: string[]
+    formulation_pipeline_disabled?: boolean
+  }
+  checklist_items: RequiredEvidenceChecklistItem[]
+  approval_blockers: string[]
+}
+
+export type CanonicalFieldMapping = {
+  field_key: string
+  raw_value: string
+  canonical_id: string
+  mapping_rule_id: string | null
+  source_url: string | null
+  source_quote: string | null
+  confidence_label: string | null
+  display_label?: string | null
+  taxonomy_file?: string | null
+  agent2_material_id?: string | null
+  claimed?: boolean
+}
+
+export type CanonicalMappingsPayload = {
+  schema_version: string
+  primary_contact_material_id?: CanonicalFieldMapping
+  substrate_material_id?: CanonicalFieldMapping
+  coating_modifier_id?: CanonicalFieldMapping
+  pfas_status_id?: CanonicalFieldMapping
+  safety_claim_ids?: Record<string, CanonicalFieldMapping>
+  regulatory_flag_ids?: CanonicalFieldMapping[]
+  certification_ids?: Record<string, CanonicalFieldMapping>
+  blockers?: string[]
+}
+
+export type FieldEditAuditEntry = {
+  path: string
+  prior_value: string | null
+  new_value: string
+  edited_by: string
+  edited_at: string
 }
 
 export type AgentMetadata = {
@@ -129,21 +285,25 @@ export type AgentMetadata = {
   minimum_threshold?: MinimumThreshold
   in_testing_queue?: boolean
   api_usage?: Agent1ApiUsage
+  /** Gate 1 human edits (draft / pending_review only). */
+  field_edit_audit?: FieldEditAuditEntry[]
 }
 
 export type ProductEvidence = {
   evidence_id: string
   product_id: string
   bundle_version: number
-  review_status: string
+  review_status: EvidenceReviewStatus | string
   algorithm_version: string
   sources: EvidenceSource[]
   facts: EvidenceFact[]
   agent_metadata: AgentMetadata
+  /** Dot-path keys → provenance entries (immutable after approval). */
+  field_provenance?: Record<string, EvidenceFieldProvenanceEntry>
   reviewer_notes: string | null
   reviewed_by: string | null
   reviewed_at: string | null
-  submitted_at: string | null
+  pending_review_at: string | null
   approved_at: string | null
   created_at: string
   updated_at: string
@@ -158,11 +318,15 @@ export type ProductPipelineRow = {
   agent_status: AgentStatus | string
   score_basis?: string | null
   testing_queue_reason?: string | null
+  active_evidence_id?: string | null
+  publish_status?: PublishStatus | string | null
 }
 
 export type Agent1ReviewQueueItem = {
   product: ProductPipelineRow
   evidence: ProductEvidence | null
+  /** Set when agent_status is evidence_awaiting_review but bundle join failed or status mismatches. */
+  evidenceMismatch?: 'draft_not_pending_review' | 'no_pending_review_row'
 }
 
 export type Agent1DashboardData = {
@@ -220,6 +384,13 @@ export type NormalizationLayer4b = {
   badge_justification?: string
 }
 
+export type NormalizationMetadata = {
+  agent_version?: string
+  algorithm_version?: string
+  description_generator_version?: string
+  run_timestamp?: string
+}
+
 export type NormalizationInputs = {
   product_id: string
   evidence_id: string
@@ -233,6 +404,11 @@ export type NormalizationInputs = {
   human_review_required?: boolean
   human_review_reason?: string | null
   normalization_notes?: string
+  normalization_metadata?: NormalizationMetadata
+  /** Step 7 — deterministic copy for public product page */
+  product_description?: string | null
+  status?: string
+  flagged_missing_fields?: string[]
 }
 
 export type ScoringInputRow = {
@@ -363,7 +539,6 @@ export type Agent4DashboardData = {
     score: ProductScoreRow
   }>
   runnable: ProductPipelineRow[]
-  withQaHistory: ProductPipelineRow[]
   pendingQaByProductId: Record<string, ProductQaRow>
   approvedQaByProductId: Record<string, ProductQaRow>
   latestQaByProductId: Record<string, ProductQaRow>
@@ -399,4 +574,6 @@ export type Agent2DashboardData = {
     scoringInput: ScoringInputRow | null
   }>
   statusCounts: Record<string, number>
+  /** Most recent scoring_inputs row per product (any review_status). */
+  latestScoringByProductId: Record<string, ScoringInputRow>
 }

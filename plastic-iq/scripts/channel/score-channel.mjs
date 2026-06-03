@@ -1,4 +1,4 @@
-import { basisAdmitsNoQuantitativeSignal } from './audience-rules.mjs'
+import { hasQuantitativeAudienceSize } from './audience-extract.mjs'
 import { TOPIC_RELEVANCE_LEVELS } from './schema.mjs'
 
 /** Topic saturation dominates; audience contributes when any estimate exists. */
@@ -79,16 +79,16 @@ export function resolveAudienceEstimate(channel) {
   const sizeText = String(channel.audience_size ?? '').trim()
   const basisText = String(channel.audience_basis ?? '').trim()
 
-  if (basisAdmitsNoQuantitativeSignal(basisText)) {
+  if (channel.audience_verified === true && hasQuantitativeAudienceSize(sizeText)) {
     return {
-      audience_verified: false,
-      audience_size: 'unverified',
-      audience_basis: basisText,
-      score_note: 'Audience unverified — basis admits no quantitative source',
+      audience_verified: true,
+      audience_size: sizeText,
+      audience_basis: basisText || undefined,
+      score_note: undefined,
     }
   }
 
-  if (/^unverified$/i.test(sizeText)) {
+  if (/^unverified$/i.test(sizeText) || channel.audience_verified === false) {
     return {
       audience_verified: false,
       audience_size: 'unverified',
@@ -115,7 +115,7 @@ export function resolveAudienceEstimate(channel) {
     }
   }
 
-  if (!sizeText && basisText && !basisAdmitsNoQuantitativeSignal(basisText)) {
+  if (!sizeText && basisText) {
     const inferred = inferSizeFromBasis(basisText)
     if (inferred) {
       return {

@@ -4,11 +4,12 @@ import { ChevronRight, ShieldCheck } from 'lucide-react'
 import type { NormalizationComponent } from '../types/agent'
 import type { Product, ProductTier } from '../types'
 import { fetchProduct, fetchProductsByCategory } from '../lib/productsApi'
+import { pickSaferAlternatives } from '../lib/saferAlternatives'
 import { fetchProductPageScore, type ProductPageScore } from '../lib/productScoresApi'
-import {
-  fetchWhyThisScore,
-  primaryContactMaterialDisplay,
-} from '../lib/whyThisScoreApi'
+import { fetchProductDescription } from '../lib/productDescriptionApi'
+import { fetchWhyThisScore } from '../lib/whyThisScoreApi'
+import { primaryContactMaterialDisplayFromComponents } from '../lib/primaryContactMaterials'
+import { applyHazardSortToWhyThisScoreFields } from '../lib/whyThisScoreSort'
 import { WhyThisScore } from '../components/WhyThisScore'
 import type { WhyThisScoreFields } from '../lib/whyThisScoreApi'
 import { fetchNormalizationComponents } from '../lib/normalizationComponentsApi'
@@ -20,7 +21,11 @@ import { TransparencyBadge } from '../components/TransparencyBadge'
 import { transparencyBadgeSummary } from '../lib/transparencyBadge'
 import { PacTierLegend } from '../components/PacTierLegend'
 import { ProductImage } from '../components/ProductImage'
-import { colorForTier, tierForScore } from '../lib/score'
+import {
+  hasApprovedPageScore,
+  PUBLIC_SCORE_PENDING_MESSAGE,
+} from '../lib/publicProductDisplay'
+import { colorForTier, isBelowGoodTier, showsSaferAlternatives, tierForScore } from '../lib/score'
 import { orderedRetailerLinks, RetailerBuyButtons } from '../components/RetailerBuyButtons'
 
 export function ProductPage() {
@@ -31,6 +36,7 @@ export function ProductPage() {
     NormalizationComponent[] | null
   >(null)
   const [whyThisScore, setWhyThisScore] = useState<WhyThisScoreFields | null>(null)
+  const [productDescription, setProductDescription] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [alternatives, setAlternatives] = useState<Product[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,6 +47,7 @@ export function ProductPage() {
     setProduct(null)
     setPageScore(null)
     setNormalizationComponents(null)
+    setProductDescription(null)
     setError(null)
     fetchProduct(productId)
       .then((d) => setProduct(d))
@@ -55,20 +62,37 @@ export function ProductPage() {
     fetchWhyThisScore(productId)
       .then((fields) => setWhyThisScore(fields))
       .catch(() => setWhyThisScore(null))
+    fetchProductDescription(productId)
+      .then((text) => setProductDescription(text))
+      .catch(() => setProductDescription(null))
   }, [productId])
 
-  const score = pageScore?.pac_safety_score ?? product?.pac_safety_score ?? 0
-  const tier = useMemo(
-    () => pageScore?.tier ?? (product?.tier ? product.tier : tierForScore(score)),
-    [pageScore, product, score],
-  )
+  const hasPageScore = hasApprovedPageScore(pageScore)
+  const score = hasPageScore ? (pageScore!.pac_safety_score as number) : null
+  const tier = useMemo(() => {
+    if (!hasPageScore || score == null) return null
+    return pageScore!.tier ?? tierForScore(score)
+  }, [hasPageScore, pageScore, score])
   const primaryMaterialName = useMemo(
-    () => primaryContactMaterialDisplay(whyThisScore?.primary_material_options),
-    [whyThisScore],
+    () =>
+      primaryContactMaterialDisplayFromComponents(
+        normalizationComponents,
+        whyThisScore?.primary_material_options,
+      ),
+    [normalizationComponents, whyThisScore?.primary_material_options],
   )
 
+  const whyThisScoreDisplay = useMemo(() => {
+    if (!whyThisScore) return null
+    return applyHazardSortToWhyThisScoreFields(whyThisScore, normalizationComponents)
+  }, [whyThisScore, normalizationComponents])
+
   useEffect(() => {
-    const shouldShow = tier === 'Caution' || tier === 'High Risk'
+    if (score == null) {
+      setAlternatives(null)
+      return
+    }
+    const shouldShow = showsSaferAlternatives(score)
     if (!shouldShow) {
       setAlternatives(null)
       return
@@ -83,7 +107,7 @@ export function ProductPage() {
     fetchProductsByCategory({ category: product.category, subcategory: product.subcategory })
       .then((items) => {
         if (cancelled) return
-        setAlternatives(items.filter((p) => p.product_id !== product.product_id).slice(0, 3))
+        setAlternatives(pickSaferAlternatives(items, product.product_id))
       })
       .catch(() => {
         if (cancelled) return
@@ -93,7 +117,10 @@ export function ProductPage() {
     return () => {
       cancelled = true
     }
-  }, [product?.category, product?.subcategory, product?.product_id, tier])
+  }, [product?.category, product?.subcategory, product?.product_id, score])
+
+  const buySectionTitle =
+    score != null && tier != null && isBelowGoodTier(score) ? 'View product here' : 'Where to buy'
 
   if (loading) {
     return (
@@ -124,10 +151,6 @@ export function ProductPage() {
   }
 
   const retailerLinks = orderedRetailerLinks(product)
-  const buySectionTitle =
-    tier === 'Caution' || tier === 'Concern' || tier === 'High Risk'
-      ? 'View product here'
-      : 'Where to buy'
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
@@ -161,7 +184,11 @@ export function ProductPage() {
 
           <div className="mt-6 flex flex-wrap items-start gap-5">
             <div className="flex flex-col items-center gap-2">
-              <ScoreMark score={score} tier={tier} size="lg" />
+              {hasPageScore && score != null && tier != null ? (
+                <ScoreMark score={score} tier={tier} size="lg" />
+              ) : (
+                <ScorePendingMark />
+              )}
               {pageScore?.displayed_confidence_range ? (
                 <p className="text-center text-sm font-semibold tabular-nums text-slate-700">
                   Range {pageScore.displayed_confidence_range}
@@ -172,6 +199,9 @@ export function ProductPage() {
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 PAC Safety Score
               </div>
+              {!hasPageScore ? (
+                <p className="text-sm leading-relaxed text-slate-600">{PUBLIC_SCORE_PENDING_MESSAGE}</p>
+              ) : null}
               {pageScore?.transparency_badge ? (
                 <div>
                   <TransparencyBadge badge={pageScore.transparency_badge} />
@@ -183,9 +213,9 @@ export function ProductPage() {
             </div>
           </div>
 
-          {product.description ? (
+          {productDescription ? (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-700 shadow-card">
-              {product.description}
+              {productDescription}
             </div>
           ) : null}
 
@@ -199,8 +229,8 @@ export function ProductPage() {
 
           {productId ? <CertificationBadges productId={productId} className="mt-6" /> : null}
 
-          {whyThisScore ? (
-            <WhyThisScore fields={whyThisScore} className="mt-6" />
+          {whyThisScoreDisplay ? (
+            <WhyThisScore fields={whyThisScoreDisplay} className="mt-6" />
           ) : (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-card">
               <div className="text-sm font-semibold text-ink-900">Why this score?</div>
@@ -211,7 +241,7 @@ export function ProductPage() {
             </div>
           )}
 
-          {(tier === 'Caution' || tier === 'High Risk') && (
+          {score != null && showsSaferAlternatives(score) && (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -290,7 +320,11 @@ export function ProductPage() {
               <p className="mt-1 text-sm text-slate-600">Links open in a new tab.</p>
               {retailerLinks.length > 0 ? (
                 <div className="mt-4">
-                  <RetailerBuyButtons tier={tier} links={retailerLinks} />
+                  {hasPageScore && score != null && tier != null ? (
+                    <RetailerBuyButtons tier={tier} pacScore={score} links={retailerLinks} />
+                  ) : (
+                    <RetailerBuyButtons tier="Good" links={retailerLinks} />
+                  )}
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-slate-500">
@@ -316,9 +350,24 @@ export function ProductPage() {
   )
 }
 
+function ScorePendingMark() {
+  return (
+    <div
+      className="grid h-20 w-20 place-items-center rounded-2xl bg-white px-2 text-center ring-1 ring-slate-200 shadow-sm"
+      aria-label={PUBLIC_SCORE_PENDING_MESSAGE}
+    >
+      <div className="text-[11px] font-semibold leading-tight text-slate-600">
+        {PUBLIC_SCORE_PENDING_MESSAGE}
+      </div>
+    </div>
+  )
+}
+
 function AlternativeRow({ product }: { product: Product }) {
-  const score = product.pac_safety_score ?? 0
-  const tier = product.tier ?? tierForScore(score)
+  if (typeof product.pac_safety_score !== 'number') return null
+
+  const score = product.pac_safety_score
+  const tier = product.tier ? product.tier : tierForScore(score)
   const altLinks = orderedRetailerLinks(product)
   const pill = scorePillStyle(tier)
 
@@ -351,7 +400,7 @@ function AlternativeRow({ product }: { product: Product }) {
 
       <div className="col-span-2 mt-3 w-full md:col-auto md:mt-0 md:min-w-[148px] md:max-w-[200px]">
         {altLinks.length > 0 ? (
-          <RetailerBuyButtons tier={tier} links={altLinks} size="compact" />
+          <RetailerBuyButtons tier={tier} pacScore={score} links={altLinks} size="compact" />
         ) : (
           <span className="text-xs text-slate-400">No retailer link</span>
         )}

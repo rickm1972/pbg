@@ -25,6 +25,7 @@ import categoryWaterBottles from '../assets/category-water-bottles.png'
 import categoryCookingUtensils from '../assets/category-cooking-utensils.png'
 import categoryCookware from '../assets/category-cookware.png'
 import magicHero from '../assets/magic-wide-cropped.png'
+import { filterPublicListProducts } from '../lib/publicProductDisplay'
 import { colorForTier, tierForScore } from '../lib/score'
 import { ProductImage } from '../components/ProductImage'
 import { TopNav } from '../components/nav/TopNav'
@@ -123,9 +124,13 @@ export function HomePage() {
   }, [])
 
   const showSearch = focusSearch || query.trim().length > 0
-  const kitchenProducts = useMemo(
-    () => (allProducts ?? []).filter((p) => (p.category ?? '') === 'Kitchen'),
+  const publicProducts = useMemo(
+    () => filterPublicListProducts(allProducts ?? []),
     [allProducts],
+  )
+  const kitchenProducts = useMemo(
+    () => publicProducts.filter((p) => (p.category ?? '') === 'Kitchen'),
+    [publicProducts],
   )
   const kitchenSubcategories = useMemo(() => {
     const set = new Set<string>()
@@ -145,7 +150,7 @@ export function HomePage() {
     return out
   }, [kitchenProducts])
 
-  const topRated = useMemo(() => (allProducts ?? []).slice(0, 10), [allProducts])
+  const topRated = useMemo(() => publicProducts.slice(0, 10), [publicProducts])
 
   async function onSearchSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -155,7 +160,7 @@ export function HomePage() {
     setError(null)
     try {
       const d = await searchProducts(q, 24)
-      setResults(d)
+      setResults(filterPublicListProducts(d))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Search failed')
     } finally {
@@ -605,7 +610,9 @@ export function HomePage() {
 }
 
 function TopRatedCard({ product }: { product: Product }) {
-  const score = product.pac_safety_score ?? 0
+  if (typeof product.pac_safety_score !== 'number') return null
+
+  const score = product.pac_safety_score
   const tier = product.tier ?? tierForScore(score)
   const tierLabel = tier
   const tierStyles = colorForTier(tier)

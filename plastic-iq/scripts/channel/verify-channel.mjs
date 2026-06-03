@@ -1,7 +1,13 @@
 import { jsonrepair } from 'jsonrepair'
 import { loadEnv } from '../lib/env.mjs'
 import { isMalformedOrSpamUrl, normalizeSourceUrl } from '../persona/url-guard.mjs'
-import { fixAudienceContradictions } from './audience-rules.mjs'
+import { applyLiveAudience, enforceAudienceRules } from './audience-rules.mjs'
+import {
+  extractLiveAudience,
+  fetchRedditAbout,
+  liveAudienceFromRedditAbout,
+  parseSubredditName,
+} from './audience-extract.mjs'
 import { countTopicEvidence } from './score-channel.mjs'
 import { defaultChannelPerplexityModel } from './pricing.mjs'
 
@@ -41,13 +47,6 @@ function normalizeComparableUrl(url) {
   } catch {
     return String(url ?? '').trim().toLowerCase()
   }
-}
-
-/**
- * @param {object} channel
- */
-export function scrubChannelCandidate(channel) {
-  return fixAudienceContradictions(channel ?? {})
 }
 
 /**
@@ -92,8 +91,7 @@ export function urlMatchesClaimedChannelType(url, channelType) {
  * @param {object} channel
  */
 export function isCircularEvidenceOnly(channel) {
-  if (hasIndependentEvidence(channel)) return false
-  return true
+  return !hasIndependentEvidence(channel)
 }
 
 /**
@@ -160,7 +158,7 @@ async function fetchPage(url) {
     let text = ''
     if (res.ok && !contentType.includes('application/json')) {
       const raw = await res.text()
-      text = raw.slice(0, 80_000)
+      text = raw.slice(0, 120_000)
     } else if (res.ok) {
       text = await res.text()
     }
@@ -284,6 +282,7 @@ Rules:
     return {
       ok: false,
       reason: `Perplexity error: ${body?.error?.message ?? response.status}`,
+      contentMatch: false,
     }
   }
 
@@ -292,46 +291,229 @@ Rules:
   try {
     parsed = parseJsonLoose(content)
   } catch {
-    return { ok: false, reason: 'Perplexity verification returned invalid JSON' }
+    return { ok: false, reason: 'Perplexity verification returned invalid JSON', contentMatch: false }
   }
 
   if (parsed.phantom_personal_channel) {
-    return { ok: false, reason: parsed.reason || 'Phantom personal channel from host video' }
+    return {
+      ok: false,
+      reason: parsed.reason || 'Phantom personal channel from host video',
+      contentMatch: false,
+    }
   }
   if (!parsed.exists || !parsed.matches_claimed_type) {
-    return { ok: false, reason: parsed.reason || 'Channel URL not verified' }
+    return { ok: false, reason: parsed.reason || 'Channel URL not verified', contentMatch: false }
   }
   if (!parsed.matches_topic) {
-    return { ok: false, reason: parsed.reason || 'Channel not on-topic' }
+    return { ok: false, reason: parsed.reason || 'Channel not on-topic', contentMatch: false }
   }
-  return { ok: true, reason: parsed.reason || 'Perplexity confirmed', method: 'perplexity' }
+  return {
+    ok: true,
+    reason: parsed.reason || 'Perplexity confirmed',
+    method: 'perplexity',
+    contentMatch: true,
+  }
+}
+
+/**
+ * @param {(msg: string) => void} auditLog
+ * @param {string} msg
+ */
+function audit(auditLog, msg) {
+  if (auditLog) auditLog(msg)
+}
+
+/**
+ * @param {{ reason?: string, checks?: { urlVerification?: boolean, contentMatch?: boolean } }} result
+ */
+function classifyRejectionStage(result) {
+  const reason = String(result.reason ?? '').toLowerCase()
+  if (
+    /circular|independent evidence|malformed|missing name|does not match claimed|phantom/i.test(
+      reason,
+    )
+  ) {
+    return 'structural'
+  }
+  if (result.checks?.urlVerification === false) return 'url_fetch'
+  if (result.checks?.contentMatch === false) return 'content_match'
+  return 'other'
+}
+
+/**
+ * @param {number} synthesizedCount
+ * @param {number} keptCount
+ * @param {Array<{ stage: string }>} rejections
+ */
+export function buildIndustryVerificationNote(synthesizedCount, keptCount, rejections) {
+  if (synthesizedCount === 0) {
+    return 'Industry: synthesis returned 0 candidates this run.'
+  }
+  if (keptCount > 0) return null
+
+  const n = synthesizedCount
+  const stages = {}
+  for (const r of rejections) {
+    stages[r.stage] = (stages[r.stage] ?? 0) + 1
+  }
+
+  if (stages.url_fetch === n) {
+    return `Industry: ${n} candidate${n === 1 ? '' : 's'} synthesized, all rejected at verification (URL fetch failed).`
+  }
+  if (stages.content_match === n) {
+    return `Industry: ${n} candidate${n === 1 ? '' : 's'} synthesized, all rejected at content match (topic mismatch).`
+  }
+  if (stages.structural === n) {
+    return `Industry: ${n} candidate${n === 1 ? '' : 's'} synthesized, all rejected (structural: evidence or URL type).`
+  }
+
+  const parts = Object.entries(stages).map(([s, c]) => `${c} at ${s.replace(/_/g, ' ')}`)
+  return `Industry: ${n} candidates synthesized, all rejected (${parts.join('; ')}).`
 }
 
 /**
  * @param {object} channel
  * @param {string} topic
+ * @param {(msg: string) => void} [auditLog]
  */
-export async function verifyChannel(channel, topic) {
+async function verifySubredditChannel(channel, topic, auditLog) {
+  const url = String(channel.url_or_handle ?? '').trim()
+  const name = String(channel.channel_name ?? '').trim()
+  const sub = parseSubredditName(url)
+
+  if (!sub) {
+    audit(auditLog, '    reddit: could not parse subreddit name from URL')
+    return null
+  }
+
+  audit(auditLog, `    reddit: verifying via about.json (r/${sub})`)
+  const about = await fetchRedditAbout(sub)
+
+  if (!about.ok) {
+    audit(auditLog, `    reddit: about.json failed (${about.error}) — will try HTML fallback`)
+    return null
+  }
+
+  const checks = {
+    found: true,
+    urlVerification: true,
+    contentMatch: false,
+    liveAudience: false,
+  }
+
+  const description = `${about.title} ${about.public_description} ${about.display_name}`
+  const topicMatch = pageMentionsTopic(topic, description, name)
+  checks.contentMatch = topicMatch
+
+  const liveAudience = liveAudienceFromRedditAbout(about)
+  if (liveAudience) {
+    checks.liveAudience = true
+    audit(auditLog, `    reddit: ${liveAudience.size} (about.json)`)
+  } else {
+    audit(auditLog, '    reddit: subscriber count missing or suspicious in about.json')
+  }
+
+  if (topicMatch) {
+    audit(auditLog, '    reddit: content match passed (about.json description)')
+    return {
+      ok: true,
+      reason: 'Reddit about.json: subreddit exists and matches topic',
+      method: 'reddit-about.json',
+      liveAudience,
+      checks,
+      rejectionStage: null,
+    }
+  }
+
+  audit(auditLog, '    reddit: topic weak on about.json — trying Perplexity for content only')
+  const env = loadEnv()
+  const apiKey = env.PERPLEXITY_API_KEY
+  if (apiKey) {
+    const model = defaultChannelPerplexityModel()
+    const px = await perplexityConfirmChannel(channel, topic, apiKey, model)
+    if (px.ok) {
+      checks.contentMatch = true
+      audit(auditLog, '    reddit: content match passed (Perplexity)')
+      return {
+        ok: true,
+        reason: 'Reddit about.json + Perplexity topic confirmation',
+        method: 'reddit-about.json+perplexity',
+        liveAudience,
+        checks,
+      }
+    }
+    audit(auditLog, `    reddit: Perplexity rejected — ${px.reason}`)
+    return {
+      ok: false,
+      reason: px.reason ?? 'Subreddit not on-topic',
+      checks,
+      rejectionStage: 'content_match',
+    }
+  }
+
+  return {
+    ok: false,
+    reason: 'Subreddit exists (about.json) but topic not confirmed',
+    checks,
+    rejectionStage: 'content_match',
+  }
+}
+
+/**
+ * @param {object} channel
+ * @param {string} topic
+ * @param {{ auditLog?: (msg: string) => void }} [opts]
+ */
+export async function verifyChannel(channel, topic, opts = {}) {
+  const { auditLog } = opts
   const env = loadEnv()
   const url = String(channel.url_or_handle ?? '').trim()
   const name = String(channel.channel_name ?? '').trim()
 
+  const checks = {
+    found: true,
+    urlVerification: false,
+    contentMatch: false,
+    liveAudience: false,
+  }
+
+  const fail = (reason, checksOverride = {}) => ({
+    ok: false,
+    reason,
+    checks: { ...checks, ...checksOverride },
+    rejectionStage: classifyRejectionStage({ reason, checks: { ...checks, ...checksOverride } }),
+  })
+
   if (!name || !url) {
-    return { ok: false, reason: 'Missing channel name or URL' }
+    audit(auditLog, '    missing name or URL')
+    return fail('Missing channel name or URL')
   }
   if (isMalformedOrSpamUrl(url)) {
-    return { ok: false, reason: 'Malformed channel URL' }
+    audit(auditLog, '    malformed URL')
+    return fail('Malformed channel URL')
   }
   if (isCircularEvidenceOnly(channel)) {
-    return { ok: false, reason: 'Circular evidence — channel URL used as sole evidence' }
+    audit(auditLog, '    failed: circular evidence (channel URL is sole evidence)')
+    return fail('Circular evidence — channel URL used as sole evidence')
   }
   if (!hasIndependentEvidence(channel)) {
-    return { ok: false, reason: 'No independent evidence URL separate from channel page' }
+    audit(auditLog, '    failed: no independent evidence URL')
+    return fail('No independent evidence URL separate from channel page')
   }
   if (!urlMatchesClaimedChannelType(url, channel.channel_type)) {
-    return {
-      ok: false,
-      reason: `URL does not match claimed channel type (${channel.channel_type})`,
+    audit(auditLog, `    failed: URL shape does not match type ${channel.channel_type}`)
+    return fail(`URL does not match claimed channel type (${channel.channel_type})`)
+  }
+
+  audit(auditLog, '    structural checks passed')
+
+  if (channel.channel_type === 'subreddit') {
+    const redditResult = await verifySubredditChannel(channel, topic, auditLog)
+    if (redditResult?.ok) {
+      return redditResult
+    }
+    if (redditResult && !redditResult.ok) {
+      return { ...redditResult, rejectionStage: redditResult.rejectionStage ?? classifyRejectionStage(redditResult) }
     }
   }
 
@@ -340,88 +522,184 @@ export async function verifyChannel(channel, topic) {
     const oembed = await youtubeOembedAuthor(phantom.watchUrl)
     if (oembed?.author_key && phantom.claimedKey) {
       if (oembed.author_key !== phantom.claimedKey) {
-        return {
-          ok: false,
-          reason: `Phantom channel: video is hosted on ${oembed.author_name ?? oembed.author_key}, not this channel`,
-          method: 'youtube-oembed',
-        }
+        audit(auditLog, `    failed: phantom channel (host ${oembed.author_name ?? oembed.author_key})`)
+        return fail(
+          `Phantom channel: video is hosted on ${oembed.author_name ?? oembed.author_key}, not this channel`,
+        )
       }
     } else if (phantom.reason && !phantom.claimedKey) {
-      return { ok: false, reason: phantom.reason, method: 'structural' }
+      audit(auditLog, `    failed: ${phantom.reason}`)
+      return fail(phantom.reason)
     }
   }
 
   const fetchResult = await fetchPage(url)
+  checks.urlVerification = fetchResult.ok
+
+  let liveAudience = null
+  if (fetchResult.ok && fetchResult.text) {
+    liveAudience = await extractLiveAudience(channel, {
+      html: fetchResult.text,
+      url: fetchResult.finalUrl || url,
+    })
+    if (liveAudience) {
+      checks.liveAudience = true
+      audit(auditLog, `    live audience: ${liveAudience.size}`)
+    } else {
+      audit(auditLog, '    live audience: none on page')
+    }
+  } else {
+    audit(
+      auditLog,
+      `    fetch failed: ${fetchResult.error ?? `HTTP ${fetchResult.status}`}`,
+    )
+  }
+
   let fetchTopicMatch = false
   if (fetchResult.ok && fetchResult.text) {
     const titleMatch =
       fetchResult.text.toLowerCase().includes(name.toLowerCase().slice(0, 12)) ||
       name.length < 4
     fetchTopicMatch = pageMentionsTopic(topic, fetchResult.text, name)
-    if (titleMatch && fetchTopicMatch) {
+    checks.contentMatch = titleMatch && fetchTopicMatch
+    if (checks.contentMatch) {
+      audit(auditLog, '    content match: passed (fetch)')
       return {
         ok: true,
         reason: 'Direct fetch: page resolves and content matches topic',
         method: 'fetch',
         status: fetchResult.status,
+        liveAudience,
+        checks,
       }
     }
+    audit(auditLog, '    content match: weak on fetch — trying Perplexity')
   }
 
   const apiKey = env.PERPLEXITY_API_KEY
   if (!apiKey) {
     if (fetchResult.ok && fetchTopicMatch) {
+      checks.contentMatch = true
       return {
         ok: true,
         reason: 'Direct fetch: page resolves with topic match (no Perplexity key)',
         method: 'fetch',
+        liveAudience,
+        checks,
       }
     }
+    audit(auditLog, '    rejected: fetch/topic insufficient and no Perplexity key')
     return {
       ok: false,
       reason: fetchResult.error
         ? `Fetch failed: ${fetchResult.error}`
         : `Fetch HTTP ${fetchResult.status} — set PERPLEXITY_API_KEY for fallback verification`,
+      checks,
     }
   }
 
   const model = defaultChannelPerplexityModel()
   const px = await perplexityConfirmChannel(channel, topic, apiKey, model)
   if (px.ok) {
-    return { ...px, method: px.method ?? 'perplexity' }
+    checks.contentMatch = true
+    audit(auditLog, '    content match: passed (Perplexity)')
+    return { ...px, method: px.method ?? 'perplexity', liveAudience, checks }
   }
 
-  return {
-    ok: false,
-    reason: px.reason ?? (fetchResult.ok ? 'Topic/type not confirmed' : `Fetch HTTP ${fetchResult.status}`),
-  }
+  audit(auditLog, `    rejected: ${px.reason ?? 'verification failed'}`)
+  return fail(
+    px.reason ?? (fetchResult.ok ? 'Topic/type not confirmed' : `Fetch HTTP ${fetchResult.status}`),
+    { urlVerification: fetchResult.ok, contentMatch: false },
+  )
 }
 
 /**
  * @param {object[]} channels
- * @param {{ topic: string, log?: (msg: string) => void, label?: string }} opts
+ * @param {{ topic: string, log?: (msg: string) => void, label?: string, industryAudit?: boolean }} opts
  */
-export async function filterVerifiedChannels(channels, { topic, log = () => {}, label = 'channel' }) {
-  const scrubbed = (channels ?? []).map(scrubChannelCandidate)
+export async function filterVerifiedChannels(channels, { topic, log = () => {}, label = 'channel', industryAudit = false }) {
   const kept = []
-  let rejected = 0
+  const rejections = []
+  const isIndustry = industryAudit || label === 'industry'
+  const candidates = channels ?? []
 
-  for (const channel of scrubbed) {
-    const result = await verifyChannel(channel, topic)
-    if (result.ok) {
-      kept.push(channel)
-      log(
-        `  ✓ Verified ${label}: ${channel.channel_name} (${result.method ?? 'ok'})`,
-      )
-    } else {
-      rejected += 1
-      log(`  ✗ Rejected ${label}: ${channel.channel_name} — ${result.reason}`)
+  if (isIndustry) {
+    log(`  Industry verification: ${candidates.length} candidate(s) from synthesis`)
+    if (!candidates.length) {
+      log('  Industry section empty — synthesis returned zero industry_channels')
     }
   }
 
-  if (rejected > 0) {
-    log(`  ${label} verification: kept ${kept.length}, rejected ${rejected}`)
+  for (const channel of candidates) {
+    if (isIndustry) {
+      log(
+        `  [industry] ── ${channel.channel_name} (${channel.channel_type}) ${channel.url_or_handle}`,
+      )
+    }
+
+    const auditLog = isIndustry
+      ? (msg) => log(`  [industry] ${channel.channel_name}:${msg}`)
+      : channel.channel_type === 'subreddit'
+        ? (msg) => log(`  [reddit] ${channel.channel_name}:${msg}`)
+        : undefined
+
+    const result = await verifyChannel(channel, topic, { auditLog })
+
+    if (result.ok) {
+      let accepted = channel
+      if (result.liveAudience) {
+        accepted = applyLiveAudience(channel, result.liveAudience)
+        if (isIndustry) {
+          log(`  [industry] ACCEPTED — live audience ${result.liveAudience.size}`)
+        } else if (channel.channel_type === 'subreddit') {
+          log(`  ✓ Verified subreddit: ${channel.channel_name} — ${result.liveAudience.size} (${result.method ?? 'ok'})`)
+        } else {
+          log(`  ✓ Verified ${label}: ${channel.channel_name} — live audience ${result.liveAudience.size}`)
+        }
+      } else if (isIndustry) {
+        log(`  [industry] ACCEPTED (${result.method ?? 'ok'}) — no public count on page`)
+      } else if (channel.channel_type === 'subreddit') {
+        log(`  ✓ Verified subreddit: ${channel.channel_name} (${result.method ?? 'ok'})`)
+      } else {
+        log(`  ✓ Verified ${label}: ${channel.channel_name} (${result.method ?? 'ok'})`)
+      }
+      accepted = enforceAudienceRules(accepted)
+      kept.push(accepted)
+    } else {
+      const stage = result.rejectionStage ?? classifyRejectionStage(result)
+      rejections.push({ name: channel.channel_name, stage, reason: result.reason })
+      if (isIndustry) {
+        log(
+          `  [industry] REJECTED (${stage}) — ${result.reason} | url_ok=${result.checks?.urlVerification ?? '?'} content=${result.checks?.contentMatch ?? '?'}`,
+        )
+      } else if (channel.channel_type === 'subreddit') {
+        log(`  ✗ Rejected subreddit: ${channel.channel_name} (${stage}) — ${result.reason}`)
+      } else {
+        log(`  ✗ Rejected ${label}: ${channel.channel_name} — ${result.reason}`)
+      }
+    }
   }
 
-  return kept
+  const industryVerificationNote = isIndustry
+    ? buildIndustryVerificationNote(candidates.length, kept.length, rejections)
+    : null
+
+  if (isIndustry) {
+    log(
+      `  Industry verification summary: ${kept.length} kept, ${rejections.length} rejected (of ${candidates.length} synthesized)`,
+    )
+    if (industryVerificationNote) {
+      log(`  ${industryVerificationNote}`)
+    }
+  } else if (rejections.length > 0) {
+    log(`  ${label} verification: kept ${kept.length}, rejected ${rejections.length}`)
+    const subRejected = rejections.filter((r) =>
+      candidates.some((c) => c.channel_name === r.name && c.channel_type === 'subreddit'),
+    )
+    if (subRejected.length) {
+      log(`  Subreddit rejections: ${subRejected.map((r) => `${r.name} (${r.stage})`).join('; ')}`)
+    }
+  }
+
+  return { channels: kept, industryVerificationNote }
 }

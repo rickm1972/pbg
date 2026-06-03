@@ -46,39 +46,27 @@ async function main() {
     .from('scoring_inputs')
     .select('input_id, review_status')
     .eq('product_id', product.product_id)
-    .eq('review_status', 'submitted')
+    .eq('review_status', 'pending_review')
     .order('run_timestamp', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (findError) throw findError
   if (!row) {
-    console.error(`No submitted scoring_inputs for ${product.product_name}`)
+    console.error(`No pending_review scoring_inputs for ${product.product_name}`)
     process.exit(2)
   }
 
-  const now = new Date().toISOString()
-  const { error: inputError } = await supabase
-    .from('scoring_inputs')
-    .update({
-      review_status: 'rejected',
-      review_timestamp: now,
-      review_notes: notes.trim(),
-      human_reviewer: 'script:agent2-reject',
-    })
-    .eq('input_id', row.input_id)
+  const { data, error } = await supabase.rpc('reject_scoring_inputs', {
+    p_input_id: row.input_id,
+    p_review_notes: notes.trim(),
+    p_reviewed_by: 'script:agent2-reject',
+  })
 
-  if (inputError) throw inputError
-
-  const { error: productError } = await supabase
-    .from('products')
-    .update({ agent_status: 'normalization_rejected' })
-    .eq('product_id', product.product_id)
-
-  if (productError) throw productError
+  if (error) throw error
 
   console.log(`Rejected ${product.product_name} (${row.input_id})`)
-  console.log(`agent_status → normalization_rejected`)
+  console.log('agent_status:', data?.kept_prior_approved ? 'normalization_approved (prior chain kept)' : 'normalization_rejected')
 }
 
 main().catch((err) => {

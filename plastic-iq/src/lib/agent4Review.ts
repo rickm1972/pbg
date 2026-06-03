@@ -1,5 +1,10 @@
 import { supabase } from './supabaseClient'
 import { humanizeAgentStatus } from './agent1Review'
+import {
+  canRunAgent4Sequential,
+  isAgent4OnAwaitingReviewTab,
+  onlyActivePipelineProducts,
+} from './pipelineCatalog'
 import type {
   Agent4DashboardData,
   ProductPipelineRow,
@@ -12,15 +17,8 @@ export { humanizeAgentStatus }
 const PRODUCT_PIPELINE_SELECT =
   'product_id, product_name, brand, category, subcategory, agent_status, score_basis, testing_queue_reason'
 
-const QA_RUN_STATUSES = new Set([
-  'scoring_review_pending',
-  'scoring_approved',
-  'qa_pending',
-  'qa_awaiting_review',
-])
-
 export function canRunAgent4(status: string): boolean {
-  return QA_RUN_STATUSES.has(status)
+  return canRunAgent4Sequential(status)
 }
 
 export function agent4ApiBase(): string {
@@ -45,10 +43,9 @@ export type Agent4BatchRunResult = {
 }
 
 export async function fetchAgent4Dashboard(): Promise<Agent4DashboardData> {
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select(PRODUCT_PIPELINE_SELECT)
-    .order('product_name', { ascending: true })
+  const { data: products, error: productsError } = await onlyActivePipelineProducts(
+    supabase.from('products').select(PRODUCT_PIPELINE_SELECT),
+  ).order('product_name', { ascending: true })
 
   if (productsError) throw productsError
 
@@ -135,8 +132,6 @@ export async function fetchAgent4Dashboard(): Promise<Agent4DashboardData> {
 
   runnable.sort((a, b) => a.product_name.localeCompare(b.product_name))
 
-  const withQaHistory: ProductPipelineRow[] = rows.filter((p) => latestAnyQa.has(p.product_id))
-
   const statusCounts: Record<string, number> = {}
   for (const p of rows) {
     const key = p.agent_status || 'unscored'
@@ -160,7 +155,6 @@ export async function fetchAgent4Dashboard(): Promise<Agent4DashboardData> {
     products: rows,
     pendingReview,
     runnable,
-    withQaHistory,
     pendingQaByProductId,
     approvedQaByProductId,
     latestQaByProductId,

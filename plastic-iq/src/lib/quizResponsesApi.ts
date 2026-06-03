@@ -30,6 +30,14 @@ export type QuizResponseSnapshot = {
   letter_grade?: string | null
   tier?: string | null
   completed_at?: string | null
+  user_email?: string | null
+  first_name?: string | null
+}
+
+export function hasQuizContactOnRecord(row: QuizResponseSnapshot | null | undefined): boolean {
+  const email = String(row?.user_email ?? '').trim()
+  const name = String(row?.first_name ?? '').trim()
+  return email.length > 0 && name.length > 0
 }
 
 /** Empty {} must not be sent — RPC would replace stored answers and wipe prior saves. */

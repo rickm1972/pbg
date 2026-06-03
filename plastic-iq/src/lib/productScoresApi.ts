@@ -18,10 +18,6 @@ type RpcRow = {
   explanation_draft?: string | null
 }
 
-type ScoreRow = RpcRow & {
-  review_status?: string | null
-}
-
 function parseProductPageScore(data: RpcRow | null): ProductPageScore | null {
   if (!data || typeof data.pac_safety_score !== 'number') return null
   const tier = String(data.tier ?? '').trim() as ProductTier
@@ -54,41 +50,14 @@ async function fetchProductPageScoreViaRpc(
   return parseProductPageScore((data as RpcRow | null) ?? null)
 }
 
-async function fetchProductPageScoreDirect(
-  productId: string,
-): Promise<ProductPageScore | null> {
-  const { data: rows, error } = await supabase
-    .from('product_scores')
-    .select(
-      'pac_safety_score, tier, displayed_confidence_range, transparency_badge, explanation_draft, review_status',
-    )
-    .eq('product_id', productId)
-    .in('review_status', ['approved', 'pending_review'])
-    .order('run_timestamp', { ascending: false })
-
-  if (error) throw error
-  const list = (rows ?? []) as ScoreRow[]
-  const row =
-    list.find((r) => r.review_status === 'approved') ?? list[0] ?? null
-  if (!row) return null
-
-  const parsed = parseProductPageScore(row)
-  if (parsed) return parsed
-
-  return null
-}
-
-/** Public product page score — Agent 3 product_scores with Agent 2 layer_4b fallback via RPC. */
+/**
+ * Phase 2A: public score only via get_product_page_score RPC
+ * (published + approved product_scores; no pending_review or products row cache).
+ */
 export async function fetchProductPageScore(
   productId: string,
 ): Promise<ProductPageScore | null> {
-  const viaRpc = await fetchProductPageScoreViaRpc(productId)
-  if (viaRpc) return viaRpc
-
-  const direct = await fetchProductPageScoreDirect(productId)
-  if (direct) return direct
-
-  return null
+  return fetchProductPageScoreViaRpc(productId)
 }
 
 /** @deprecated Use fetchProductPageScore */

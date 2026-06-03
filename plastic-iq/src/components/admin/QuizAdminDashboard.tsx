@@ -36,6 +36,17 @@ const MOTIVATION_QUESTIONS: Array<{ id: 'q18' | 'q18b' | 'q19' | 'q20' | 'q21'; 
   },
 ]
 
+function formatQuizCompletedCell(row: QuizResponseRow): string {
+  if (row.completed_at) return new Date(row.completed_at).toLocaleString()
+  const email = String(row.user_email ?? '').trim()
+  const motivation = row.motivation_answers ?? {}
+  const hasAnswers =
+    Object.keys(row.scored_answers ?? {}).length > 0 ||
+    Object.keys(motivation).length > 0
+  if (!email && hasAnswers) return 'Abandoned (left before email)'
+  return '—'
+}
+
 type Filters = {
   createdFrom: string
   createdTo: string
@@ -893,7 +904,7 @@ export function QuizAdminDashboard({
                         <td className="px-2 py-3">{kids ?? '—'}</td>
                         <td className="px-2 py-3 text-xs text-slate-600">{new Date(r.created_at).toLocaleString()}</td>
                         <td className="px-2 py-3 text-xs text-slate-600">
-                          {r.completed_at ? new Date(r.completed_at).toLocaleString() : '—'}
+                          {formatQuizCompletedCell(r)}
                         </td>
                         <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                           <button

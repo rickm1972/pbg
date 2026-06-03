@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom'
 import type { Product } from '../types'
-import { ScoreMark } from './ScoreMark'
+import { hasPublicDisplayScore } from '../lib/publicProductDisplay'
 import { tierForScore } from '../lib/score'
+import { ScoreMark } from './ScoreMark'
 import { ProductImage } from './ProductImage'
 
 export function ProductCard({ product }: { product: Product }) {
-  const score = product.pac_safety_score ?? 0
+  if (!hasPublicDisplayScore(product)) return null
+
+  const score = product.pac_safety_score as number
   const tier = product.tier ?? tierForScore(score)
 
   return (

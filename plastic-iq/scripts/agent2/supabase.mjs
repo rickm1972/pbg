@@ -8,6 +8,26 @@ import {
 export { createServiceClient, fetchProductById, fetchProductByName, updateAgentStatus }
 
 export async function fetchApprovedEvidence(supabase, productId) {
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select('active_evidence_id')
+    .eq('product_id', productId)
+    .maybeSingle()
+
+  if (productError) throw new Error(`Failed to load product: ${productError.message}`)
+
+  if (product?.active_evidence_id) {
+    const { data, error } = await supabase
+      .from('product_evidence')
+      .select('*')
+      .eq('evidence_id', product.active_evidence_id)
+      .eq('review_status', 'approved')
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to load active evidence: ${error.message}`)
+    if (data) return data
+  }
+
   const { data, error } = await supabase
     .from('product_evidence')
     .select('*')
@@ -22,6 +42,21 @@ export async function fetchApprovedEvidence(supabase, productId) {
     throw new Error(
       `No approved evidence packet for product ${productId}. Approve Agent 1 evidence first.`,
     )
+  }
+  return data
+}
+
+export async function fetchLatestScoringInput(supabase, productId) {
+  const { data, error } = await supabase
+    .from('scoring_inputs')
+    .select('input_id, review_status, inputs, run_timestamp')
+    .eq('product_id', productId)
+    .order('run_timestamp', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to load latest scoring_inputs: ${error.message}`)
   }
   return data
 }

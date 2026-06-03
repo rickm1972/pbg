@@ -228,6 +228,7 @@ function addPrimaryFromSchemaCoatings(evidence, components) {
 
 function addPrimaryFromLegacyFacts(evidence, components) {
   const legacyKeys = [
+    'primary_material',
     'primary_contact_surface',
     'finishing_treatments',
     'primary_contact_surface_coating_detail',
@@ -238,6 +239,25 @@ function addPrimaryFromLegacyFacts(evidence, components) {
     if (!text.trim()) continue
     const row = factByKey(evidence, key)
     const confidence = resolveConfidenceLabel(evidence, row)
+
+    if (key === 'primary_material' || key === 'primary_contact_surface') {
+      const matId = detectMaterialId(text.replace(/_/g, ' '))
+      if (matId && getMaterial(matId) && !hasPrimaryCookingMaterial(components, matId)) {
+        const mat = requireMaterial(matId)
+        components.push({
+          component_name: `Cooking Surface and Body (${mat.name})`,
+          role: 'primary_food_contact',
+          material_id: matId,
+          material: text,
+          evidence_source: {
+            fact_key: key,
+            excerpt: row?.excerpt ?? text.slice(0, 200),
+            source_url: row?.source_url ?? null,
+          },
+          data_confidence: confidence,
+        })
+      }
+    }
 
     if (
       PEAKS_AFFIRMATIVE.test(text) &&

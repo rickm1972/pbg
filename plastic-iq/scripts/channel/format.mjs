@@ -65,11 +65,16 @@ export function formatChannelMapSummary(row) {
     }
   }
 
+  lines.push('\n--- Industry / counter-aligned (not seeding) ---\n')
   if (industry.length) {
-    lines.push('\n--- Industry / counter-aligned (not seeding) ---\n')
     for (const c of industry) {
       lines.push(formatChannelLine(c))
     }
+  } else {
+    const note =
+      row.run_metadata?.industry_verification_note ??
+      'Industry: no industry channels in this map.'
+    lines.push(note)
   }
 
   if (media.length) {

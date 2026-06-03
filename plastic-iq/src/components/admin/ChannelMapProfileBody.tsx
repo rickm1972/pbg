@@ -297,20 +297,25 @@ export const ChannelMapProfileBody = forwardRef<HTMLDivElement, Props>(
           <p className="mt-4 text-sm text-slate-500">No community channels in this map yet.</p>
         ) : null}
 
-        {industryChannels.length > 0 ? (
-          <section className="mt-10 border-t border-orange-200 pt-8">
-            <h2 className="text-lg font-semibold text-orange-950">Industry / counter-aligned</h2>
-            <p className="mt-1 text-sm text-orange-900/90">
-              Trade groups, manufacturer-aligned podcasts, and industry PR — not seeding targets.
-              Shown for awareness only.
-            </p>
+        <section className="mt-10 border-t border-orange-200 pt-8">
+          <h2 className="text-lg font-semibold text-orange-950">Industry / counter-aligned</h2>
+          <p className="mt-1 text-sm text-orange-900/90">
+            Trade groups, manufacturer-aligned podcasts, and industry PR — not seeding targets.
+            Shown for awareness only.
+          </p>
+          {industryChannels.length > 0 ? (
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {industryChannels.map((ch) => (
                 <ChannelCard key={ch.channel_id ?? ch.channel_name} channel={ch} />
               ))}
             </div>
-          </section>
-        ) : null}
+          ) : (
+            <p className="mt-4 rounded-xl border border-orange-200/80 bg-orange-50/80 px-4 py-3 text-sm text-orange-950">
+              {row.run_metadata?.industry_verification_note ??
+                'Industry: no industry channels in this map.'}
+            </p>
+          )}
+        </section>
 
         {mediaOutlets.length > 0 ? (
           <section className="mt-10 border-t border-slate-200 pt-8">

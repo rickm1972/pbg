@@ -41,7 +41,7 @@ async function main() {
     .from('scoring_inputs')
     .select('input_id, review_status')
     .eq('product_id', product.product_id)
-    .eq('review_status', 'submitted')
+    .eq('review_status', 'pending_review')
     .order('run_timestamp', { ascending: false })
     .limit(1)
     .maybeSingle()

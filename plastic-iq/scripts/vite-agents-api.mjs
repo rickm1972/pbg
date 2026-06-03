@@ -2,7 +2,11 @@
  * Vite dev middleware: product agents (1–4) + Persona agent from the admin UI (`npm run dev`).
  * Persona runs are async (202 + background job); product agents remain synchronous.
  */
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { loadEnv } from './lib/env.mjs'
+
+const scriptsDir = dirname(fileURLToPath(import.meta.url))
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -37,12 +41,23 @@ function corsHeaders(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Agent-Secret')
 }
 
+/**
+ * Dynamic import from scripts/ using absolute file URLs.
+ * Vite compiles this plugin under node_modules/.vite-temp — relative `./agent2/...` breaks there.
+ */
+function importFresh(relativeFromScripts, { dev }) {
+  const href = pathToFileURL(join(scriptsDir, relativeFromScripts)).href
+  if (!dev) return import(href)
+  return import(`${href}?t=${Date.now()}`)
+}
+
 export function agentsApiPlugin() {
   return {
     name: 'agents-api',
     configureServer(server) {
       const env = loadEnv()
       const secret = env.VITE_ADMIN_PASSWORD
+      const dev = server.config.command === 'serve'
 
       const syncViteDevBaseUrl = async () => {
         const url =
@@ -95,6 +110,17 @@ export function agentsApiPlugin() {
         }
 
         if (req.method === 'GET' && pathname.endsWith('/health')) {
+          if (pathname === '/api/agent2/health') {
+            const { PRODUCT_DESCRIPTION_GENERATOR_VERSION } = await importFresh(
+              'agent2/deterministic/product-description-generate.mjs',
+              { dev },
+            )
+            sendJson(res, 200, {
+              ok: true,
+              description_generator_version: PRODUCT_DESCRIPTION_GENERATOR_VERSION,
+            })
+            return
+          }
           sendJson(res, 200, { ok: true })
           return
         }
@@ -102,9 +128,12 @@ export function agentsApiPlugin() {
         const provided = req.headers['x-agent-secret']
         const needsSecret =
           pathname === '/api/agent1/dashboard' ||
+          pathname === '/api/agent1/pending-evidence' ||
           (req.method === 'POST' &&
             (pathname === '/api/persona/run' ||
               pathname === '/api/persona/export-pdf' ||
+              pathname === '/api/agent1/save-evidence-draft' ||
+              pathname === '/api/agent1/reset-for-retest' ||
               (isAgentApi && pathname.endsWith('/run'))))
         if (needsSecret) {
           if (!secret || provided !== secret) {
@@ -117,6 +146,23 @@ export function agentsApiPlugin() {
           const { fetchAgent1DashboardData } = await import('./agent1/dashboard-fetch.mjs')
           const dashboard = await fetchAgent1DashboardData()
           sendJson(res, 200, dashboard)
+          return
+        }
+
+        if (req.method === 'GET' && pathname === '/api/agent1/pending-evidence') {
+          const {
+            fetchPendingEvidenceRowsService,
+            fetchPendingEvidenceForProductService,
+          } = await import('./agent1/dashboard-fetch.mjs')
+          const q = new URL(req.url ?? '', 'http://localhost').searchParams
+          const productId = (q.get('product_id') ?? '').trim()
+          if (productId) {
+            const evidence = await fetchPendingEvidenceForProductService(productId)
+            sendJson(res, 200, { evidence })
+            return
+          }
+          const rows = await fetchPendingEvidenceRowsService()
+          sendJson(res, 200, { rows })
           return
         }
 
@@ -305,6 +351,58 @@ export function agentsApiPlugin() {
           return
         }
 
+        if (req.method === 'POST' && pathname === '/api/agent1/reset-for-retest') {
+          try {
+            const body = await readJsonBody(req)
+            if (!body.product_id) {
+              sendJson(res, 400, { error: 'product_id is required' })
+              return
+            }
+            const { createServiceClient } = await importFresh('agent1/supabase.mjs', { dev })
+            const { resetAgent1ForRetest } = await importFresh('agent1/reset-for-retest.mjs', {
+              dev,
+            })
+            const sb = createServiceClient()
+            const result = await resetAgent1ForRetest(sb, body.product_id)
+            sendJson(res, 200, { ok: true, result })
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            console.error('[agent1-api] /reset-for-retest:', message)
+            sendJson(res, 500, { error: message })
+          }
+          return
+        }
+
+        if (req.method === 'POST' && pathname === '/api/agent1/save-evidence-draft') {
+          try {
+            const body = await readJsonBody(req)
+            if (!body.evidence_id) {
+              sendJson(res, 400, { error: 'evidence_id is required' })
+              return
+            }
+            const { saveEvidenceDraft } = await importFresh('agent1/save-evidence-draft.mjs', {
+              dev,
+            })
+            const result = await saveEvidenceDraft({
+              evidence_id: body.evidence_id,
+              structured_evidence: body.structured_evidence,
+              field_edit_audit: body.field_edit_audit,
+              edited_by: body.edited_by ?? null,
+            })
+            sendJson(res, 200, {
+              ok: true,
+              evidence: result.evidence,
+              field_provenance_keys: result.field_provenance_keys,
+              facts_count: result.facts_count,
+            })
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            console.error('[agent1-api] /save-evidence-draft:', message)
+            sendJson(res, 500, { error: message })
+          }
+          return
+        }
+
         if (req.method !== 'POST' || !pathname.endsWith('/run')) {
           sendJson(res, 404, { error: 'Not found' })
           return
@@ -318,7 +416,15 @@ export function agentsApiPlugin() {
           }
 
           if (pathname === '/api/agent1/run') {
-            const { runAgent1, formatPacketSummary } = await import('./agent1/runner.mjs')
+            // Bust transitive imports (execute-required-retrieval.mjs) — importFresh on runner.mjs alone is not enough.
+            process.env.AGENT1_RELOAD_MODULES = '1'
+            await importFresh('agent1/required-check-retrieval/task-runners.mjs', { dev })
+            await importFresh('agent1/required-check-retrieval/execute-required-retrieval.mjs', {
+              dev,
+            })
+            const { runAgent1, formatPacketSummary } = await importFresh('agent1/runner.mjs', {
+              dev,
+            })
             const result = await runAgent1({ productId: body.product_id })
             sendJson(res, result.ok ? 200 : 422, {
               ok: result.ok,
@@ -333,7 +439,10 @@ export function agentsApiPlugin() {
           }
 
           if (pathname === '/api/agent2/run') {
-            const { runAgent2, formatNormalizationSummary } = await import('./agent2/runner.mjs')
+            const { runAgent2, formatNormalizationSummary } = await importFresh(
+              'agent2/runner.mjs',
+              { dev },
+            )
             const result = await runAgent2({ productId: body.product_id })
             if (!result.ok) {
               sendJson(res, 422, {
@@ -343,6 +452,8 @@ export function agentsApiPlugin() {
               })
               return
             }
+            const genVersion =
+              result.inputs?.normalization_metadata?.description_generator_version ?? null
             sendJson(res, 200, {
               ok: true,
               summary: formatNormalizationSummary(result),
@@ -350,13 +461,19 @@ export function agentsApiPlugin() {
               evidence_id: result.evidence.evidence_id,
               input_id: result.scoringInput.input_id,
               human_review_required: result.inputs.human_review_required,
+              description_generator_version: genVersion,
+              product_description_preview: String(
+                result.inputs?.product_description ?? '',
+              ).slice(0, 160),
               inputs: result.inputs,
             })
             return
           }
 
           if (pathname === '/api/agent3/run') {
-            const { runAgent3, formatScoringSummary } = await import('./agent3/runner.mjs')
+            const { runAgent3, formatScoringSummary } = await importFresh('agent3/runner.mjs', {
+              dev,
+            })
             const result = await runAgent3({ productId: body.product_id })
             if (!result.ok) {
               sendJson(res, 422, {
@@ -378,7 +495,9 @@ export function agentsApiPlugin() {
           }
 
           if (pathname === '/api/agent4/run') {
-            const { runAgent4, formatQaSummary } = await import('./agent4/runner.mjs')
+            const { runAgent4, formatQaSummary } = await importFresh('agent4/runner.mjs', {
+              dev,
+            })
             const result = await runAgent4({
               productId: body.product_id,
               scoreId: body.score_id,

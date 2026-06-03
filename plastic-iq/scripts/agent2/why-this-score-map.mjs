@@ -5,6 +5,7 @@
 
 import { isPacRelevant, resolveCertEntry } from '../../src/shared/certification-taxonomy.mjs'
 import { isUnknownFoodContactCoatingMaterial } from './deterministic/material-taxonomy.mjs'
+import { sortComponentsByHazardDesc } from './why-this-score-component-sort.mjs'
 import { whyThisScoreLabelForComponent } from './why-this-score-labels.mjs'
 import { finalizeOptions, NONE, VOCABULARY } from './why-this-score-vocabulary.mjs'
 import { factValue } from './deterministic/evidence-facts.mjs'
@@ -14,7 +15,7 @@ const SECONDARY_ROLES = new Set(['handle', 'lid', 'rivet', 'gasket', 'packaging'
 
 function labelsFromComponents(components, field) {
   const picked = []
-  for (const c of components ?? []) {
+  for (const c of sortComponentsByHazardDesc(components)) {
     const role = c.component_role ?? c.role
     const label = whyThisScoreLabelForComponent(c.material_id, role, field)
     if (label && !picked.includes(label)) picked.push(label)
@@ -42,21 +43,20 @@ function mapSecondaryMaterials(_evidence, inputs) {
 }
 
 function mapCoatingsFinishes(_evidence, inputs) {
-  const picked = []
+  const coatingComponents = []
   for (const c of inputs?.components ?? []) {
     const role = c.component_role ?? c.role
     if (role === 'coating') {
-      const label = whyThisScoreLabelForComponent(c.material_id, role, 'coating')
-      if (label && !picked.includes(label)) picked.push(label)
+      coatingComponents.push(c)
     } else if (
       role === 'primary_food_contact' &&
       (isUnknownFoodContactCoatingMaterial(c.material_id) ||
         /^ptfe/i.test(String(c.material_id ?? '')))
     ) {
-      const label = whyThisScoreLabelForComponent(c.material_id, role, 'coating')
-      if (label && !picked.includes(label)) picked.push(label)
+      coatingComponents.push(c)
     }
   }
+  const picked = labelsFromComponents(coatingComponents, 'coating')
   if (!picked.length) {
     return finalizeOptions([NONE], 'coatings_finishes_options')
   }

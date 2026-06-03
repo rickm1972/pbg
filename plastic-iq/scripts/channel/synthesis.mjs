@@ -14,7 +14,7 @@ import {
 } from './schema.mjs'
 import { extractSynthesisPayload } from './sources-from-synthesis.mjs'
 import { finalizeChannelMap, partitionChannelGroups } from './normalize-map.mjs'
-import { filterVerifiedChannels, scrubChannelCandidate } from './verify-channel.mjs'
+import { filterVerifiedChannels } from './verify-channel.mjs'
 
 const SYNTHESIS_SYSTEM = `You are a US channel discovery analyst for PlasticBegone (non-toxic household / plastic exposure topics).
 
@@ -265,23 +265,32 @@ export async function synthesizeChannelMap({ topic, catalog, retrievalAngles, lo
   )
 
   const rawIndustry = extracted.industry_channels ?? []
-  const scrubbedCommunities = [...rawCommunities, ...rawIndustry].map(scrubChannelCandidate)
-  const scrubbedMedia = (rawMedia ?? []).map(scrubChannelCandidate)
 
   log('\n[channel] Verifying channel URLs and evidence (fetch + Perplexity)…')
-  const verifiedCommunities = await filterVerifiedChannels(scrubbedCommunities, {
+  const outreachResult = await filterVerifiedChannels(rawCommunities, {
     topic,
     log,
     label: 'community',
   })
-  const verifiedMedia = await filterVerifiedChannels(scrubbedMedia, {
+  const industryResult = await filterVerifiedChannels(rawIndustry, {
+    topic,
+    log,
+    label: 'industry',
+    industryAudit: true,
+  })
+  const mediaResult = await filterVerifiedChannels(rawMedia ?? [], {
     topic,
     log,
     label: 'media',
   })
 
+  const verifiedOutreach = outreachResult.channels
+  const verifiedIndustry = industryResult.channels
+  const verifiedMedia = mediaResult.channels
+  const industry_verification_note = industryResult.industryVerificationNote
+
   const { communities, media_outlets, industry_channels } = finalizeChannelMap({
-    communities: verifiedCommunities,
+    communities: [...verifiedOutreach, ...verifiedIndustry],
     media_outlets: verifiedMedia,
     log,
   })
@@ -294,6 +303,7 @@ export async function synthesizeChannelMap({ topic, catalog, retrievalAngles, lo
     topic_description: extracted.topic_description,
     facebook_coverage_note: extracted.facebook_coverage_note,
     type_coverage_notes: extracted.type_coverage_notes,
+    industry_verification_note,
     channels: communities,
     media_outlets,
     industry_channels,

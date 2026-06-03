@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatSupabaseUnknownError } from '../../lib/supabaseClient'
 import {
   approveNormalization,
-  AGENT2_VALIDATION_RERUN_PRODUCT_IDS,
   canRerunAgent2FromReviewCard,
-  isAgent2ValidationRerunProduct,
   showOnAgent2ReviewTab,
   showOnAgent2RunTab,
+  isAgent2FailedDraftStuck,
   fetchAgent2Dashboard,
   hasNormalizationRun,
   humanizeAgentStatus,
@@ -14,25 +13,38 @@ import {
   rejectNormalization,
   runAgent2Batch,
   runAgent2Remote,
+  checkAgent2ServerHealth,
+  EXPECTED_AGENT2_DESCRIPTION_GENERATOR_VERSION,
+  isAgent2DescriptionGeneratorCurrent,
+  isCookwarePipelineProduct,
 } from '../../lib/agent2Review'
 import { AGENT_STATUSES } from '../../types/agent'
-import type {
-  Agent2DashboardData,
-  NormalizationComponent,
-  NormalizationLayer4a,
-  ProductPipelineRow,
-  ScoringInputRow,
-} from '../../types/agent'
+import type { Agent2DashboardData, ProductPipelineRow, ScoringInputRow } from '../../types/agent'
+import { Gate2NormalizationReviewPanel } from './Gate2NormalizationReviewPanel'
 import { WhyThisScore } from '../WhyThisScore'
-import type { WhyThisScoreFields } from '../../lib/whyThisScoreApi'
+import {
+  Gate2Section,
+  NormalizationComponentBlock,
+  ProductDescriptionSection,
+  Layer4aSection,
+  whyFieldsFromScoringInput,
+} from './gate2NormalizationDisplay'
 
 type Props = {
   authUserEmail: string | null
+  initialProductId?: string | null
+  onNavigateToGate?: (tab: 'agent1' | 'agent2' | 'agent3', productId: string) => void
   onNotice: (message: string | null) => void
   onError: (message: string | null) => void
 }
 
-export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Props) {
+export function Agent2ReviewDashboard({
+  authUserEmail,
+  initialProductId,
+  onNavigateToGate,
+  onNotice,
+  onError,
+}: Props) {
   const [data, setData] = useState<Agent2DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -51,6 +63,15 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     () => new Set(),
   )
   const initialTabSet = useRef(false)
+  const [apiHealth, setApiHealth] = useState<{
+    ok: boolean
+    description_generator_version?: string | null
+  } | null>(null)
+
+  const loadApiHealth = useCallback(async () => {
+    const health = await checkAgent2ServerHealth()
+    setApiHealth(health)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -67,27 +88,34 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   useEffect(() => {
     load()
-  }, [load])
+    void loadApiHealth()
+  }, [load, loadApiHealth])
 
   const scoringInputByProductId = useMemo(() => {
     const map = new Map<string, ScoringInputRow>()
     if (!data) return map
-    for (const item of data.pendingReview) {
-      map.set(item.product.product_id, item.scoringInput)
-    }
-    for (const item of data.testingQueue) {
-      if (item.scoringInput) {
-        map.set(item.product.product_id, item.scoringInput)
-      }
+    for (const [productId, row] of Object.entries(data.latestScoringByProductId ?? {})) {
+      map.set(productId, row)
     }
     return map
   }, [data])
 
+  const latestScoringFor = useCallback(
+    (productId: string) => scoringInputByProductId.get(productId),
+    [scoringInputByProductId],
+  )
+
   const reviewQueue = useMemo(() => {
     if (!data) return []
-    return data.pendingReview
-      .filter((x) => showOnAgent2ReviewTab(x.product, readyForReviewAfterRunIds))
-      .map((x) => x.product)
+    return data.products
+      .filter((p) =>
+        showOnAgent2ReviewTab(
+          p,
+          readyForReviewAfterRunIds,
+          data.latestScoringByProductId[p.product_id],
+        ),
+      )
+      .sort((a, b) => a.product_name.localeCompare(b.product_name))
   }, [data, readyForReviewAfterRunIds])
 
   const testingQueueProducts = useMemo(() => {
@@ -98,14 +126,9 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   const runnableProducts = useMemo(() => {
     if (!data) return []
     return data.products
-      .filter((p) => showOnAgent2RunTab(p, readyForReviewAfterRunIds))
-      .sort((a, b) => {
-        const aVal = isAgent2ValidationRerunProduct(a.product_id) ? 0 : 1
-        const bVal = isAgent2ValidationRerunProduct(b.product_id) ? 0 : 1
-        if (aVal !== bVal) return aVal - bVal
-        return a.product_name.localeCompare(b.product_name)
-      })
-  }, [data])
+      .filter((p) => showOnAgent2RunTab(p, readyForReviewAfterRunIds, latestScoringFor(p.product_id)))
+      .sort((a, b) => a.product_name.localeCompare(b.product_name))
+  }, [data, readyForReviewAfterRunIds])
 
   const listProducts = useMemo(() => {
     if (!data) return []
@@ -129,8 +152,18 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   const selectedItem = useMemo(() => {
     if (!data || !selectedId) return null
-    return data.pendingReview.find((x) => x.product.product_id === selectedId) ?? null
-  }, [data, selectedId])
+    const fromPending = data.pendingReview.find((x) => x.product.product_id === selectedId)
+    if (fromPending) return fromPending
+    const product = data.products.find((p) => p.product_id === selectedId)
+    const scoringInput = data.latestScoringByProductId[selectedId]
+    if (
+      product &&
+      showOnAgent2ReviewTab(product, readyForReviewAfterRunIds, scoringInput)
+    ) {
+      return { product, scoringInput }
+    }
+    return null
+  }, [data, selectedId, readyForReviewAfterRunIds])
 
   const selectedTestingItem = useMemo(() => {
     if (!data || !selectedId) return null
@@ -138,6 +171,10 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
   }, [data, selectedId])
 
   const selectedScoringInput = selectedId ? scoringInputByProductId.get(selectedId) : undefined
+
+  useEffect(() => {
+    if (initialProductId) setSelectedId(initialProductId)
+  }, [initialProductId])
 
   useEffect(() => {
     if (!data || selectedId) return
@@ -156,6 +193,29 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       setListFilter('run')
     }
   }, [data, runnableProducts.length, reviewQueue.length])
+
+  /** Don’t stay on Awaiting review when the queue is empty (e.g. after a pipeline DB reset). */
+  useEffect(() => {
+    if (!data) return
+    if (listFilter === 'review' && reviewQueue.length === 0 && runnableProducts.length > 0) {
+      setListFilter('run')
+      setSelectedId(null)
+    }
+  }, [data, listFilter, reviewQueue.length, runnableProducts.length])
+
+  useEffect(() => {
+    if (!data) return
+    setReadyForReviewAfterRunIds((prev) => {
+      if (prev.size === 0) return prev
+      const next = new Set<string>()
+      for (const id of prev) {
+        const product = data.products.find((p) => p.product_id === id)
+        const scoring = data.latestScoringByProductId[id]
+        if (product && showOnAgent2ReviewTab(product, prev, scoring)) next.add(id)
+      }
+      return next.size === prev.size ? prev : next
+    })
+  }, [data])
 
   const statusSummary = useMemo(() => {
     if (!data) return []
@@ -225,6 +285,7 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
           : outcome.message ?? 'Agent 2 finished with issues.',
       )
       await load()
+      void loadApiHealth()
       if (outcome.ok) {
         setReadyForReviewAfterRunIds((prev) => new Set(prev).add(productId))
         setListFilter('review')
@@ -253,13 +314,18 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     setSelectedRunIds(new Set(runnableProducts.map((p) => p.product_id)))
   }
 
-  function selectValidationBatch() {
-    const ids = AGENT2_VALIDATION_RERUN_PRODUCT_IDS.filter((id) =>
-      runnableProducts.some((p) => p.product_id === id),
-    )
+  function selectCookwareBatch() {
+    const ids = runnableProducts
+      .filter((p) => isCookwarePipelineProduct(p))
+      .map((p) => p.product_id)
     setSelectedRunIds(new Set(ids))
     if (listFilter !== 'run') switchListFilter('run')
   }
+
+  const cookwareRunnableCount = useMemo(
+    () => runnableProducts.filter((p) => isCookwarePipelineProduct(p)).length,
+    [runnableProducts],
+  )
 
   function clearRunSelection() {
     setSelectedRunIds(new Set())
@@ -295,10 +361,21 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       })
 
       const succeeded = results.filter((r) => r.ok).length
-      const failed = results.length - succeeded
+      const failed = results.filter((r) => !r.ok)
       onNotice(
-        `Batch complete: ${succeeded} submitted for review, ${failed} failed or skipped.`,
+        `Batch complete: ${succeeded} submitted for review, ${failed.length} failed or skipped.`,
       )
+      if (failed.length > 0) {
+        const detail = failed
+          .slice(0, 3)
+          .map((r) => `${r.productName}: ${r.message ?? 'failed'}`)
+          .join(' · ')
+        onError(
+          failed.length === results.length
+            ? `Agent 2 did not run — nothing saved. ${detail}${failed.length > 3 ? ' …' : ''} Check dev server /api/agent2 and restart Vite on port 5173.`
+            : `Failed: ${detail}${failed.length > 3 ? ` (+${failed.length - 3} more)` : ''}`,
+        )
+      }
       setSelectedRunIds(new Set())
       await load()
       const okIds = results.filter((r) => r.ok).map((r) => r.productId)
@@ -360,6 +437,28 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
 
   return (
     <div className="mt-6 space-y-6">
+
+      {apiHealth && !isAgent2DescriptionGeneratorCurrent(apiHealth.description_generator_version) ? (
+        <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-950">
+          <p className="font-semibold">Agent 2 API is not running the current description generator</p>
+          <p className="mt-1">
+            Health check reports{' '}
+            <code className="rounded bg-red-100 px-1">
+              {apiHealth.description_generator_version ?? 'missing'}
+            </code>
+            ; required{' '}
+            <code className="rounded bg-red-100 px-1">
+              {EXPECTED_AGENT2_DESCRIPTION_GENERATOR_VERSION}
+            </code>
+            . You are likely on an old <code className="rounded bg-red-100 px-1">localhost:5173</code>{' '}
+            tab while a newer dev server is on another port. Use only{' '}
+            <a className="font-semibold underline" href="http://localhost:5173/">
+              http://localhost:5173/
+            </a>{' '}
+            after Cursor restarts dev, then re-run Agent 2.
+          </p>
+        </div>
+      ) : null}
 
       {!authUserEmail ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -465,27 +564,26 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    Evidence must be approved first. Lodge / Branch Basics / HexClad awaiting review
-                    with old output stay on <strong>Run</strong> until you re-run; after success they
-                    move to <strong>Awaiting review</strong> only. Use{' '}
-                    <strong>Select validation (3)</strong>.
+                    Only <strong>evidence approved</strong> (or <strong>normalization rejected</strong>)
+                    . After a successful run, products move to <strong>Awaiting review</strong>; after
+                    approval they leave Agent 2 for Agent 3.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       disabled={batchBusy || runnableProducts.length === 0}
                       onClick={selectAllRunnable}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
                     >
                       Select all
                     </button>
                     <button
                       type="button"
-                      disabled={batchBusy}
-                      onClick={selectValidationBatch}
-                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                      disabled={batchBusy || cookwareRunnableCount === 0}
+                      onClick={selectCookwareBatch}
+                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
                     >
-                      Select validation (3)
+                      Select Cookware ({cookwareRunnableCount})
                     </button>
                     <button
                       type="button"
@@ -526,7 +624,9 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                 listProducts.map((p) => {
                   const isSelected = p.product_id === selectedId
                   const scoringInput = scoringInputByProductId.get(p.product_id)
-                  const runnable = showOnAgent2RunTab(p, readyForReviewAfterRunIds)
+                  const latestScoring = latestScoringFor(p.product_id)
+                  const failedDraft = isAgent2FailedDraftStuck(p.agent_status, latestScoring)
+                  const runnable = showOnAgent2RunTab(p, readyForReviewAfterRunIds, latestScoring)
                   const checked = selectedRunIds.has(p.product_id)
                   return (
                     <li key={p.product_id}>
@@ -563,13 +663,15 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                               <span className="text-[10px] font-semibold text-amber-800">
                                 Testing queue
                               </span>
-                            ) : scoringInput && p.agent_status === 'normalization_awaiting_review' ? (
+                            ) : failedDraft ? (
+                              <span className="text-[10px] font-semibold text-red-800">
+                                Agent 2 failed — re-run
+                              </span>
+                            ) : scoringInput &&
+                              p.agent_status === 'normalization_awaiting_review' &&
+                              scoringInput.review_status === 'pending_review' ? (
                               <span className="text-[10px] font-semibold text-violet-700">
                                 Ready to review
-                              </span>
-                            ) : isAgent2ValidationRerunProduct(p.product_id) && runnable ? (
-                              <span className="text-[10px] font-semibold text-emerald-800">
-                                Session 2 validation · ready to run
                               </span>
                             ) : runnable ? (
                               <span className="text-[10px] font-semibold text-emerald-800">
@@ -607,7 +709,12 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
           {listFilter === 'run' ? (
             <Agent2RunTabPanel
               selectedProduct={
-                selectedProduct && showOnAgent2RunTab(selectedProduct, readyForReviewAfterRunIds)
+                selectedProduct &&
+                showOnAgent2RunTab(
+                  selectedProduct,
+                  readyForReviewAfterRunIds,
+                  latestScoringFor(selectedProduct.product_id),
+                )
                   ? selectedProduct
                   : null
               }
@@ -623,7 +730,7 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
           ) : selectedTestingItem ? (
             <TestingQueueDetailPanel item={selectedTestingItem} />
           ) : selectedItem ? (
-            <NormalizationReviewCard
+            <Gate2NormalizationReviewPanel
               product={selectedItem.product}
               scoringInput={selectedItem.scoringInput}
               busy={busyId === selectedItem.product.product_id}
@@ -656,6 +763,12 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   ? () => handleRunAgent2(selectedItem.product.product_id)
                   : undefined
               }
+              onNavigateToGate1={
+                onNavigateToGate
+                  ? (productId) => onNavigateToGate('agent1', productId)
+                  : undefined
+              }
+              onRefresh={() => void load()}
             />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -670,8 +783,13 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               <p className="mt-4 text-sm text-slate-700">
                 {selectedProduct.agent_status === 'in_testing_queue'
                   ? 'This product is in the testing queue. Open the Testing queue tab to see tier-change details and normalization notes.'
-                  : selectedProduct.agent_status === 'normalization_awaiting_review'
-                  ? 'Normalization is awaiting review but could not be loaded. Sign in with Supabase Auth and refresh.'
+                  : isAgent2FailedDraftStuck(
+                        selectedProduct.agent_status,
+                        latestScoringFor(selectedProduct.product_id),
+                      )
+                    ? 'Agent 2 failed (description or taxonomy). Complete Agent 1 evidence, then re-run from the Run tab.'
+                    : selectedProduct.agent_status === 'normalization_awaiting_review'
+                      ? 'Normalization is awaiting review but could not be loaded. Sign in with Supabase Auth and refresh.'
                   : selectedProduct.agent_status === 'normalization_approved'
                     ? 'Normalization approved. Agent 3 scoring is next.'
                     : selectedProduct.agent_status === 'evidence_awaiting_review' ||
@@ -681,7 +799,11 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                         ? 'Submitted normalization could not be loaded. Refresh the page.'
                         : 'No submitted normalization packet for this product yet.'}
               </p>
-              {showOnAgent2RunTab(selectedProduct, readyForReviewAfterRunIds) ? (
+              {showOnAgent2RunTab(
+                selectedProduct,
+                readyForReviewAfterRunIds,
+                latestScoringFor(selectedProduct.product_id),
+              ) ? (
                 <button
                   type="button"
                   disabled={busyId === selectedProduct.product_id}
@@ -697,25 +819,11 @@ export function Agent2ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
       </div>
 
       <p className="text-xs text-slate-500">
-        Re-run validation products from <strong>Run Agent 2</strong> (not Awaiting review) until a
-        successful run moves them to <strong>Awaiting review</strong>. Tier-change holds are under{' '}
-        <strong>Testing queue</strong>.
+        Awaiting review: <strong>pending_review</strong> normalization only. Failed Agent 2 drafts return to{' '}
+        <strong>Run</strong>. Tier-change holds: <strong>Testing queue</strong>.
       </p>
     </div>
   )
-}
-
-function whyFieldsFromScoringInput(row: ScoringInputRow): WhyThisScoreFields | null {
-  const primary = row.primary_material_options ?? []
-  if (!Array.isArray(primary) || primary.length === 0) return null
-  return {
-    primary_material_options: primary,
-    secondary_materials_options: row.secondary_materials_options ?? ['None'],
-    coatings_finishes_options: row.coatings_finishes_options ?? ['None'],
-    use_conditions_options: row.use_conditions_options ?? ['None'],
-    disclosure_quality_options: row.disclosure_quality_options ?? ['None'],
-    certifications_options: row.certifications_options ?? ['Third-party verification absent'],
-  }
 }
 
 function TestingQueueDetailPanel({
@@ -786,18 +894,23 @@ function TestingQueueDetailPanel({
             </p>
           ) : null}
 
+          {inputs ? <ProductDescriptionSection inputs={inputs} /> : null}
+
           {inputs?.components?.length ? (
-            <Section title={`Components (${inputs.components.length})`}>
+            <Gate2Section title={`Components (${inputs.components.length})`}>
               <div className="space-y-4">
                 {inputs.components.map((component, i) => (
-                  <ComponentBlock key={`${component.component_name}-${i}`} component={component} />
+                  <NormalizationComponentBlock
+                    key={`${component.component_name}-${i}`}
+                    component={component}
+                  />
                 ))}
               </div>
-            </Section>
+            </Gate2Section>
           ) : null}
 
           {inputs?.layer_4b ? (
-            <Section title="Transparency (Layer 4B)">
+            <Gate2Section title="Transparency (Layer 4B)">
               <p className="text-sm font-semibold text-ink-900">
                 {inputs.layer_4b.transparency_badge ?? '—'}
                 {inputs.layer_4b.confidence_interval != null
@@ -807,21 +920,24 @@ function TestingQueueDetailPanel({
               {inputs.layer_4b.badge_justification ? (
                 <p className="mt-2 text-sm text-slate-700">{inputs.layer_4b.badge_justification}</p>
               ) : null}
-            </Section>
+            </Gate2Section>
           ) : null}
 
-          {scoringInput && whyFieldsFromScoringInput(scoringInput) ? (
-            <WhyThisScore fields={whyFieldsFromScoringInput(scoringInput)!} className="border-0 p-0 shadow-none" />
+          {scoringInput && whyFieldsFromScoringInput(scoringInput, inputs?.components) ? (
+            <WhyThisScore
+              fields={whyFieldsFromScoringInput(scoringInput, inputs?.components)!}
+              className="border-0 p-0 shadow-none"
+            />
           ) : null}
 
           {inputs?.layer_4a ? <Layer4aSection layer4a={inputs.layer_4a} /> : null}
 
           {inputs?.normalization_notes ? (
-            <Section title="Normalization notes">
+            <Gate2Section title="Normalization notes">
               <p className="text-sm text-slate-700 whitespace-pre-wrap">
                 {inputs.normalization_notes}
               </p>
-            </Section>
+            </Gate2Section>
           ) : null}
         </>
       )}
@@ -914,293 +1030,6 @@ function Agent2RunTabPanel({
       </div>
     </div>
   )
-}
-
-function NormalizationReviewCard({
-  product,
-  scoringInput,
-  busy,
-  showRejectNotes,
-  rejectNotes,
-  onRejectNotesChange,
-  onApprove,
-  onRejectOpen,
-  onRejectCancel,
-  onRejectConfirm,
-  onRerun,
-}: {
-  product: ProductPipelineRow
-  scoringInput: ScoringInputRow
-  busy: boolean
-  showRejectNotes: boolean
-  rejectNotes: string
-  onRejectNotesChange: (v: string) => void
-  onApprove: () => void
-  onRejectOpen: () => void
-  onRejectCancel: () => void
-  onRejectConfirm: () => void
-  onRerun?: () => void
-}) {
-  const inputs = scoringInput.inputs
-
-  return (
-    <article className="max-h-[75dvh] overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-card md:p-6">
-      <header className="border-b border-slate-100 pb-4">
-        <h3 className="text-lg font-semibold text-ink-900">{product.product_name}</h3>
-        <dl className="mt-2 grid gap-1 text-sm text-slate-700 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Brand</dt>
-            <dd>{product.brand ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Category
-            </dt>
-            <dd>{product.category ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Subcategory
-            </dt>
-            <dd>{product.subcategory ?? '—'}</dd>
-          </div>
-        </dl>
-        <p className="mt-2 text-xs text-slate-500">
-          Algorithm {scoringInput.algorithm_version} · run{' '}
-          {new Date(scoringInput.run_timestamp).toLocaleString()}
-        </p>
-        {inputs.product_category_default ? (
-          <p className="mt-2 text-sm text-slate-700">
-            <span className="font-semibold">Category default:</span>{' '}
-            {inputs.product_category_default}
-          </p>
-        ) : null}
-        {scoringInput.human_review_required ? (
-          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            <span className="font-semibold">Human review required:</span>{' '}
-            {scoringInput.human_review_reason ?? inputs.human_review_reason ?? 'See notes below.'}
-          </p>
-        ) : null}
-      </header>
-
-      <Section title={`Components (${inputs.components?.length ?? 0})`}>
-        <div className="space-y-4">
-          {(inputs.components ?? []).map((component, i) => (
-            <ComponentBlock key={`${component.component_name}-${i}`} component={component} />
-          ))}
-        </div>
-      </Section>
-
-      {inputs.layer_4b ? (
-        <Section title="Transparency (Layer 4B)">
-          <p className="text-sm font-semibold text-ink-900">
-            {inputs.layer_4b.transparency_badge ?? '—'}
-            {inputs.layer_4b.confidence_interval != null
-              ? ` · ±${inputs.layer_4b.confidence_interval}`
-              : ''}
-          </p>
-          {inputs.layer_4b.badge_justification ? (
-            <p className="mt-2 text-sm text-slate-700">{inputs.layer_4b.badge_justification}</p>
-          ) : null}
-        </Section>
-      ) : null}
-
-      {whyFieldsFromScoringInput(scoringInput) ? (
-        <Section title="Why this score (structured)">
-          <WhyThisScore fields={whyFieldsFromScoringInput(scoringInput)!} className="mt-2 border-0 p-0 shadow-none" />
-        </Section>
-      ) : null}
-
-      {inputs.layer_4a ? <Layer4aSection layer4a={inputs.layer_4a} /> : null}
-
-      {inputs.normalization_notes ? (
-        <Section title="Normalization notes">
-          <p className="text-sm text-slate-700 whitespace-pre-wrap">{inputs.normalization_notes}</p>
-        </Section>
-      ) : null}
-
-      {showRejectNotes ? (
-        <div
-          id="agent2-reject-panel"
-          className="mt-6 rounded-xl border-2 border-red-300 bg-red-50 p-4 shadow-sm"
-        >
-          <p className="text-sm font-semibold text-red-900">Reject normalization</p>
-          <p className="mt-1 text-xs text-red-800/90">
-            Notes are saved on the scoring_inputs row for Agent 2 on the next run.
-          </p>
-          <label className="mt-3 block text-xs font-semibold text-red-900">Rejection notes</label>
-          <textarea
-            value={rejectNotes}
-            onChange={(e) => onRejectNotesChange(e.target.value)}
-            rows={6}
-            placeholder="Why are these normalization inputs being rejected? Include corrections for re-normalization."
-            className="mt-2 w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm"
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onRejectConfirm}
-              className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
-            >
-              Confirm reject
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onRejectCancel}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <footer className="sticky bottom-0 mt-6 flex flex-wrap gap-2 border-t border-slate-100 bg-white pt-4 pb-1">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onApprove}
-          className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
-        >
-          Approve
-        </button>
-        <button
-          type="button"
-          disabled={busy || showRejectNotes}
-          onClick={onRejectOpen}
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-60"
-        >
-          {showRejectNotes ? 'Add notes above…' : 'Reject'}
-        </button>
-        {onRerun ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onRerun}
-            className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-60"
-          >
-            Re-run Agent 2
-          </button>
-        ) : null}
-      </footer>
-    </article>
-  )
-}
-
-function ComponentBlock({ component }: { component: NormalizationComponent }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-      <h4 className="font-semibold text-ink-900">{component.component_name}</h4>
-      <p className="mt-1 text-sm text-slate-700">{component.material}</p>
-
-      <dl className="mt-3 grid gap-2 sm:grid-cols-3">
-        <Metric label="Material Hazard" value={component.material_hazard} />
-        <Metric label="Migration Potential" value={component.adjusted_migration_potential} />
-        <Metric label="Contact Intimacy" value={component.contact_intimacy} />
-      </dl>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Severity ({component.exposure_severity})
-          </p>
-          <p className="mt-1 text-sm text-slate-700">{component.severity_justification}</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Duration ({component.exposure_duration})
-          </p>
-          <p className="mt-1 text-sm text-slate-700">{component.duration_justification}</p>
-        </div>
-      </div>
-
-      {component.inert_protection_applies ? (
-        <p className="mt-3 inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900">
-          Inert protection applies
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-lg font-semibold tabular-nums text-ink-900">{value}</dd>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-6">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
-      <div className="mt-2">{children}</div>
-    </section>
-  )
-}
-
-function Layer4aSection({ layer4a }: { layer4a: NormalizationLayer4a }) {
-  const positives = formatLayer4aAdjustments(layer4a.positive_adjustments)
-  const negatives = formatLayer4aAdjustments(layer4a.negative_adjustments)
-
-  return (
-    <Section title="Layer 4A adjustments">
-      {positives.length > 0 ? (
-        <div className="mt-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Positive</p>
-          <ul className="mt-1 space-y-1 text-sm text-slate-700">
-            {positives.map((row, i) => (
-              <li key={`pos-${i}`}>
-                {row.label}
-                {row.value != null ? (
-                  <span className="ml-1 font-semibold tabular-nums text-emerald-800">
-                    {row.value > 0 ? `+${row.value}` : row.value}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {negatives.length > 0 ? (
-        <div className={positives.length > 0 ? 'mt-3' : 'mt-1'}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-red-800">Negative</p>
-          <ul className="mt-1 space-y-1 text-sm text-slate-700">
-            {negatives.map((row, i) => (
-              <li key={`neg-${i}`}>
-                {row.label}
-                {row.value != null ? (
-                  <span className="ml-1 font-semibold tabular-nums text-red-800">{row.value}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {positives.length === 0 && negatives.length === 0 ? (
-        <p className="text-sm text-slate-600">No itemized adjustments listed.</p>
-      ) : null}
-      <p className="mt-3 text-sm text-slate-700">
-        Net adjustment: <strong className="tabular-nums">{layer4a.net_adjustment ?? 0}</strong>
-      </p>
-    </Section>
-  )
-}
-
-function formatLayer4aAdjustments(
-  items?: NormalizationLayer4a['positive_adjustments'],
-): Array<{ label: string; value: number | null }> {
-  if (!items?.length) return []
-  return items.map((item) => {
-    if (typeof item === 'string') return { label: item, value: null }
-    const label = item.reason ?? item.label ?? 'Adjustment'
-    const value = item.value ?? item.points ?? null
-    return { label, value: value != null ? value : null }
-  })
 }
 
 function StatusChip({

@@ -1,4 +1,27 @@
 import { supabase } from './supabaseClient'
+import {
+  assembleAgent1Dashboard,
+  mergeEvidenceRows,
+} from './agent1DashboardAssemble'
+import {
+  AGENT1_TFAL_PRODUCT_ID,
+  isAgent1HeldFromAwaitingReviewTab,
+} from './agent1RunTabOnly'
+import {
+  canRerunAgent1FromReviewSequential,
+  canRunAgent1FromPipelineStart,
+  onlyActivePipelineProducts,
+  PIPELINE_CATALOG_EXPECTED_COUNT,
+} from './pipelineCatalog'
+
+export {
+  AGENT1_TFAL_PRODUCT_ID,
+  canAgent1RetestReset,
+  isAgent1HeldFromAwaitingReviewTab,
+  showAgent1RetestResetButton,
+} from './agent1RunTabOnly'
+
+export { PIPELINE_CATALOG_EXPECTED_COUNT }
 import type {
   Agent1DashboardData,
   AgentMetadata,
@@ -18,88 +41,119 @@ export function agent1Secret(): string | undefined {
   return import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
 }
 
+/** Dev API: pending_review rows via service role (when browser Supabase cannot read product_evidence). */
+export async function fetchPendingEvidenceRowsViaApi(): Promise<ProductEvidence[]> {
+  const secret = agent1Secret()
+  if (!secret) return []
+
+  const res = await fetch(`${agent1ApiBase()}/pending-evidence`, {
+    headers: { 'X-Agent-Secret': secret },
+  })
+  const body = (await res.json().catch(() => ({}))) as {
+    rows?: ProductEvidence[]
+    error?: string
+  }
+  if (!res.ok) return []
+  return body.rows ?? []
+}
+
+/** Latest pending_review bundle for one product (dev API → service role). */
+export async function fetchPendingEvidenceForProductViaApi(
+  productId: string,
+): Promise<ProductEvidence | null> {
+  const secret = agent1Secret()
+  if (!secret) return null
+
+  const q = new URLSearchParams({ product_id: productId })
+  const res = await fetch(`${agent1ApiBase()}/pending-evidence?${q}`, {
+    headers: { 'X-Agent-Secret': secret },
+  })
+  const body = (await res.json().catch(() => ({}))) as {
+    evidence?: ProductEvidence | null
+    error?: string
+  }
+  if (!res.ok) return null
+  return body.evidence ?? null
+}
+
+export async function fetchLatestPendingEvidenceForProduct(
+  productId: string,
+): Promise<ProductEvidence | null> {
+  const { data, error } = await supabase
+    .from('product_evidence')
+    .select('*')
+    .eq('product_id', productId)
+    .eq('review_status', 'pending_review')
+    .order('bundle_version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  const row = (data as ProductEvidence | null) ?? null
+  if (row) return row
+
+  return fetchPendingEvidenceForProductViaApi(productId)
+}
+
 export async function fetchAgent1Dashboard(): Promise<Agent1DashboardData> {
   const secret = agent1Secret()
   if (secret) {
-    const res = await fetch(`${agent1ApiBase()}/dashboard`, {
-      headers: { 'X-Agent-Secret': secret },
-    })
-    const body = (await res.json().catch(() => ({}))) as Agent1DashboardData & {
-      error?: string
+    try {
+      const res = await fetch(`${agent1ApiBase()}/dashboard`, {
+        headers: { 'X-Agent-Secret': secret },
+      })
+      const body = (await res.json().catch(() => ({}))) as Agent1DashboardData & {
+        error?: string
+      }
+      if (res.ok) return body
+    } catch {
+      // Fall through to Supabase + pending-evidence API merge.
     }
-    if (res.ok) return body
-    throw new Error(body.error || `Agent 1 dashboard failed (${res.status})`)
   }
 
   return fetchAgent1DashboardViaSupabase()
 }
 
 async function fetchAgent1DashboardViaSupabase(): Promise<Agent1DashboardData> {
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select(PRODUCT_PIPELINE_SELECT)
-    .order('product_name', { ascending: true })
+  const { data: products, error: productsError } = await onlyActivePipelineProducts(
+    supabase.from('products').select(PRODUCT_PIPELINE_SELECT),
+  ).order('product_name', { ascending: true })
 
   if (productsError) throw productsError
+
+  const rows = (products ?? []) as ProductPipelineRow[]
 
   const { data: evidenceRows, error: evidenceError } = await supabase
     .from('product_evidence')
     .select('*')
-    .in('review_status', ['submitted', 'draft'])
+    .in('review_status', ['pending_review', 'draft'])
     .order('bundle_version', { ascending: false })
 
   if (evidenceError) throw evidenceError
 
-  const rows = (products ?? []) as ProductPipelineRow[]
+  let merged = (evidenceRows ?? []) as ProductEvidence[]
 
-  const latestSubmitted = new Map<string, ProductEvidence>()
-  const latestDraft = new Map<string, ProductEvidence>()
-  for (const row of evidenceRows ?? []) {
-    const e = row as ProductEvidence
-    if (e.review_status === 'submitted' && !latestSubmitted.has(e.product_id)) {
-      latestSubmitted.set(e.product_id, e)
-    }
-    if (e.review_status === 'draft' && !latestDraft.has(e.product_id)) {
-      latestDraft.set(e.product_id, e)
+  const awaitingCount = rows.filter((p) => p.agent_status === 'evidence_awaiting_review').length
+  const pendingInMerge = merged.filter((e) => e.review_status === 'pending_review').length
+
+  if (awaitingCount > 0 && (merged.length === 0 || pendingInMerge === 0)) {
+    const apiRows = await fetchPendingEvidenceRowsViaApi()
+    if (apiRows.length > 0) {
+      merged = mergeEvidenceRows(merged, apiRows)
     }
   }
 
-  const pendingReview: Agent1DashboardData['pendingReview'] = []
-  const heldRuns: Agent1DashboardData['heldRuns'] = []
   for (const product of rows) {
-    if (product.agent_status === 'evidence_awaiting_review') {
-      const evidence = latestSubmitted.get(product.product_id)
-      if (!evidence) continue
-      pendingReview.push({ product, evidence })
-    }
-    if (product.agent_status === 'evidence_pending') {
-      heldRuns.push({
-        product,
-        evidence: latestDraft.get(product.product_id) ?? null,
-      })
-    }
+    if (product.agent_status !== 'evidence_awaiting_review') continue
+    const hasPending = merged.some(
+      (e) => e.product_id === product.product_id && e.review_status === 'pending_review',
+    )
+    if (hasPending) continue
+    const row = await fetchLatestPendingEvidenceForProduct(product.product_id)
+    if (row) merged = mergeEvidenceRows(merged, [row])
   }
 
-  pendingReview.sort((a, b) =>
-    a.product.product_name.localeCompare(b.product.product_name),
-  )
-  heldRuns.sort((a, b) =>
-    a.product.product_name.localeCompare(b.product.product_name),
-  )
-
-  const statusCounts: Record<string, number> = {}
-  for (const p of rows) {
-    const key = p.agent_status || 'unscored'
-    statusCounts[key] = (statusCounts[key] ?? 0) + 1
-  }
-
-  return {
-    products: rows,
-    pendingReview,
-    validationRunQueue: [],
-    heldRuns,
-    statusCounts,
-  }
+  return assembleAgent1Dashboard(rows, merged)
 }
 
 export async function approveEvidence(
@@ -107,25 +161,19 @@ export async function approveEvidence(
   productId: string,
   reviewedBy?: string | null,
 ) {
-  const now = new Date().toISOString()
-  const { error: evidenceError } = await supabase
-    .from('product_evidence')
-    .update({
-      review_status: 'approved',
-      reviewed_at: now,
-      approved_at: now,
-      reviewed_by: reviewedBy ?? null,
-    })
-    .eq('evidence_id', evidenceId)
+  const { data, error } = await supabase.rpc('approve_product_evidence', {
+    p_evidence_id: evidenceId,
+    p_reviewed_by: reviewedBy ?? null,
+  })
 
-  if (evidenceError) throw evidenceError
+  if (error) throw error
 
-  const { error: productError } = await supabase
-    .from('products')
-    .update({ agent_status: 'evidence_approved' })
-    .eq('product_id', productId)
-
-  if (productError) throw productError
+  const row = data as { product_id?: string } | null
+  if (row?.product_id && row.product_id !== productId) {
+    throw new Error(
+      `Evidence ${evidenceId} belongs to product ${row.product_id}, not ${productId}`,
+    )
+  }
 }
 
 export async function rejectEvidence(
@@ -276,6 +324,47 @@ export async function runAgent1Remote(productId: string): Promise<Agent1RunOutco
   }
 }
 
+export type Agent1RetestResetOutcome = {
+  ok: boolean
+  message?: string
+  prior_status?: string
+  evidence_deleted?: number
+}
+
+export async function resetAgent1ForRetestRemote(productId: string): Promise<Agent1RetestResetOutcome> {
+  const secret = agent1Secret()
+  if (!secret) {
+    throw new Error('VITE_ADMIN_PASSWORD is not set (required to call Agent 1 API).')
+  }
+
+  const res = await fetch(`${agent1ApiBase()}/reset-for-retest`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Agent-Secret': secret,
+    },
+    body: JSON.stringify({ product_id: productId }),
+  })
+
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: string
+    ok?: boolean
+    result?: { prior_status?: string; evidence_deleted?: number; product_name?: string }
+  }
+
+  if (!res.ok) {
+    throw new Error(typeof body.error === 'string' ? body.error : `Reset failed (${res.status})`)
+  }
+
+  const r = body.result
+  return {
+    ok: true,
+    message: `Reset ${r?.product_name ?? 'product'}: deleted ${r?.evidence_deleted ?? 0} evidence bundle(s), status → unscored. Run Agent 1 again from Run tab.`,
+    prior_status: r?.prior_status,
+    evidence_deleted: r?.evidence_deleted,
+  }
+}
+
 const BATCH_PAUSE_MS = 5000
 
 export async function runAgent1Batch(
@@ -409,13 +498,14 @@ export function getStructuredEvidence(
 /** Lodge — re-run Agent 1 from Run tab after pipeline moved on. */
 export const AGENT1_ADMIN_RERUN_PRODUCT_ID = '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8'
 
-/** Branch Basics concentrate — validation batch shortcut on Run tab. */
+/** Archived formulation product — excluded from pipeline UIs (migration 0019). */
 export const BRANCH_BASICS_PRODUCT_ID = 'a0c72167-f0f6-491e-90f7-bbb622fa5123'
 
-/** Lodge + HexClad — materials-science validation duo (V2.3.4). */
+/** Lodge + HexClad + T-Fal — materials-science validation trio (V2.3.4). */
 export const AGENT1_VALIDATION_RERUN_PRODUCT_IDS: readonly string[] = [
   AGENT1_ADMIN_RERUN_PRODUCT_ID, // Lodge cast iron skillet
   'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5', // HexClad frying pan
+  AGENT1_TFAL_PRODUCT_ID, // T-Fal fry pan set
 ] as const
 
 export function isAgent1ValidationRerunProduct(productId: string): boolean {
@@ -441,7 +531,6 @@ export const CACHE_TEST_AGENT1_BATCH_PRODUCT_IDS: readonly string[] = [
   'c645ae86-0b82-429d-8f46-78b8007041b5', // All-Clad G5 skillet
   '86c204f4-3af4-4b5b-936d-4c6b7bf27928', // Hydro Flask bottle
   '1c010355-10d7-44d8-a81c-2c562d70e34c', // Dawn dish soap
-  'a0c72167-f0f6-491e-90f7-bbb622fa5123', // Branch Basics concentrate
 ] as const
 
 export function isCacheTestAgent1BatchProduct(productId: string): boolean {
@@ -511,47 +600,41 @@ export function canAdminRerunAgent1(productId: string): boolean {
 
 /**
  * Agent 1 tab routing (do not special-case products):
- * - evidence_awaiting_review → Awaiting review only (never Run tab).
- * - Successful run → status becomes evidence_awaiting_review → UI switches to Awaiting review.
- * - Re-run while awaiting review → Re-run button on the review card (validation products).
+ * - Successful Agent 1 run → Awaiting review. T-Fal: use Reset for re-test on Run tab to run again.
  */
 export function isAgent1OnAwaitingReviewTab(status: string): boolean {
   return status === 'evidence_awaiting_review'
 }
 
-/** First run, retry after failure, or validation re-run after evidence moved on. */
-export function canRunAgent1(status: string, productId?: string): boolean {
-  if (isAgent1OnAwaitingReviewTab(status)) return false
-
-  if (
-    status === 'unscored' ||
-    status === 'evidence_rejected' ||
-    status === 'evidence_pending'
-  ) {
-    return true
-  }
-  if (productId && isAgent1ValidationRerunProduct(productId)) {
-    return AGENT1_VALIDATION_RERUN_STATUSES.has(status)
-  }
-  return false
+/** All active catalog on Run except evidence awaiting review / in progress. */
+export function canRunAgent1(status: string, _productId?: string): boolean {
+  return canRunAgent1FromPipelineStart(status)
 }
 
-/** Run Agent 1 tab — mutually exclusive with Awaiting review. */
+/** Run Agent 1 tab — catalog default; validation trio also listed for re-run / recovery. */
 export function canShowOnAgent1RunTab(product: {
   agent_status: string
   product_id: string
 }): boolean {
-  return canRunAgent1(product.agent_status, product.product_id)
+  if (canRunAgent1FromPipelineStart(product.agent_status)) return true
+  if (!isAgent1ValidationRerunProduct(product.product_id)) return false
+  return (
+    product.agent_status === 'evidence_awaiting_review' ||
+    product.agent_status === 'evidence_in_progress'
+  )
 }
 
-/** Re-run from Awaiting review card (validation trio while submitted evidence exists). */
-export function canRerunAgent1FromReviewCard(
-  status: string,
-  productId: string,
-): boolean {
-  return (
-    isAgent1OnAwaitingReviewTab(status) && isAgent1ValidationRerunProduct(productId)
-  )
+/**
+ * Re-run from Gate 1 review card — not used for validation trio (Run Agent 1 tab only).
+ */
+export function canRerunAgent1FromReviewCard(status: string, productId: string): boolean {
+  if (isAgent1ValidationRerunProduct(productId)) return false
+  return canRerunAgent1FromReviewSequential(status)
+}
+
+/** Run Agent 1 tab only (includes validation trio while awaiting review). */
+export function canRerunAgent1ForProduct(status: string, productId: string): boolean {
+  return canShowOnAgent1RunTab({ agent_status: status, product_id: productId })
 }
 
 export function isAgent1Rerun(status: string): boolean {

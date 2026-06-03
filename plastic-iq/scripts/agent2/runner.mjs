@@ -4,6 +4,7 @@ import { projectRoot } from '../lib/env.mjs'
 import { ALGORITHM_VERSION, AGENT_VERSION } from './version.mjs'
 import { normalizeEvidence } from './normalize.mjs'
 import { buildWhyThisScoreOptions } from './why-this-score-map.mjs'
+import { canRunAgent2Sequential } from '../lib/pipeline-catalog.mjs'
 import {
   createServiceClient,
   fetchProductById,
@@ -21,34 +22,40 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     : await fetchProductByName(supabase, productName)
 
   const id = product.product_id
+  if (product.active === false) {
+    const reason = 'Product is archived (inactive) and is not in the pipeline catalog.'
+    console.log(`Stopped: ${reason}`)
+    return { ok: false, product, reason }
+  }
+
   console.log(`\n=== Agent 2: ${product.product_name} (${id}) ===\n`)
 
   const isRerun = product.agent_status === 'normalization_rejected'
-  const dryRunAllowed = new Set([
-    'evidence_approved',
-    'normalization_rejected',
-    'normalization_approved',
-    'normalization_awaiting_review',
-    'scoring_review_pending',
-    'scoring_approved',
-  ])
-  const saveRerunAllowed = new Set([
-    'normalization_awaiting_review',
-    'normalization_approved',
-    'scoring_review_pending',
-    'scoring_approved',
-  ])
-  const canRun =
-    dryRun && dryRunAllowed.has(product.agent_status)
-      ? true
-      : product.agent_status === 'evidence_approved' ||
-        isRerun ||
-        saveRerunAllowed.has(product.agent_status)
+  let canRun = canRunAgent2Sequential(product.agent_status)
+  if (!canRun && product.agent_status === 'normalization_awaiting_review') {
+    const { data: latest } = await supabase
+      .from('scoring_inputs')
+      .select('review_status')
+      .eq('product_id', id)
+      .order('run_timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (latest?.review_status === 'draft') {
+      canRun = true
+      if (!dryRun) {
+        await updateAgentStatus(supabase, id, 'evidence_approved')
+        product.agent_status = 'evidence_approved'
+        console.log(
+          'Step 0: reset normalization_awaiting_review → evidence_approved (failed draft — re-run)',
+        )
+      }
+    }
+  }
 
   if (!canRun) {
     const reason = dryRun
       ? `Agent 2 dry run not allowed for agent_status ${product.agent_status}`
-      : `Agent 2 requires agent_status evidence_approved, normalization_rejected, or a scoring rerun state (current: ${product.agent_status})`
+      : `Agent 2 requires approved evidence and a pipeline-catalog status (not awaiting review / in progress). Current: ${product.agent_status}`
     console.log(`Stopped: ${reason}`)
     return { ok: false, product, reason }
   }
@@ -96,6 +103,7 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
   }
 
   const taxonomyBlocked = inputs.status === 'taxonomy_expansion_required'
+  const descriptionBlocked = inputs.status === 'description_generation_failed'
   console.log(
     taxonomyBlocked
       ? 'Step 5: taxonomy_expansion_required — normalization halted for missing material taxonomy.'
@@ -107,8 +115,18 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     console.log(
       'Step 5b: skipping Why This Score vocabulary mapping (taxonomy expansion required).',
     )
+  } else if (descriptionBlocked) {
+    console.log('Step 5b: Why This Score vocabulary options mapped')
+    console.log(
+      `  product_description FAILED: ${(inputs.flagged_missing_fields ?? []).join(', ')}`,
+    )
   } else {
     console.log('Step 5b: Why This Score vocabulary options mapped')
+    if (inputs.product_description) {
+      console.log(
+        `  product_description: ${inputs.product_description.slice(0, 80)}… (${inputs.product_description.split(/\s+/).length} words)`,
+      )
+    }
   }
 
   if (inputs.human_review_required) {
@@ -127,7 +145,7 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
     agent_version: inputs.normalization_metadata?.agent_version ?? AGENT_VERSION,
     algorithm_version: inputs.normalization_metadata?.algorithm_version ?? ALGORITHM_VERSION,
     inputs,
-    review_status: taxonomyBlocked ? 'draft' : 'submitted',
+    review_status: taxonomyBlocked || descriptionBlocked ? 'draft' : 'pending_review',
     human_review_required: Boolean(inputs.human_review_required),
     human_review_reason: inputs.human_review_reason ?? null,
     ...(whyThisScore || {}),
@@ -135,8 +153,15 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
   console.log(`Step 6: saved scoring_inputs (${row.input_id})`)
 
   if (taxonomyBlocked) {
-    await updateAgentStatus(supabase, id, 'taxonomy_expansion_required')
-    console.log('Step 7: agent_status → taxonomy_expansion_required')
+    await updateAgentStatus(supabase, id, 'evidence_approved')
+    console.log(
+      'Step 7: agent_status → evidence_approved (missing material taxonomy — add taxonomy and re-run Agent 2)',
+    )
+  } else if (descriptionBlocked) {
+    await updateAgentStatus(supabase, id, 'evidence_approved')
+    console.log(
+      'Step 7: agent_status → evidence_approved (description generation failed — fix evidence and re-run Agent 2)',
+    )
   } else {
     await updateAgentStatus(supabase, id, 'normalization_awaiting_review')
     console.log('Step 7: agent_status → normalization_awaiting_review')
@@ -147,6 +172,13 @@ export async function runAgent2({ productId, productName, dryRun = false }) {
   const outFile = join(outDir, `agent2-${id}.json`)
   writeFileSync(outFile, JSON.stringify({ product, evidence, inputs, scoring_input: row }, null, 2))
   console.log(`  output: ${outFile}`)
+
+  if (taxonomyBlocked || descriptionBlocked) {
+    const reason = taxonomyBlocked
+      ? `Missing material taxonomy (${(inputs.flagged_missing_fields ?? inputs.missing_taxonomy_materials ?? []).join(', ') || 'see scoring_inputs draft'}). Add taxonomy and re-run Agent 2.`
+      : `Product description generation failed (${(inputs.flagged_missing_fields ?? []).join(', ') || 'see draft'}). Fix evidence and re-run Agent 2.`
+    return { ok: false, product, evidence, inputs, scoringInput: row, reason }
+  }
 
   return {
     ok: true,

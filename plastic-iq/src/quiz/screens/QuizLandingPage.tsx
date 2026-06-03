@@ -8,7 +8,12 @@ import {
   QuizPrimaryButton,
   QuizShell,
 } from '../ui'
-import { clearQuizAnswerStorage, clearResponseId, setResponseId } from '../quizStorage'
+import {
+  clearEmailCaptured,
+  clearQuizAnswerStorage,
+  clearResponseId,
+  setResponseId,
+} from '../quizStorage'
 
 export function QuizLandingPage() {
   const navigate = useNavigate()
@@ -23,6 +28,7 @@ export function QuizLandingPage() {
       const id = await createQuizResponse(navigator.userAgent ?? null)
       clearResponseId()
       clearQuizAnswerStorage()
+      clearEmailCaptured()
       setResponseId(id)
       sessionStorage.removeItem('quiz_first_name')
       navigate('/concern/pre')

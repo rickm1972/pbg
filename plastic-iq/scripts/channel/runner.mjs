@@ -144,6 +144,7 @@ export async function executeChannelMapRun(channelMapId) {
       api_usage,
       synthesis_model: synth.model,
       facebook_coverage_note: synth.facebook_coverage_note || null,
+      industry_verification_note: synth.industry_verification_note ?? null,
       type_coverage_notes: synth.type_coverage_notes ?? {},
       retrieval_coverage: buildRetrievalCoverageSummary(retrievalAngles),
       logs,

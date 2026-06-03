@@ -13,6 +13,7 @@ import {
 import type { Product, ProductTier } from '../types'
 import { cn } from '../lib/cn'
 import { fetchProductsByCategory } from '../lib/productsApi'
+import { filterPublicListProducts, hasPublicDisplayScore } from '../lib/publicProductDisplay'
 import { tierForScore } from '../lib/score'
 import { ScoreMark } from '../components/ScoreMark'
 import { ProductImage } from '../components/ProductImage'
@@ -59,21 +60,26 @@ export function CategoryPage() {
     setSort('highest')
   }, [category, subcategory])
 
+  const publicProducts = useMemo(
+    () => (products ? filterPublicListProducts(products) : null),
+    [products],
+  )
+
   const scopedProducts = useMemo(() => {
-    if (!products) return null
-    if (!subcategory) return products
-    return products.filter((p) => (p.subcategory ?? '').trim() === subcategory)
-  }, [products, subcategory])
+    if (!publicProducts) return null
+    if (!subcategory) return publicProducts
+    return publicProducts.filter((p) => (p.subcategory ?? '').trim() === subcategory)
+  }, [publicProducts, subcategory])
 
   const subcategoryCounts = useMemo(() => {
     const out: Record<string, number> = {}
-    for (const p of products ?? []) {
+    for (const p of publicProducts ?? []) {
       const s = (p.subcategory ?? '').trim()
       if (!s || !isPublicSubcategory(s)) continue
       out[s] = (out[s] ?? 0) + 1
     }
     return out
-  }, [products])
+  }, [publicProducts])
 
   const subcategoryOptions = useMemo(
     () =>
@@ -98,7 +104,8 @@ export function CategoryPage() {
   const filtered = useMemo(() => {
     if (!scopedProducts) return null
     const list = scopedProducts.filter((p) => {
-      const score = p.pac_safety_score ?? 0
+      if (!hasPublicDisplayScore(p)) return false
+      const score = p.pac_safety_score as number
       const tier = p.tier ?? tierForScore(score)
       if (tierFilter.size > 0 && !tierFilter.has(tier)) return false
 
@@ -122,8 +129,8 @@ export function CategoryPage() {
     })
 
     list.sort((a, b) => {
-      const as = a.pac_safety_score ?? 0
-      const bs = b.pac_safety_score ?? 0
+      const as = a.pac_safety_score as number
+      const bs = b.pac_safety_score as number
       return sort === 'highest' ? bs - as : as - bs
     })
 
@@ -524,7 +531,8 @@ function buildFacets(products: Product[]) {
   const feats: Record<string, number> = {}
 
   for (const p of products) {
-    const score = p.pac_safety_score ?? 0
+    if (!hasPublicDisplayScore(p)) continue
+    const score = p.pac_safety_score as number
     const tier = p.tier ?? tierForScore(score)
     tierCounts[tier]++
 
@@ -561,7 +569,9 @@ function inferFeatures(p: Product) {
 }
 
 function SubcategoryProductCard({ product }: { product: Product }) {
-  const score = product.pac_safety_score ?? 0
+  if (!hasPublicDisplayScore(product)) return null
+
+  const score = product.pac_safety_score as number
   const tier = product.tier ?? tierForScore(score)
   const tags = useMemo(() => {
     const out: string[] = []

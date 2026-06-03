@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuizEmailGate } from '../useQuizEmailGate'
 import { QuizCard, QuizEyebrow, QuizHeader, QuizShell } from '../ui'
 
 const FINAL_FACT =
@@ -7,11 +8,24 @@ const FINAL_FACT =
 
 export function QuizLoadingScreen() {
   const navigate = useNavigate()
+  const { ready } = useQuizEmailGate()
 
   useEffect(() => {
+    if (!ready) return
     const t = window.setTimeout(() => navigate('/result', { replace: true }), 2400)
     return () => window.clearTimeout(t)
-  }, [navigate])
+  }, [navigate, ready])
+
+  if (!ready) {
+    return (
+      <QuizShell>
+        <QuizHeader size="hero" />
+        <div className="flex min-h-[50dvh] items-center justify-center px-4 text-sm text-slate-600">
+          Loading…
+        </div>
+      </QuizShell>
+    )
+  }
 
   return (
     <QuizShell>

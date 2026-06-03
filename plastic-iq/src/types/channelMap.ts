@@ -96,6 +96,7 @@ export type ChannelRunMetadata = {
   api_usage?: ChannelApiUsage
   synthesis_model?: string
   facebook_coverage_note?: string | null
+  industry_verification_note?: string | null
   type_coverage_notes?: Record<string, string>
   logs?: string[]
   error_message?: string | null

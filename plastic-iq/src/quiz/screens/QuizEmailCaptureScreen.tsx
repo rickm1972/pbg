@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patchQuizResponse } from '../../lib/quizResponsesApi'
-import { getResponseId, setFirstName } from '../quizStorage'
+import { getResponseId, setEmailCaptured, setFirstName } from '../quizStorage'
 import {
   QuizCard,
   QuizEyebrow,
@@ -52,6 +52,7 @@ export function QuizEmailCaptureScreen() {
         first_name: trimmedName,
         user_email: trimmedEmail,
       })
+      setEmailCaptured()
       navigate('/loading', { replace: true })
     } catch {
       setError('Failed to save. Please try again.')

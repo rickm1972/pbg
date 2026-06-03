@@ -6,6 +6,7 @@ import { finalizeNormalization } from '../agent2/layer4b-enforce.mjs'
 import { enforceNormalizationDeterminism } from '../agent2/normalize-enforce.mjs'
 import { ALGORITHM_VERSION, formatCalculationTrace, scoreNormalization } from './algorithm.mjs'
 import { fetchApprovedEvidence } from '../agent2/supabase.mjs'
+import { AGENT3_SEQUENTIAL_RUN_STATUSES } from '../lib/pipeline-catalog.mjs'
 import {
   createServiceClient,
   fetchApprovedScoringInputs,
@@ -15,12 +16,6 @@ import {
   updateAgentStatus,
 } from './supabase.mjs'
 
-const CAN_RUN_STATUSES = new Set([
-  'normalization_approved',
-  'scoring_review_pending',
-  'scoring_approved',
-])
-
 export async function runAgent3({ productId, productName, dryRun = false }) {
   const supabase = createServiceClient()
   const product = productId
@@ -28,10 +23,16 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
     : await fetchProductByName(supabase, productName)
 
   const id = product.product_id
+  if (product.active === false) {
+    const reason = 'Product is archived (inactive) and is not in the pipeline catalog.'
+    console.log(`Stopped: ${reason}`)
+    return { ok: false, product, reason }
+  }
+
   console.log(`\n=== Agent 3: ${product.product_name} (${id}) ===\n`)
 
-  if (!CAN_RUN_STATUSES.has(product.agent_status)) {
-    const reason = `Agent 3 requires normalization_approved, scoring_review_pending, or scoring_approved (current: ${product.agent_status})`
+  if (!AGENT3_SEQUENTIAL_RUN_STATUSES.has(product.agent_status)) {
+    const reason = `Agent 3 requires normalization_approved (or scoring retry). Current: ${product.agent_status}`
     console.log(`Stopped: ${reason}`)
     return { ok: false, product, reason }
   }

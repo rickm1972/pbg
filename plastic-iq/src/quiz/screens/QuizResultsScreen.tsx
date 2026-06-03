@@ -9,6 +9,7 @@ import {
   topScoredYesItems,
   type ScoredAnswerValue,
 } from '../quizModel'
+import { useQuizEmailGate } from '../useQuizEmailGate'
 import {
   getFirstName,
   getResponseId,
@@ -51,6 +52,7 @@ function takeawaySupportingLine(deductionCount: number): string {
 
 export function QuizResultsScreen() {
   const navigate = useNavigate()
+  const { ready: emailGateReady } = useQuizEmailGate()
   const responseId = getResponseId()
   const firstName = getFirstName()
   const [scoredAnswers, setScoredAnswers] = useState<Record<string, ScoredAnswerValue> | null>(
@@ -64,7 +66,7 @@ export function QuizResultsScreen() {
   }, [responseId, navigate])
 
   useEffect(() => {
-    if (!responseId) return
+    if (!responseId || !emailGateReady) return
     let cancelled = false
 
     void (async () => {
@@ -84,7 +86,7 @@ export function QuizResultsScreen() {
     return () => {
       cancelled = true
     }
-  }, [responseId])
+  }, [responseId, emailGateReady])
 
   const answeredCount = scoredAnswers ? Object.keys(scoredAnswers).length : 0
   const missingAnswers = hydrated && answeredCount === 0
@@ -141,7 +143,7 @@ export function QuizResultsScreen() {
     }
   }
 
-  if (!hydrated || !scoredAnswers) {
+  if (!emailGateReady || !hydrated || !scoredAnswers) {
     return (
       <QuizShell>
         <QuizHeader size="hero" />

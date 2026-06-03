@@ -3,7 +3,6 @@ import {
   MEDIA_CHANNEL_TYPES,
   OUTREACH_ORIENTATIONS,
 } from './schema.mjs'
-import { fixAudienceContradictions } from './audience-rules.mjs'
 import { computeChannelScore } from './score-channel.mjs'
 
 const MAX_COMMUNITIES = 30
@@ -35,11 +34,10 @@ export function normalizeOrientation(value) {
  * @param {object} channel
  */
 function enrichChannel(channel) {
-  const normalized = fixAudienceContradictions(channel)
-  const scored = computeChannelScore(normalized)
+  const scored = computeChannelScore(channel)
   return {
-    ...normalized,
-    orientation: normalizeOrientation(normalized.orientation),
+    ...channel,
+    orientation: normalizeOrientation(channel.orientation),
     topic_relevance: scored.topic_relevance,
     topic_evidence_count: scored.topic_evidence_count,
     audience_verified: scored.audience_verified,

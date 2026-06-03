@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { projectRoot } from '../lib/env.mjs'
 import { runAllQaChecks, formatQaReport } from './run-checks.mjs'
 import { AGENT_VERSION, ALGORITHM_VERSION } from './constants.mjs'
+import { AGENT4_SEQUENTIAL_RUN_STATUSES } from '../lib/pipeline-catalog.mjs'
 import {
   createServiceClient,
   fetchApprovedEvidence,
@@ -16,14 +17,6 @@ import {
   updateProductQa,
   updateAgentStatus,
 } from './supabase.mjs'
-
-const CAN_RUN_STATUSES = new Set([
-  'scoring_review_pending',
-  'scoring_approved',
-  'qa_pending',
-  'qa_awaiting_review',
-  'qa_in_progress',
-])
 
 export async function runAgent4({
   productId,
@@ -40,8 +33,8 @@ export async function runAgent4({
   const id = product.product_id
   console.log(`\n=== Agent 4 QA: ${product.product_name} (${id}) ===\n`)
 
-  if (!CAN_RUN_STATUSES.has(product.agent_status)) {
-    const reason = `Agent 4 requires scoring_review_pending, scoring_approved, qa_pending, or qa_awaiting_review (current: ${product.agent_status})`
+  if (!AGENT4_SEQUENTIAL_RUN_STATUSES.has(product.agent_status)) {
+    const reason = `Agent 4 requires a score ready for QA. Current: ${product.agent_status}`
     console.log(`Stopped: ${reason}`)
     return { ok: false, product, reason }
   }
