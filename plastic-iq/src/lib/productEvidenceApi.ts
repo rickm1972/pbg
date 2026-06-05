@@ -1,5 +1,10 @@
 import { supabase } from './supabaseClient'
-import type { CertificationVerifiedRow, EvidenceSource } from '../types/agent'
+import type { CertificationVerifiedRow, EvidenceSource, ProductEvidence } from '../types/agent'
+import {
+  buildPublicSourcesFromEvidence,
+  filterSourcesHeuristic,
+  type PublicProductSource,
+} from './publicSourceDisplay'
 
 export type ProductPageSource = {
   source_type: string
@@ -7,6 +12,8 @@ export type ProductPageSource = {
   title: string | null
   fetched_at?: string
 }
+
+export type { PublicProductSource }
 
 export type VerifiedCertification = {
   cert_name: string
@@ -34,6 +41,37 @@ export async function fetchVerifiedCertifications(
       source_url: row.source_url!.trim(),
     }))
     .filter((row) => row.cert_name.length > 0)
+}
+
+/** Minimal approved evidence for public source / retailer eligibility (published products). */
+export async function fetchProductEvidenceDisplayPack(
+  productId: string,
+): Promise<ProductEvidence | null> {
+  const { data, error } = await supabase.rpc('get_product_evidence_display_pack', {
+    p_product_id: productId,
+  })
+
+  if (error) {
+    if (error.code === 'PGRST202' || /does not exist/i.test(error.message ?? '')) {
+      return null
+    }
+    throw error
+  }
+  if (!data || typeof data !== 'object') return null
+  return data as ProductEvidence
+}
+
+/** Sources filtered for public display (approved evidence + Gate 1 eligibility rules). */
+export async function fetchPublicProductSources(
+  productId: string,
+): Promise<PublicProductSource[]> {
+  const evidence = await fetchProductEvidenceDisplayPack(productId)
+  if (evidence?.sources?.length) {
+    return buildPublicSourcesFromEvidence(evidence)
+  }
+
+  const raw = await fetchProductSources(productId)
+  return filterSourcesHeuristic(raw)
 }
 
 /** Sources from approved Agent 1 evidence packet (`product_evidence.sources`). */

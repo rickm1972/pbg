@@ -10,6 +10,8 @@ import { fetchProductDescription } from '../lib/productDescriptionApi'
 import { fetchWhyThisScore } from '../lib/whyThisScoreApi'
 import { primaryContactMaterialDisplayFromComponents } from '../lib/primaryContactMaterials'
 import { applyHazardSortToWhyThisScoreFields } from '../lib/whyThisScoreSort'
+import { shapePublicWhyThisScoreFields } from '../lib/whyThisScorePublicDisplay'
+import { rewritePublicDescriptionDisclosureGap } from '../lib/publicDisclosureGapCopy'
 import { WhyThisScore } from '../components/WhyThisScore'
 import type { WhyThisScoreFields } from '../lib/whyThisScoreApi'
 import { fetchNormalizationComponents } from '../lib/normalizationComponentsApi'
@@ -21,12 +23,24 @@ import { TransparencyBadge } from '../components/TransparencyBadge'
 import { transparencyBadgeSummary } from '../lib/transparencyBadge'
 import { PacTierLegend } from '../components/PacTierLegend'
 import { ProductImage } from '../components/ProductImage'
+import { fetchProductEvidenceDisplayPack } from '../lib/productEvidenceApi'
+import { publicRetailerLinks } from '../lib/publicRetailerLinks'
 import {
   hasApprovedPageScore,
+  publicRetailerCautionNote,
+  publicRetailerSectionTitle,
   PUBLIC_SCORE_PENDING_MESSAGE,
+  SAFER_ALTERNATIVES_COMING_SOON,
+  softenPublicDescription,
 } from '../lib/publicProductDisplay'
-import { colorForTier, isBelowGoodTier, showsSaferAlternatives, tierForScore } from '../lib/score'
-import { orderedRetailerLinks, RetailerBuyButtons } from '../components/RetailerBuyButtons'
+import {
+  colorForTier,
+  isGoodOrExcellentProduct,
+  showsSaferAlternatives,
+  tierForScore,
+} from '../lib/score'
+import { RetailerBuyButtons } from '../components/RetailerBuyButtons'
+import type { ProductEvidence } from '../types/agent'
 
 export function ProductPage() {
   const { productId } = useParams()
@@ -39,6 +53,7 @@ export function ProductPage() {
   const [productDescription, setProductDescription] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [alternatives, setAlternatives] = useState<Product[] | null>(null)
+  const [evidencePack, setEvidencePack] = useState<ProductEvidence | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -48,6 +63,7 @@ export function ProductPage() {
     setPageScore(null)
     setNormalizationComponents(null)
     setProductDescription(null)
+    setEvidencePack(null)
     setError(null)
     fetchProduct(productId)
       .then((d) => setProduct(d))
@@ -65,6 +81,9 @@ export function ProductPage() {
     fetchProductDescription(productId)
       .then((text) => setProductDescription(text))
       .catch(() => setProductDescription(null))
+    fetchProductEvidenceDisplayPack(productId)
+      .then((pack) => setEvidencePack(pack))
+      .catch(() => setEvidencePack(null))
   }, [productId])
 
   const hasPageScore = hasApprovedPageScore(pageScore)
@@ -84,8 +103,33 @@ export function ProductPage() {
 
   const whyThisScoreDisplay = useMemo(() => {
     if (!whyThisScore) return null
-    return applyHazardSortToWhyThisScoreFields(whyThisScore, normalizationComponents)
+    const sorted = applyHazardSortToWhyThisScoreFields(whyThisScore, normalizationComponents)
+    return shapePublicWhyThisScoreFields(sorted)
   }, [whyThisScore, normalizationComponents])
+
+  const publicDescription = useMemo(() => {
+    if (!productDescription) return null
+    const softened = softenPublicDescription(productDescription)
+    const gapFields = whyThisScoreDisplay ?? whyThisScore
+    if (!gapFields) return softened
+    return rewritePublicDescriptionDisclosureGap(
+      softened,
+      gapFields.primary_material_options,
+      gapFields.coatings_finishes_options,
+    )
+  }, [productDescription, whyThisScoreDisplay, whyThisScore])
+
+  const retailerLinks = useMemo(
+    () => (product ? publicRetailerLinks(product, evidencePack) : []),
+    [product, evidencePack],
+  )
+
+  const showSaferAlternativesSection = useMemo(() => {
+    if (score == null || !showsSaferAlternatives(score)) return false
+    if (alternatives === null) return true
+    if (alternatives.length > 0) return true
+    return tier === 'High Risk'
+  }, [score, alternatives, tier])
 
   useEffect(() => {
     if (score == null) {
@@ -119,8 +163,7 @@ export function ProductPage() {
     }
   }, [product?.category, product?.subcategory, product?.product_id, score])
 
-  const buySectionTitle =
-    score != null && tier != null && isBelowGoodTier(score) ? 'View product here' : 'Where to buy'
+  const buySectionTitle = publicRetailerSectionTitle(tier)
 
   if (loading) {
     return (
@@ -150,7 +193,7 @@ export function ProductPage() {
     )
   }
 
-  const retailerLinks = orderedRetailerLinks(product)
+  const retailerLinksForPage = retailerLinks
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
@@ -189,16 +232,14 @@ export function ProductPage() {
               ) : (
                 <ScorePendingMark />
               )}
-              {pageScore?.displayed_confidence_range ? (
-                <p className="text-center text-sm font-semibold tabular-nums text-slate-700">
-                  Range {pageScore.displayed_confidence_range}
-                </p>
-              ) : null}
             </div>
             <div className="min-w-[12rem] space-y-3 pt-1">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 PAC Safety Score
               </div>
+              {hasPageScore && tier ? (
+                <p className="text-sm font-semibold text-ink-900">{tier}</p>
+              ) : null}
               {!hasPageScore ? (
                 <p className="text-sm leading-relaxed text-slate-600">{PUBLIC_SCORE_PENDING_MESSAGE}</p>
               ) : null}
@@ -213,9 +254,9 @@ export function ProductPage() {
             </div>
           </div>
 
-          {productDescription ? (
+          {publicDescription ? (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-700 shadow-card">
-              {productDescription}
+              {publicDescription}
             </div>
           ) : null}
 
@@ -223,6 +264,7 @@ export function ProductPage() {
             <RiskDashboard
               components={normalizationComponents}
               primaryMaterialName={primaryMaterialName}
+              transparencyBadge={pageScore?.transparency_badge ?? null}
               className="mt-6"
             />
           ) : null}
@@ -241,16 +283,16 @@ export function ProductPage() {
             </div>
           )}
 
-          {score != null && showsSaferAlternatives(score) && (
+          {showSaferAlternativesSection && (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-semibold text-ink-900">Safer alternatives</div>
                   <div className="mt-1 text-sm text-slate-500">
-                    Higher PAC scores, lower exposure risk.
+                    Higher PAC scores, lower expected PAC exposure.
                   </div>
                 </div>
-                {product.category && product.subcategory ? (
+                {product.category && product.subcategory && alternatives && alternatives.length > 0 ? (
                   <Link
                     to={`/category/${encodeURIComponent(product.category)}?subcategory=${encodeURIComponent(product.subcategory)}`}
                     className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:text-emerald-900"
@@ -264,12 +306,18 @@ export function ProductPage() {
               {alternatives === null ? (
                 <div className="mt-3 text-sm text-slate-600">Loading alternatives…</div>
               ) : alternatives.length === 0 ? (
-                <div className="mt-3 text-sm text-slate-600">No alternatives found.</div>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  {SAFER_ALTERNATIVES_COMING_SOON}
+                </p>
               ) : (
                 <div className="mt-5 overflow-hidden rounded-2xl border border-slate-100 bg-white">
                   <div className="divide-y divide-slate-100">
                     {alternatives.map((p) => (
-                      <AlternativeRow key={p.product_id} product={p} />
+                      <AlternativeRow
+                        key={p.product_id}
+                        product={p}
+                        evidencePack={evidencePack}
+                      />
                     ))}
                   </div>
                 </div>
@@ -282,7 +330,7 @@ export function ProductPage() {
                       <ShieldCheck className="h-4 w-4 text-emerald-700" />
                     </div>
                     <div className="pt-1">
-                      These alternatives have higher PAC Safety Scores and lower expected chemical
+                      These alternatives have higher PAC Safety Scores and lower expected PAC
                       exposure.
                     </div>
                   </div>
@@ -318,20 +366,28 @@ export function ProductPage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
               <div className="text-sm font-semibold text-ink-900">{buySectionTitle}</div>
               <p className="mt-1 text-sm text-slate-600">Links open in a new tab.</p>
-              {retailerLinks.length > 0 ? (
+              {retailerLinksForPage.length > 0 ? (
                 <div className="mt-4">
                   {hasPageScore && score != null && tier != null ? (
-                    <RetailerBuyButtons tier={tier} pacScore={score} links={retailerLinks} />
+                    <RetailerBuyButtons tier={tier} pacScore={score} links={retailerLinksForPage} />
                   ) : (
-                    <RetailerBuyButtons tier="Good" links={retailerLinks} />
+                    <RetailerBuyButtons tier="Good" links={retailerLinksForPage} />
                   )}
+                  {publicRetailerCautionNote(tier) ? (
+                    <p className="mt-3 text-xs leading-relaxed text-highrisk">
+                      {publicRetailerCautionNote(tier)}
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-slate-500">
-                  No retailer links yet. Add Amazon, Target, or Walmart URLs in Admin.
+                  No verified retailer listings for this product yet.
                 </p>
               )}
-              {retailerLinks.length > 0 ? (
+              {retailerLinksForPage.length > 0 &&
+              hasPageScore &&
+              score != null &&
+              isGoodOrExcellentProduct(score, tier) ? (
                 <div className="mt-3 text-xs leading-relaxed text-slate-500">
                   FTC disclosure: PlasticBegone may earn a commission if you purchase through affiliate
                   links. Ratings are independent and based on our PAC Safety Score methodology.
@@ -363,12 +419,18 @@ function ScorePendingMark() {
   )
 }
 
-function AlternativeRow({ product }: { product: Product }) {
+function AlternativeRow({
+  product,
+  evidencePack,
+}: {
+  product: Product
+  evidencePack: ProductEvidence | null
+}) {
   if (typeof product.pac_safety_score !== 'number') return null
 
   const score = product.pac_safety_score
   const tier = product.tier ? product.tier : tierForScore(score)
-  const altLinks = orderedRetailerLinks(product)
+  const altLinks = publicRetailerLinks(product, evidencePack)
   const pill = scorePillStyle(tier)
 
   return (
@@ -380,6 +442,7 @@ function AlternativeRow({ product }: { product: Product }) {
             name={product.product_name}
             fit="contain"
             className="rounded-xl"
+            decorative
           />
         </div>
       </div>

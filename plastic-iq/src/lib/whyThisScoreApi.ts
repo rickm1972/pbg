@@ -1,5 +1,13 @@
 import { supabase } from './supabaseClient'
 import { isPacRelevant } from './certificationTaxonomy'
+import { applyHazardSortToWhyThisScoreFields } from './whyThisScoreSort'
+import { publicCertificationOption, shapePublicWhyThisScoreFields } from './whyThisScorePublicDisplay'
+import {
+  CERT_VERIFICATION_ABSENT,
+  isAllowedWhyOption,
+  normalizeWhyThisScoreOption,
+} from './whyThisScoreVocabulary'
+import type { NormalizationComponent, ScoringInputRow } from '../types/agent'
 
 export type WhyThisScoreFields = {
   primary_material_options: string[]
@@ -32,12 +40,38 @@ export function primaryContactMaterialDisplay(
 
 /** Same rule as CertificationBadges — only PAC-relevant certs in Why This Score display. */
 export function filterPacRelevantCertificationOptions(options: string[]): string[] {
-  const absent = 'Third-party verification absent'
-  const filtered = options.filter((o) => o === absent || isPacRelevant(o))
-  if (filtered.length === 0 && options.some((o) => o !== absent && o !== 'None')) {
-    return [absent]
+  const filtered = options.filter((o) => {
+    const canonical = normalizeWhyThisScoreOption('certifications_options', o)
+    return canonical === CERT_VERIFICATION_ABSENT || isPacRelevant(o)
+  })
+  if (
+    filtered.length === 0 &&
+    options.some((o) => {
+      const c = normalizeWhyThisScoreOption('certifications_options', o)
+      return c !== CERT_VERIFICATION_ABSENT && o !== 'None'
+    })
+  ) {
+    return [CERT_VERIFICATION_ABSENT]
   }
   return filtered
+}
+
+/** Build sorted Why This Score fields from an approved scoring_inputs row (Gate 2 / Gate 3 / product page). */
+export function whyFieldsFromScoringInput(
+  row: ScoringInputRow,
+  components?: NormalizationComponent[] | null,
+): WhyThisScoreFields | null {
+  const primary = row.primary_material_options ?? []
+  if (!Array.isArray(primary) || primary.length === 0) return null
+  const fields: WhyThisScoreFields = {
+    primary_material_options: primary,
+    secondary_materials_options: row.secondary_materials_options ?? ['None'],
+    coatings_finishes_options: row.coatings_finishes_options ?? ['None'],
+    use_conditions_options: row.use_conditions_options ?? ['None'],
+    disclosure_quality_options: row.disclosure_quality_options ?? ['None'],
+    certifications_options: row.certifications_options ?? [CERT_VERIFICATION_ABSENT],
+  }
+  return applyHazardSortToWhyThisScoreFields(fields, components)
 }
 
 export async function fetchWhyThisScore(productId: string): Promise<WhyThisScoreFields | null> {
@@ -63,3 +97,5 @@ export async function fetchWhyThisScore(productId: string): Promise<WhyThisScore
   const hasAny = Object.values(fields).some((arr) => arr.length > 0)
   return hasAny ? fields : null
 }
+
+export { shapePublicWhyThisScoreFields }
