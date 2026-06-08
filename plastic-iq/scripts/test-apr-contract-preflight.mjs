@@ -322,17 +322,21 @@ console.log('✓ Assertion 9: risk-bar Oura-style contract enforced')
 }
 console.log('✓ Fixture F: renderer visible strings from APR only; chrome exempt; no forbidden imports')
 
-// ── Fixture I / Assertion 11: negative-score placeholder only ───────────────
+// ── Fixture I / Assertion 11: negative-score publication gate ─────────────
 
 {
-  assert.equal(NEGATIVE_SCORE_PUBLICATION_GATE.enabled, false)
+  assert.equal(NEGATIVE_SCORE_PUBLICATION_GATE.enabled, true)
   const apr = buildTwelveInchSkilletFixtureApr()
-  const lowScore = structuredClone(apr)
-  lowScore.score.payload.pac_safety_score = 40
-  lowScore.score.payload.tier = 'Concern'
-  assert.equal(assertNegativeScorePublicationPolicy(lowScore).length, 0)
-  assert.equal(runAprContractPreflight(lowScore).passed, true)
+  const highScore = structuredClone(apr)
+  highScore.score.payload.pac_safety_score = 99
+  assert.equal(assertNegativeScorePublicationPolicy(highScore).length, 0)
+
+  const lowScoreUnreviewed = structuredClone(apr)
+  lowScoreUnreviewed.score.payload.pac_safety_score = 40
+  lowScoreUnreviewed.score.payload.tier = 'Concern'
+  assert.ok(assertNegativeScorePublicationPolicy(lowScoreUnreviewed).length > 0)
+  assert.equal(runAprContractPreflight(lowScoreUnreviewed).passed, false)
 }
-console.log('✓ Fixture I: negative-score gate is placeholder only (not enforced)')
+console.log('✓ Fixture I: negative-score gate enforced for score < 75; bypass at 99')
 
 console.log('\nPhase 4 APR contract preflight tests passed (complete)')

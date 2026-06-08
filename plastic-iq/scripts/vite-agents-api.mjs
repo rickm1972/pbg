@@ -2,6 +2,7 @@
  * Vite dev middleware: product agents (1–4) + Persona agent from the admin UI (`npm run dev`).
  * Persona runs are async (202 + background job); product agents remain synchronous.
  */
+import { execSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { loadEnv } from './lib/env.mjs'
@@ -110,23 +111,118 @@ export function agentsApiPlugin() {
 
         const isPersonaApi = pathname.startsWith('/api/persona')
         const isChannelApi = pathname.startsWith('/api/channel')
+        const isDescriptionOverrideApi = pathname.startsWith('/api/description-override')
         const isAgentApi =
           pathname.startsWith('/api/agent1') ||
           pathname.startsWith('/api/agent2') ||
           pathname.startsWith('/api/agent3') ||
           pathname.startsWith('/api/agent4')
 
-        if (!isPersonaApi && !isChannelApi && !isAgentApi) {
+        if (!isPersonaApi && !isChannelApi && !isAgentApi && !isDescriptionOverrideApi) {
           next()
           return
         }
 
         corsHeaders(res)
 
+        const provided = req.headers['x-agent-secret']
+
         if (req.method === 'OPTIONS') {
           res.statusCode = 204
           res.end()
           return
+        }
+
+        if (isDescriptionOverrideApi) {
+          if (!secret || provided !== secret) {
+            sendJson(res, 401, { error: 'Unauthorized' })
+            return
+          }
+
+          try {
+            if (req.method === 'GET' && pathname === '/api/description-override/state') {
+              const q = new URL(req.url ?? '', 'http://localhost').searchParams
+              const productId = (q.get('product_id') ?? '').trim()
+              if (!productId) {
+                sendJson(res, 400, { error: 'product_id is required' })
+                return
+              }
+              const { getDescriptionOverrideState } = await server.ssrLoadModule(
+                '/src/lib/apr/descriptionOverride.ts',
+              )
+              sendJson(res, 200, { state: getDescriptionOverrideState(productId) })
+              return
+            }
+
+            if (req.method === 'POST') {
+              const body = await readJsonBody(req)
+              const {
+                saveDescriptionOverrideDraft,
+                submitDescriptionOverrideForReview,
+                approveDescriptionOverride,
+                rejectDescriptionOverride,
+              } = await server.ssrLoadModule('/src/lib/apr/descriptionOverride.ts')
+
+              if (pathname === '/api/description-override/draft') {
+                const record = saveDescriptionOverrideDraft({
+                  product_id: body.product_id,
+                  proposed_override_text: body.proposed_override_text,
+                  created_by: body.created_by ?? null,
+                })
+                sendJson(res, 200, { record })
+                return
+              }
+
+              if (pathname === '/api/description-override/submit') {
+                const record = submitDescriptionOverrideForReview(body.override_id)
+                sendJson(res, 200, { record })
+                return
+              }
+
+              if (pathname === '/api/description-override/approve') {
+                const result = approveDescriptionOverride(body.override_id, {
+                  reviewer_id: body.reviewer_id,
+                  low_score_publication_review: body.low_score_publication_review ?? null,
+                  display_remediation: body.display_remediation ?? undefined,
+                  notes: body.notes ?? null,
+                })
+                let bundledSynced = false
+                try {
+                  execSync('node scripts/sync-bundled-durable-snapshots.mjs', {
+                    cwd: join(scriptsDir, '..'),
+                    stdio: 'pipe',
+                  })
+                  bundledSynced = true
+                } catch (syncErr) {
+                  console.error('[agents-api] bundled sync failed:', syncErr)
+                }
+                sendJson(res, 200, {
+                  override: result.override,
+                  new_snapshot_id: result.new_snapshot.snapshot_id,
+                  bundled_synced: bundledSynced,
+                })
+                return
+              }
+
+              if (pathname === '/api/description-override/reject') {
+                const record = rejectDescriptionOverride(
+                  body.override_id,
+                  body.reviewer_id,
+                  body.notes ?? null,
+                )
+                sendJson(res, 200, { record })
+                return
+              }
+            }
+
+            sendJson(res, 404, { error: 'Not found' })
+            return
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            console.error(`[agents-api] ${pathname}:`, message)
+            sendJson(res, 500, { error: message })
+            return
+          }
         }
 
         if (req.method === 'GET' && pathname.endsWith('/health')) {
@@ -145,7 +241,6 @@ export function agentsApiPlugin() {
           return
         }
 
-        const provided = req.headers['x-agent-secret']
         const needsSecret =
           pathname === '/api/agent1/dashboard' ||
           pathname === '/api/agent1/pending-evidence' ||

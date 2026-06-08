@@ -8,6 +8,11 @@ import { consumePipelineFocus } from '../lib/adminPipelineNav'
 import { QuizAdminDashboard } from '../components/admin/QuizAdminDashboard'
 import { ChannelDashboard } from '../components/admin/ChannelDashboard'
 import { PersonaDashboard } from '../components/admin/PersonaDashboard'
+import { PublicDescriptionOverridePanel } from '../components/admin/PublicDescriptionOverridePanel'
+import {
+  ADMIN_PIPELINE_READONLY_FIELDS,
+  formatAdminReadOnlyFieldValue,
+} from '../lib/adminProductEditor'
 import { saveAdminProduct } from '../lib/adminProductSave'
 import { formatSupabaseUnknownError, supabase } from '../lib/supabaseClient'
 import {
@@ -475,9 +480,9 @@ export function AdminPage() {
                     category: 'Kitchen',
                     subcategory: null,
                     description: null,
-                    pac_safety_score: 0,
-                    tier: 'Good',
-                    score_basis: 'Based on Materials Science',
+                    pac_safety_score: null,
+                    tier: null,
+                    score_basis: null,
                     primary_material: null,
                     secondary_material: null,
                     bpa_free: 'Unknown',
@@ -544,8 +549,6 @@ export function AdminPage() {
                     }
                     if (!p.product_name.trim()) throw new Error('Product name is required')
                     if (!p.category) throw new Error('Category is required')
-                    if (!p.tier) throw new Error('Tier is required')
-                    if (!p.score_basis) throw new Error('Score basis is required')
 
                     const { product, message: saveMsg } = await saveAdminProduct(p)
                     setSelected(product)
@@ -634,58 +637,24 @@ function ProductEditor({
         />
       </Field>
 
-      <Field label="PAC Safety Score" required>
-        <input
-          inputMode="numeric"
-          value={String(product.pac_safety_score ?? 0)}
-          onChange={(e) => set('pac_safety_score', Number(e.target.value))}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-        />
-      </Field>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Tier" required>
-          <select
-            value={product.tier ?? ''}
-            onChange={(e) => set('tier', (e.target.value as Product['tier']) || null)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="Excellent">Excellent</option>
-            <option value="Good">Good</option>
-            <option value="Caution">Caution</option>
-            <option value="Concern">Concern</option>
-            <option value="High Risk">High Risk</option>
-          </select>
-        </Field>
-        <Field label="Score basis" required>
-          <select
-            value={product.score_basis ?? ''}
-            onChange={(e) => set('score_basis', (e.target.value as Product['score_basis']) || null)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="Lab Verified">Lab Verified</option>
-            <option value="Based on Materials Science">Based on Materials Science</option>
-            <option value="AI Estimated">AI Estimated</option>
-            <option value="In Testing Queue">In Testing Queue</option>
-          </select>
-        </Field>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Primary material">
-          <input
-            value={product.primary_material ?? ''}
-            onChange={(e) => set('primary_material', e.target.value || null)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-        </Field>
-        <Field label="Secondary material">
-          <input
-            value={product.secondary_material ?? ''}
-            onChange={(e) => set('secondary_material', e.target.value || null)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-        </Field>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Pipeline-owned (read-only)
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          These values come from approved pipeline gates. To change them, rerun and approve the
+          relevant agent — do not edit here.
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {ADMIN_PIPELINE_READONLY_FIELDS.map((field) => (
+            <ReadOnlyField
+              key={field.key}
+              label={field.label}
+              hint={field.hint}
+              value={formatAdminReadOnlyFieldValue(field.key, product)}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -772,13 +741,21 @@ function ProductEditor({
         />
       </Field>
 
-      <Field label="Description">
+      {product.product_id ? (
+        <PublicDescriptionOverridePanel productId={product.product_id} reviewerId="admin-editor" />
+      ) : null}
+
+      <Field label="Legacy listing description">
         <textarea
           value={product.description ?? ''}
           onChange={(e) => set('description', e.target.value || null)}
           rows={6}
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
         />
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          Legacy listing text (`products.description`) for browse cards only. Product detail pages
+          use the approved frozen display snapshot — not this field.
+        </p>
       </Field>
 
       <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -817,6 +794,29 @@ function Field({
       </div>
       <div className="mt-1">{children}</div>
     </label>
+  )
+}
+
+function ReadOnlyField({
+  label,
+  hint,
+  value,
+}: {
+  label: string
+  hint: string
+  value: string
+}) {
+  return (
+    <div>
+      <div className="text-xs font-semibold text-slate-600">{label}</div>
+      <div
+        className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-ink-900"
+        aria-readonly="true"
+      >
+        {value}
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-slate-500">{hint}</p>
+    </div>
   )
 }
 

@@ -1,6 +1,10 @@
 import type { Product } from '../types'
 import { supabase, formatSupabaseUnknownError } from './supabaseClient'
 import {
+  buildAdminProductSavePayload,
+  type AdminProductSavePayloadMode,
+} from './adminProductEditor'
+import {
   normalizeProductRow,
   PRODUCT_SELECT_WITH_SCORE,
   stringifyRetailLinksSidecar,
@@ -10,38 +14,7 @@ import {
   type RetailLinksSidecar,
 } from './retailerLinksSidecar'
 
-type PayloadMode = 'full' | 'no_other' | 'no_retailer_urls'
-
-function productWritePayload(p: Product, mode: PayloadMode): Record<string, unknown> {
-  const core = {
-    product_name: p.product_name,
-    brand: p.brand,
-    category: p.category,
-    subcategory: p.subcategory,
-    description: p.description,
-    pac_safety_score: p.pac_safety_score,
-    tier: p.tier,
-    score_basis: p.score_basis,
-    primary_material: p.primary_material,
-    secondary_material: p.secondary_material,
-    bpa_free: p.bpa_free,
-    phthalate_free_claim: p.phthalate_free_claim,
-    amazon_url: p.amazon_url,
-    affiliate_link: p.affiliate_link,
-    image_url: p.image_url,
-    active: p.active,
-  }
-  const out: Record<string, unknown> = { ...core }
-  if (mode !== 'no_retailer_urls') {
-    out.target_url = p.target_url
-    out.walmart_url = p.walmart_url
-  }
-  if (mode === 'full') {
-    out.other_retailer_label = p.other_retailer_label
-    out.other_retailer_url = p.other_retailer_url
-  }
-  return out
-}
+type PayloadMode = AdminProductSavePayloadMode
 
 function isRetailerColumnSchemaCacheError(error: unknown): boolean {
   const msg = formatSupabaseUnknownError(error, '')
@@ -164,7 +137,7 @@ export async function saveAdminProduct(p: Product): Promise<SaveAdminProductResu
 
   for (let i = 0; i < modes.length; i++) {
     const mode = modes[i]
-    const payload = productWritePayload(p, mode)
+    const payload = buildAdminProductSavePayload(p, mode)
     const res = !isUpdate
       ? await supabase.from('products').insert(payload).select(PRODUCT_SELECT_WITH_SCORE).single()
       : await supabase

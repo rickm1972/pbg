@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780928046586",
+    "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+    "version_sequence": 2,
+    "source_snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780926804249",
+    "reason": "description_override",
+    "override_id": "desc-override-695324ef-295b-4c69-b8fc-b25074186380",
+    "approved_at": "2026-06-08T14:14:06.585Z",
+    "approved_by": "admin-editor",
+    "low_score_publication_review": null,
+    "immutable": true
+  },
+  "record": {
+    "contract_version": "0.25.0",
+    "published_at": "2026-06-08T14:14:06.585Z",
+    "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+    "evidence_content_hash": "",
+    "normalization_content_hash": "",
+    "display_content_hash": "",
+    "score_content_hash": "",
+    "assembled_content_hash": "",
+    "display": {
+      "input_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+      "evidence_id": "",
+      "evidence_content_hash": "",
+      "normalization_content_hash": "",
+      "product_title": "All-Clad G5 Graphite Core Stainless-Steel Fry Pan with Lid, 12 inch",
+      "primary_material": "Stainless steel of unspecified grade",
+      "disclosure_sentence": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+      "product_description": "All-Clad's G5 cooking surface is stainless steel — an inert metal with no nonstick coating, no PFAS, and no plastic-based food-contact layer. Stainless steel doesn't transfer plastic-associated chemicals into food, even under high-heat cooking, which is why this pan earns one of the highest PAC Safety Scores in cookware. The exact steel grade isn't published by the manufacturer, which is reflected in the Documentation Incomplete badge, but it does not affect the low PAC exposure.",
+      "secondary_materials": [
+        {
+          "name": "Aluminum core",
+          "note": null
+        },
+        {
+          "name": "Graphite core",
+          "note": "Internal bonded core — not a food-contact surface."
+        }
+      ],
+      "coatings": "None",
+      "use_conditions": [
+        "Oven heat with fat exposure",
+        "Stovetop heat with fat exposure"
+      ],
+      "disclosure_quality": "Documentation Incomplete",
+      "cert_line": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+      "risk_bars": [
+        {
+          "id": "material",
+          "label": "Contact material: Stainless steel of unspecified grade",
+          "fill_percent": 97,
+          "color_token": "emerald",
+          "status_label": "Minimal PAC concern"
+        },
+        {
+          "id": "migration",
+          "label": "Migration",
+          "fill_percent": 98,
+          "color_token": "emerald",
+          "status_label": "Low migration"
+        },
+        {
+          "id": "use_conditions",
+          "label": "Use conditions",
+          "fill_percent": 4,
+          "color_token": "red",
+          "status_label": "Harsh"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://www.all-clad.com/cookware/collections/g5-graphite-core.html",
+          "group": "Manufacturer",
+          "label": "Experience Superior Cooking with G5 Graphite Cookware - All-Clad",
+          "public_source_eligible": true,
+          "source_role": "manufacturer",
+          "variant_mismatch": false,
+          "footnote": null
+        },
+        {
+          "url": "https://www.williams-sonoma.com/products/all-clad-g5-graphite-fry-pan-lid/",
+          "group": "Retailer",
+          "label": "Williams Sonoma — All-Clad G5 Graphite Core Stainless-Steel Fry Pan with Lid, 12 inch",
+          "public_source_eligible": true,
+          "source_role": "retailer_primary",
+          "variant_mismatch": false,
+          "footnote": null
+        }
+      ],
+      "why_this_score": {
+        "primary_material": "Stainless steel of unspecified grade",
+        "secondary_materials": [
+          "Aluminum core",
+          "Graphite core"
+        ],
+        "coatings": "None",
+        "use_conditions": [
+          "Oven heat with fat exposure",
+          "Stovetop heat with fat exposure"
+        ],
+        "disclosure_quality": "Documentation Incomplete",
+        "cert_line": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+        "sections": [
+          {
+            "title": "Primary material",
+            "items": [
+              {
+                "text": "Stainless steel of unspecified grade",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Secondary materials",
+            "items": [
+              {
+                "text": "Aluminum core",
+                "note": null
+              },
+              {
+                "text": "Graphite core",
+                "note": "Internal bonded core — not a food-contact surface."
+              }
+            ]
+          },
+          {
+            "title": "Coatings & finishes",
+            "items": [
+              {
+                "text": "None",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Use conditions",
+            "items": [
+              {
+                "text": "Oven heat with fat exposure",
+                "note": null
+              },
+              {
+                "text": "Stovetop heat with fat exposure",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Disclosure quality",
+            "items": [
+              {
+                "text": "Documentation Incomplete",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Certifications & testing",
+            "items": [
+              {
+                "text": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+                "note": null
+              }
+            ]
+          }
+        ]
+      },
+      "badge_summary": "Documentation Incomplete — most materials are known; minor details (grade, finish) are unconfirmed.",
+      "buy_section_title": "Where to buy",
+      "retailer_caution_note": null,
+      "sources_intro": "Sources used for this score, including manufacturer, and retailer sources where applicable.",
+      "safer_alternatives_subhead": "Higher PAC Safety Scores in this category.",
+      "safer_alternatives_footer": "These alternatives have higher PAC Safety Scores.",
+      "methodology_disclaimer": "The PAC Safety Score reflects plastic-associated-chemical exposure risk under our methodology, based on disclosed materials as of the review date. It is not an overall product safety or quality judgment.",
+      "last_reviewed_at": "2026-06-05"
+    },
+    "score": {
+      "pac_safety_score": 99,
+      "tier": "Excellent",
+      "displayed_confidence_range": "96–99",
+      "transparency_badge": "Documentation Incomplete"
+    },
+    "snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780928046586",
+    "content_hash": "177fe5b3fa2500e0077f8576e6703f65d2335cae9cde51173e0fdc95a66ba012"
+  }
+}

@@ -27,8 +27,14 @@ export {
 } from './rendererTextContract'
 export {
   NEGATIVE_SCORE_PUBLICATION_GATE,
+  LOW_SCORE_GATE_VERSION,
   assertNegativeScorePublicationPolicy,
+  assertNegativeScorePublicationReady,
+  runNegativeScorePublicationGate,
+  collectAuthoredDisplayCopy,
 } from './negativeScoreGate'
+export { assertPublishReadiness } from './publishReadiness'
+export type { PublishReadinessResult } from './publishReadiness'
 export { STATIC_SITE_CHROME_STRINGS, isStaticSiteChromeString } from './pageChrome'
 export {
   FORBIDDEN_RENDERER_IMPORTS,

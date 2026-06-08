@@ -585,6 +585,11 @@ export function runAprContractPreflight(record: ApprovedProductRecord): {
     'risk_bars.invalid_id',
     'risk_bars.invalid_color_token',
     'negative_score.publication_copy_required',
+    'negative_score.evidence_insufficient',
+    'negative_score.language_unsafe',
+    'negative_score.review_missing',
+    'negative_score.review_stale',
+    'negative_score.methodology_disclaimer_missing',
   ]
 
   const checks: AprPreflightCheck[] = checkIds.map((check_id) => ({

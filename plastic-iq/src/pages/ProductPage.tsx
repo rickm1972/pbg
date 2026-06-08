@@ -21,6 +21,11 @@ import {
 import { alternativeProductBuyCtas } from '../lib/apr/alternativeBuyCta'
 import { colorForTier, isGoodOrExcellentProduct, showsSaferAlternatives } from '../lib/score'
 import { RetailerBuyButtons } from '../components/RetailerBuyButtons'
+import { formatReviewDate } from '../lib/formatReviewDate'
+import {
+  resolvePublicMethodologyDisclaimer,
+  resolvePublicReviewDate,
+} from '../lib/apr/publicReviewStamp'
 
 export function ProductPage() {
   const { productId } = useParams()
@@ -39,6 +44,11 @@ export function ProductPage() {
 
     fetchProduct(productId)
       .then(async (p) => {
+        if (!p) {
+          setProduct(null)
+          setApr(null)
+          return
+        }
         setProduct(p)
         const renderInput = await fetchAprPublicRenderInput(p)
         setApr(renderInput)
@@ -119,6 +129,11 @@ export function ProductPage() {
 
   const display = apr?.display
   const pageTitle = display?.product_title ?? product.product_name
+  const methodologyDisclaimer = resolvePublicMethodologyDisclaimer(display)
+  const reviewedAt = resolvePublicReviewDate({
+    display,
+    snapshotPublishedAt: apr?.snapshot_meta?.published_at,
+  })
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
@@ -150,38 +165,50 @@ export function ProductPage() {
             {pageTitle}
           </h1>
 
-          <div className="mt-6 flex flex-wrap items-start gap-5">
-            <div className="flex flex-col items-center gap-2">
+          <div className="mt-6 flex flex-row flex-nowrap items-start gap-5">
+            <div className="shrink-0">
               {hasPageScore && score != null && tier != null ? (
                 <ScoreMark score={score} tier={tier} size="lg" />
               ) : (
                 <ScorePendingMark />
               )}
             </div>
-            <div className="min-w-[12rem] space-y-3 pt-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                PAC Safety Score
-              </div>
-              {hasPageScore && tier ? (
-                <p className="text-sm font-semibold text-ink-900">{tier}</p>
-              ) : null}
+            <div className="min-w-0 flex-1 space-y-2 pt-1">
               {!hasPageScore ? (
                 <p className="text-sm leading-relaxed text-slate-600">{PUBLIC_SCORE_PENDING_MESSAGE}</p>
-              ) : null}
-              {apr?.score.transparency_badge ? (
-                <div>
-                  <TransparencyBadge badge={apr.score.transparency_badge} />
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      PAC Safety Score
+                    </div>
+                    {apr?.score.transparency_badge ? (
+                      <TransparencyBadge badge={apr.score.transparency_badge} />
+                    ) : null}
+                  </div>
                   {display?.badge_summary ? (
-                    <p className="mt-2 text-xs leading-relaxed text-slate-600">{display.badge_summary}</p>
+                    <p className="text-xs leading-relaxed text-slate-600">{display.badge_summary}</p>
                   ) : null}
-                </div>
-              ) : null}
+                </>
+              )}
             </div>
           </div>
 
-          {display?.product_description ? (
+          {display?.product_description || methodologyDisclaimer ? (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-700 shadow-card">
-              {display.product_description}
+              {display?.product_description ? display.product_description : null}
+              <p
+                className={`text-xs leading-relaxed text-slate-600 ${
+                  display?.product_description ? 'mt-4 border-t border-slate-100 pt-4' : ''
+                }`}
+              >
+                {methodologyDisclaimer}
+              </p>
+              {reviewedAt ? (
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                  Reviewed {formatReviewDate(reviewedAt)}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

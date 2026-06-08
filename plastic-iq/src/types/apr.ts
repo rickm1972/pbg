@@ -187,6 +187,12 @@ export type AprDisplayPayload = {
   /** Safer alternatives section — relative score language only. */
   safer_alternatives_subhead?: string
   safer_alternatives_footer?: string
+  /** Methodology disclaimer — frozen on snapshot when present; ProductPage falls back to global copy. */
+  methodology_disclaimer?: string | null
+  /** General approved snapshot review date (YYYY-MM-DD or ISO). */
+  last_reviewed_at?: string | null
+  /** Phase 4.5 — last low-score publication review date (visual stamp integration point). */
+  low_score_last_reviewed_at?: string | null
 }
 
 export type AprDisplaySnapshot = AprGateSnapshot<AprDisplayPayload>
@@ -222,6 +228,19 @@ export type AprPreflightCheck = {
   message: string | null
 }
 
+/** Phase 4.5 — explicit human approval artifact for score < 75 publication. */
+export type LowScorePublicationReview = {
+  reviewer_id: string
+  reviewed_at: string
+  low_score_gate_version: string
+  score_at_review: number
+  primary_score_driving_concern: string
+  evidence_sufficiency: 'passed' | 'failed' | 'needs_revision'
+  language_safety: 'passed' | 'failed' | 'needs_revision'
+  approval_status: 'approved' | 'rejected' | 'needs_revision'
+  reviewer_notes?: string | null
+}
+
 export type AprQaPayload = {
   qa_id: string
   score_content_hash: string
@@ -233,6 +252,8 @@ export type AprQaPayload = {
   }
   /** Agent 4 classification checks — not display strings. */
   checks: Record<string, unknown>
+  /** Phase 4.5 — required before publishing products with score < 75. */
+  low_score_publication_review?: LowScorePublicationReview | null
 }
 
 export type AprQaSnapshot = AprGateSnapshot<AprQaPayload>
@@ -265,6 +286,11 @@ export type AprPublicRenderInput = {
     | 'displayed_confidence_range'
     | 'transparency_badge'
   >
+  /** Render-only metadata from frozen snapshot record — not live DB. */
+  snapshot_meta?: {
+    snapshot_id: string
+    published_at: string
+  }
 }
 
 /** Field ownership map — each public element maps to exactly one writer. */

@@ -43,8 +43,10 @@ export async function fetchLiveAprPublicRenderInput(
 }
 
 export async function fetchAprPublicRenderInput(
-  product: Product,
+  product: Product | null,
 ): Promise<AprPublicRenderInput | null> {
+  if (!product?.product_id) return null
+
   const snapshot = loadPublishedDisplaySnapshot(product.product_id)
   if (snapshot) {
     const commerceLinks = loadCommerceLinksForProduct(product)

@@ -15,6 +15,7 @@ import type {
 } from '../../types/apr'
 import type { ProductPageScore } from '../productScoresApi'
 import type { WhyThisScoreFields } from '../whyThisScoreApi'
+import { capitalizeDescriptionSentenceInitials } from './displayTextPolish'
 import { buildPublicSourcesFromEvidence, filterSourcesHeuristic } from '../publicSourceDisplay'
 import {
   buildPublicDisplayContract,
@@ -162,7 +163,7 @@ export function finalizeAssembledProductDescription(text: string): string {
   out = mergeFragmentSentences(out.trim())
   assertCompleteAssembledSentences(out)
 
-  return out.trim()
+  return capitalizeDescriptionSentenceInitials(out.trim())
 }
 const SAFER_ALTERNATIVES_SUBHEAD = 'Higher PAC Safety Scores in this category.'
 const SAFER_ALTERNATIVES_FOOTER = 'These alternatives have higher PAC Safety Scores.'
