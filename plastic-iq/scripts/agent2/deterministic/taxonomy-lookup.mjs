@@ -1,58 +1,33 @@
 /**
  * Step 2 — Material taxonomy lookup.
- * Reads extracted components only. Assigns base hazard/migration and role-default CI/severity/duration.
- * No server inference, Layer 4A, escalators, or Why This Score.
+ * Severity / duration / contact intimacy defaults read from product-type registry.
  */
 
 import { requireMaterial } from './material-taxonomy.mjs'
+import {
+  getExposureDefaultsForScoringCategory,
+  UNIVERSAL_ROLE_DEFAULTS,
+} from '../../../src/shared/product-type-registry/scoring-assumptions.mjs'
 
-function num(v, fallback = 0) {
-  const n = Number(v)
-  return Number.isFinite(n) ? n : fallback
+function roleDefaults(role, category) {
+  const exposure = getExposureDefaultsForScoringCategory(category)
+  const fromCategory = exposure?.roles?.[role]
+  if (fromCategory) return fromCategory
+  return UNIVERSAL_ROLE_DEFAULTS[role] ?? UNIVERSAL_ROLE_DEFAULTS.default
 }
 
 function contactIntimacyForRole(role, category) {
-  switch (role) {
-    case 'formulation':
-      return category === 'rinse-off' ? 0.25 : 0.5
-    case 'primary_food_contact':
-      return 1
-    case 'coating':
-      return 1
-    case 'handle':
-    case 'rivet':
-      return 0.5
-    case 'lid':
-    case 'gasket':
-      return 0.3
-    case 'packaging':
-      return 0.3
-    case 'structural':
-      return 0.1
-    default:
-      return 0.3
-  }
+  return roleDefaults(role, category).contact_intimacy
 }
 
 function severityForRole(role, category) {
-  if (role === 'handle' || role === 'rivet') return 0.5
-  if (role === 'packaging' || role === 'structural' || role === 'lid') return 0.3
-  if (role === 'formulation' && category === 'rinse-off') return 0.3
-  if (category === 'cookware' && (role === 'primary_food_contact' || role === 'coating')) {
-    return { severity_base: 0.88, additions: [{ factor: 'fatty food (common foreseeable)', value: 0.08 }] }
-  }
-  if (category === 'drinkware') return 0.7
-  return 0.5
+  const spec = roleDefaults(role, category).severity
+  return spec ?? 0.5
 }
 
 function durationForRole(role, category) {
-  if (role === 'formulation' && category === 'rinse-off') return { duration: 0.2, modifier: 0.3 }
-  if (category === 'cookware' && (role === 'primary_food_contact' || role === 'coating')) {
-    return { duration: 0.5, modifier: 1 }
-  }
-  if (role === 'handle') return { duration: 0.5, modifier: 1 }
-  if (role === 'packaging') return { duration: 0.2, modifier: category === 'rinse-off' ? 0.3 : 1 }
-  return { duration: 0.3, modifier: 1 }
+  const spec = roleDefaults(role, category).duration
+  return spec ?? { duration: 0.3, modifier: 1 }
 }
 
 function contactIntimacyLabel(role, category, ci) {
@@ -89,12 +64,34 @@ function severityJustification(draft, category) {
   return 'Severity assigned from category and component role (deterministic V3.0).'
 }
 
+function formatDurationValue(duration) {
+  const n = Number(duration)
+  return Number.isFinite(n) ? n.toFixed(2) : String(duration)
+}
+
 function durationJustification(draft, category, durSpec) {
-  if (draft.role === 'formulation' && category === 'rinse-off') {
+  const role = draft.role
+  const d = formatDurationValue(durSpec.duration)
+
+  if (role === 'formulation' && category === 'rinse-off') {
     return 'Rinse-off formulation pathway: base 0.20 × 0.30 modifier.'
   }
-  if (category === 'cookware') return 'Cooking pan approximately 15 min daily default — 0.50.'
-  return `Duration ${durSpec.duration} from category role table.`
+  if (category === 'cookware') {
+    if (role === 'primary_food_contact' || role === 'coating') {
+      return `Cooking pan approximately 15 min daily default — ${d}.`
+    }
+    if (role === 'handle') {
+      return `Intermittent hand contact (handles, grips) during cooking — ${d}.`
+    }
+    if (role === 'structural') {
+      return `Secondary body component exposure duration — ${d}.`
+    }
+    if (role === 'lid' || role === 'gasket' || role === 'rivet' || role === 'packaging') {
+      return `Secondary ${role} component exposure duration — ${d}.`
+    }
+    return `Cookware component exposure duration — ${d}.`
+  }
+  return `Duration ${d} from category role table (${role}).`
 }
 
 function buildRationale(draft, tax, category) {

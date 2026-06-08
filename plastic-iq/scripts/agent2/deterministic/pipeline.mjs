@@ -25,6 +25,10 @@ import {
   runProductDescriptionStep,
   PRODUCT_DESCRIPTION_GENERATOR_VERSION,
 } from './product-description-generate.mjs'
+import {
+  cosmeticProductDescriptionWarningMessage,
+  isProductDescriptionScoreBlocking,
+} from '../../../src/shared/agent2/output-contract.mjs'
 
 /**
  * @param {object} product
@@ -52,7 +56,7 @@ export function runAgent2NormalizationPipeline(product, evidence) {
 
   const formulation_pathway = buildFormulationPathway(step3.components, step1.isFormulation)
 
-  const step6 = runLayer4bStep(step3.components, step4.layer_4a)
+  const step6 = runLayer4bStep(step3.components, step4.layer_4a, evidence)
 
   const inputs = {
     product_id: product.product_id,
@@ -104,27 +108,37 @@ export function runAgent2NormalizationPipeline(product, evidence) {
     whyThisScore,
   })
 
-  if (!descResult.ok) {
-    inputs.status = descResult.status
-    inputs.flagged_missing_fields = descResult.flagged_missing_fields
-    inputs.product_description = null
-    inputs.human_review_required = true
-    inputs.human_review_reason = descResult.human_review_reason
-    inputs.normalization_notes = [
-      inputs.normalization_notes,
-      `product_description: ${descResult.human_review_reason}`,
-    ]
-      .filter(Boolean)
-      .join(' ')
-    return { inputs, whyThisScore }
-  }
-
-  inputs.product_description = descResult.product_description
+  inputs.product_description = descResult.product_description ?? null
+  inputs.product_description_status = descResult.product_description_status
   if (descResult.description_word_count != null) {
     inputs.description_word_count = descResult.description_word_count
   }
+  if (descResult.product_description_warnings?.length) {
+    inputs.product_description_warnings = descResult.product_description_warnings
+  }
+  if (descResult.flagged_missing_fields?.length) {
+    inputs.flagged_missing_fields = [
+      ...(inputs.flagged_missing_fields ?? []),
+      ...descResult.flagged_missing_fields,
+    ]
+  }
   inputs.normalization_metadata.description_generator_version =
     descResult.description_generator_version ?? PRODUCT_DESCRIPTION_GENERATOR_VERSION
+
+  if (descResult.product_description_status !== 'generated') {
+    const warningNote = cosmeticProductDescriptionWarningMessage(
+      descResult.flagged_missing_fields,
+    )
+    inputs.normalization_notes = [inputs.normalization_notes, `product_description: ${warningNote}`]
+      .filter(Boolean)
+      .join(' ')
+    if (!isProductDescriptionScoreBlocking()) {
+      // Cosmetic copy failure — scoring inputs still valid; do not set blocking status.
+    } else if (descResult.human_review_reason) {
+      inputs.human_review_required = true
+      inputs.human_review_reason = descResult.human_review_reason
+    }
+  }
 
   return { inputs, whyThisScore }
 }

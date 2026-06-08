@@ -7,6 +7,13 @@ import {
 } from '../../lib/canonicalEvidenceMapping'
 import { canonicalReviewKey } from '../../lib/gate1CanonicalReviewKeys'
 import { getGate1ContradictionBlockers } from '../../lib/gate1ContradictionBlockers'
+import { getCanonicalSourceCitation } from '../../lib/gate1SourcesReview'
+import {
+  formatCanonicalConfidenceLabel,
+  safetyClaimReviewLabel,
+} from '../../lib/gate1DisplayLabels'
+import type { EvidenceSource } from '../../types/agent'
+import { Gate1SourceCitationBlock } from './Gate1SourceCitation'
 
 const PLAIN_ENGLISH_LABELS: Record<string, string> = {
   primary_contact_material_id: 'Food-contact surface',
@@ -23,6 +30,7 @@ type ReviewStatus = 'unconfirmed' | 'confirmed' | 'edited' | 'blocked'
 
 type Props = {
   mappings: CanonicalMappingsPayload | null | undefined
+  sources?: EvidenceSource[]
   structuredForContradictions: { canonical_mappings?: CanonicalMappingsPayload | null } | null
   editable: boolean
   confirmedKeys: Set<string>
@@ -37,6 +45,7 @@ function MappingTableRow({
   reviewKey,
   label,
   row,
+  sources,
   editable,
   status,
   onConfirm,
@@ -46,12 +55,14 @@ function MappingTableRow({
   reviewKey: string
   label: string
   row: CanonicalFieldMapping | null | undefined
+  sources: EvidenceSource[]
   editable: boolean
   status: ReviewStatus
   onConfirm: () => void
   onReject: () => void
   onSaveCanonical: (canonicalId: string) => void
 }) {
+  const citation = getCanonicalSourceCitation(row, sources)
   const [editId, setEditId] = useState(row?.canonical_id ?? '')
   const [editing, setEditing] = useState(false)
   const expansion = isExpansionRequired(row?.canonical_id)
@@ -84,20 +95,11 @@ function MappingTableRow({
         {row?.mapping_rule_id ?? '—'}
       </td>
       <td className="px-3 py-2 align-top text-[10px] text-slate-600">
-        {row?.source_url ? (
-          <a href={row.source_url} target="_blank" rel="noreferrer" className="underline">
-            source
-          </a>
-        ) : (
-          '—'
-        )}
-        {row?.source_quote ? (
-          <p className="mt-1 line-clamp-2 text-slate-500" title={row.source_quote}>
-            {row.source_quote}
-          </p>
-        ) : null}
+        <Gate1SourceCitationBlock citation={citation} />
       </td>
-      <td className="px-3 py-2 align-top text-[10px] text-slate-600">{row?.confidence_label ?? '—'}</td>
+      <td className="px-3 py-2 align-top text-[10px] text-slate-600">
+        {formatCanonicalConfidenceLabel(row)}
+      </td>
       <td className="px-3 py-2 align-top">
         <span
           className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ${statusTone[status]}`}
@@ -154,6 +156,7 @@ function MappingTableRow({
 
 export function Gate1CanonicalMappingsPanel({
   mappings,
+  sources = [],
   structuredForContradictions,
   editable,
   confirmedKeys,
@@ -258,7 +261,7 @@ export function Gate1CanonicalMappingsPanel({
               <th className="px-3 py-2">Extracted text</th>
               <th className="px-3 py-2">Canonical ID (Agent 2)</th>
               <th className="px-3 py-2">Rule</th>
-              <th className="px-3 py-2">Source / quote</th>
+              <th className="px-3 py-2">Source · quote · confidence</th>
               <th className="px-3 py-2">Confidence</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Actions</th>
@@ -276,6 +279,7 @@ export function Gate1CanonicalMappingsPanel({
                   reviewKey={rk}
                   label={displayLabel(req.field_key, req.label)}
                   row={row}
+                  sources={sources}
                   editable={editable}
                   status={rowStatus(rk, row)}
                   onConfirm={() => onConfirmKey(rk)}
@@ -292,6 +296,7 @@ export function Gate1CanonicalMappingsPanel({
                   reviewKey={rk}
                   label={`Regulatory flags ${i + 1}`}
                   row={flag}
+                  sources={sources}
                   editable={editable}
                   status={rowStatus(rk, flag)}
                   onConfirm={() => onConfirmKey(rk)}
@@ -307,8 +312,9 @@ export function Gate1CanonicalMappingsPanel({
                 <MappingTableRow
                   key={rk}
                   reviewKey={rk}
-                  label={`Safety claims · ${key.replace(/_/g, ' ')}`}
+                  label={`Safety claims · ${safetyClaimReviewLabel(key)}`}
                   row={row}
+                  sources={sources}
                   editable={editable}
                   status={rowStatus(rk, row)}
                   onConfirm={() => onConfirmKey(rk)}

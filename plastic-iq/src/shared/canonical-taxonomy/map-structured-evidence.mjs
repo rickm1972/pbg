@@ -2,6 +2,14 @@
  * Phase 3.5: deterministic canonical mapping from Agent 1 structured_evidence (raw preserved).
  */
 import { GOVERNMENT_SOURCE_CONFIRMED, TAXONOMY_EXPANSION_REQUIRED } from './constants.mjs'
+import {
+  inferConfidenceForSafetyClaim,
+  reconcileCanonicalMappingsConfidence,
+  resolveSafetyClaimSourceUrl,
+  syncStructuredConfidenceFromMappings,
+} from './confidence-label-consistency.mjs'
+import { assessTransparency } from './transparency-assessment.mjs'
+import { applyOutOfScopeSafetySignalPolicy } from '../safety-signals/out-of-scope-policy.mjs'
 import { PRIMARY_CONTACT_MATERIAL_TAXONOMY } from './primary-contact-material-taxonomy.mjs'
 import { SUBSTRATE_MATERIAL_TAXONOMY } from './substrate-material-taxonomy.mjs'
 import { COATING_MODIFIER_TAXONOMY } from './coating-modifier-taxonomy.mjs'
@@ -12,8 +20,32 @@ import { resolveCertEntry } from './certification-canonical-taxonomy.mjs'
 import { getCanonicalApprovalBlockers } from './score-driving-fields.mjs'
 import { applyRequiredEvidenceValidation } from '../required-evidence-matrix/validate-required-evidence.mjs'
 import { PTFE_PRIMARY_IDS } from '../required-evidence-matrix/pattern-triggers.mjs'
+import {
+  blobDisclosesPfasFamilyPresent,
+  isCeramicNonstickMaterialText,
+  isCeramicNonstickPrimary,
+  marketingClaimsPtfeOrPfasAbsent,
+  parseCeramicCoatingSubstrateHint,
+  resolveCeramicNonstickPrimaryFromRaw,
+  textDisclosesAluminumSubstrate,
+} from './ceramic-nonstick-structural.mjs'
+import {
+  isStructurallyPfasFreePrimary,
+  isPtfeFamilyPrimary,
+  requiresCoatingModifier,
+  shouldApplyMinnesotaPfasRegulatoryFlag,
+  stripInferredPfasFreeMarketingClaim,
+} from './inert-cookware-structural.mjs'
+import {
+  resolveStainlessPrimaryFromNormalizedRaw,
+  resolveStainlessSubstrateFromNormalizedRaw,
+} from './stainless-normalized-ids.mjs'
+import {
+  compoundParseSummary,
+  parseCompoundCookwareMaterial,
+} from './compound-cookware-material.mjs'
 
-const SCHEMA_VERSION = '3.5'
+const SCHEMA_VERSION = '3.8'
 
 /**
  * @param {string} text
@@ -29,6 +61,109 @@ function matchTaxonomy(text, entries) {
     }
   }
   return null
+}
+
+/**
+ * Resolve primary food-contact from Agent 1 snake_case IDs or natural language.
+ * @param {string} raw
+ * @param {import('./types.mjs').TaxonomyEntry[]} [entries]
+ */
+export function resolvePrimaryContactEntry(raw, entries = PRIMARY_CONTACT_MATERIAL_TAXONOMY) {
+  const blob = String(raw ?? '').trim()
+  if (!blob) return null
+  const ceramic = resolveCeramicNonstickPrimaryFromRaw(blob, entries)
+  if (ceramic) return ceramic
+  const normalized = blob.toLowerCase().replace(/\s+/g, '_')
+  const exact = entries.find((e) => e.canonical_id === normalized || e.canonical_id === blob)
+  if (exact) return exact
+  if (normalized === 'stainless_steel' || normalized === 'stainless') {
+    return entries.find((e) => e.canonical_id === 'stainless_steel_unspecified') ?? null
+  }
+  const spaceBlob = blob.replace(/_/g, ' ')
+  return matchTaxonomy(spaceBlob, entries) ?? matchTaxonomy(blob, entries)
+}
+
+/**
+ * Resolve pan body / substrate from Agent 1 snake_case IDs or natural language.
+ * @param {string} raw
+ * @param {import('./types.mjs').TaxonomyEntry[]} [entries]
+ */
+export function resolveSubstrateEntry(raw, entries = SUBSTRATE_MATERIAL_TAXONOMY) {
+  const blob = String(raw ?? '').trim()
+  if (!blob) return null
+  const compound = parseCompoundCookwareMaterial(blob)
+  if (compound.substrateCanonicalId) {
+    return entries.find((e) => e.canonical_id === compound.substrateCanonicalId) ?? null
+  }
+  const normalized = blob.toLowerCase().replace(/\s+/g, '_')
+  const exact = entries.find((e) => e.canonical_id === normalized || e.canonical_id === blob)
+  if (exact) return exact
+  const stainlessBody = resolveStainlessSubstrateFromNormalizedRaw(blob, entries)
+  if (stainlessBody) return stainlessBody
+  if (
+    normalized === 'graphite_core' ||
+    normalized === 'graphite_structural_core' ||
+    normalized === 'graphite_core_layer' ||
+    /graphite/.test(normalized)
+  ) {
+    return entries.find((e) => e.canonical_id === 'graphite_structural_core') ?? null
+  }
+  const spaceBlob = blob.replace(/_/g, ' ')
+  return matchTaxonomy(spaceBlob, entries) ?? matchTaxonomy(blob, entries)
+}
+
+/**
+ * True when disclosed composition includes PTFE/nonstick stack (not PFAS marketing copy alone).
+ * @param {string} primaryRaw
+ * @param {object | null} interiorCoat
+ * @param {string} blob
+ * @param {import('./types.mjs').TaxonomyEntry | null} [primaryEntry]
+ */
+function detectsPtfeNonstickComposition(primaryRaw, interiorCoat, blob, primaryEntry) {
+  if (primaryEntry && isStructurallyPfasFreePrimary(primaryEntry.canonical_id)) {
+    return false
+  }
+  if (primaryEntry && isCeramicNonstickPrimary(primaryEntry.canonical_id)) {
+    return false
+  }
+  const composition = `${primaryRaw} ${interiorCoat?.coating_name ?? ''} ${interiorCoat?.coating_type ?? ''}`
+  if (isCeramicNonstickMaterialText(composition) && marketingClaimsPtfeOrPfasAbsent(composition)) {
+    return false
+  }
+  if (isCeramicNonstickMaterialText(composition) && !/\bptfe\b/i.test(composition)) {
+    return false
+  }
+  if (/\b(ptfe|pfoa|fep)\b/i.test(composition) && !marketingClaimsPtfeOrPfasAbsent(composition)) {
+    return true
+  }
+  if (/\bpfa\b(?!s)/i.test(composition) && !marketingClaimsPtfeOrPfasAbsent(composition)) {
+    return true
+  }
+  if (
+    interiorCoat &&
+    /\b(ptfe|pfoa|fep)\b/i.test(String(interiorCoat.coating_name ?? '')) &&
+    !marketingClaimsPtfeOrPfasAbsent(String(interiorCoat.coating_name ?? ''))
+  ) {
+    return true
+  }
+  if (/\bptfe\b/i.test(blob) && /\bnon-?stick\b/i.test(blob) && !marketingClaimsPtfeOrPfasAbsent(blob)) {
+    return true
+  }
+  return false
+}
+
+/**
+ * @param {import('./types.mjs').CanonicalMappingsPayload} cookware
+ * @param {object} structured
+ */
+function effectivePrimaryCanonicalId(cookware, structured) {
+  const mapped = cookware?.primary_contact_material_id?.canonical_id ?? ''
+  if (mapped && mapped !== TAXONOMY_EXPANSION_REQUIRED) return mapped
+  const raw =
+    cookware?.primary_contact_material_id?.raw_value ??
+    structured?.primary_contact_material?.material_identity ??
+    ''
+  return resolvePrimaryContactEntry(raw)?.canonical_id ?? mapped
 }
 
 /**
@@ -75,21 +210,103 @@ function collectSourceBlob(structured, sources) {
 
 /**
  * @param {object} structured
+ * @param {import('./compound-cookware-material.mjs').CompoundCookwareParse} compound
+ * @param {object} pcm
+ */
+function mergeCompoundSecondaryComponents(structured, compound, pcm) {
+  if (!compound.isCompound || !compound.secondaryCoreMaterialIds.length) return
+  const arr = [...(structured.secondary_components ?? [])]
+  for (const matId of compound.secondaryCoreMaterialIds) {
+    if (arr.some((c) => String(c.material_identity ?? '').toLowerCase() === matId)) continue
+    arr.push({
+      component_role: 'structural',
+      material_identity: matId,
+      source_url: pcm.source_url ?? null,
+      confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+    })
+  }
+  structured.secondary_components = arr
+}
+
+/**
+ * @param {import('./types.mjs').CanonicalMappingsPayload} out
+ * @param {string} primaryRaw
+ * @param {object} pcm
+ * @param {import('./compound-cookware-material.mjs').CompoundCookwareParse} compound
+ * @param {object} structured
+ */
+function applyCompoundCookwareMappings(out, primaryRaw, pcm, compound, structured) {
+  const summary = compoundParseSummary(primaryRaw)
+  const primaryEntry = PRIMARY_CONTACT_MATERIAL_TAXONOMY.find(
+    (e) => e.canonical_id === compound.primaryContactCanonicalId,
+  )
+  out.primary_contact_material_id = mappingRow({
+    field_key: 'primary_contact_material_id',
+    raw_value: primaryRaw,
+    entry: primaryEntry,
+    forceExpansion: !primaryEntry,
+    mapping_rule_id: compound.parseRuleId,
+    taxonomy_file: 'compound-cookware-material.mjs',
+    source_url: pcm.source_url,
+    source_quote: summary ?? primaryRaw,
+    confidence_label: pcm.confidence_label,
+  })
+
+  const substrateEntry = compound.substrateCanonicalId
+    ? SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === compound.substrateCanonicalId)
+    : null
+  const substrateRaw = compound.substrateCanonicalId
+    ? `Internal structural core: ${compound.substrateCanonicalId}${compound.secondaryCoreMaterialIds.length ? ` (+ ${compound.secondaryCoreMaterialIds.join(', ')})` : ''}`
+    : primaryRaw
+  out.substrate_material_id = mappingRow({
+    field_key: 'substrate_material_id',
+    raw_value: substrateRaw,
+    entry: substrateEntry,
+    forceExpansion: !substrateEntry,
+    mapping_rule_id: compound.parseRuleId,
+    taxonomy_file: 'compound-cookware-material.mjs',
+    source_url: pcm.source_url,
+    source_quote: summary ?? substrateRaw,
+    confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  mergeCompoundSecondaryComponents(structured, compound, pcm)
+  out.coating_modifier_id = mapCoatingModifierForPrimary(out, {
+    interiorCoat: null,
+    exteriorCoat: null,
+    pcm,
+    primaryRaw,
+  })
+}
+
+/**
+ * @param {object} structured
  * @param {object[]} sources
  */
 function mapCookwareTfalStyle(structured, sources) {
   const pcm = structured?.primary_contact_material ?? {}
   const primaryRaw = pcm.material_identity ?? ''
   const interiorCoat =
-    (structured?.coatings_and_finishes ?? []).find((c) => /ptfe|nonstick|titanium/i.test(String(c.coating_name ?? ''))) ??
+    (structured?.coatings_and_finishes ?? []).find((c) =>
+      isCeramicNonstickMaterialText(`${c.coating_name ?? ''} ${c.coating_type ?? ''}`),
+    ) ??
+    (structured?.coatings_and_finishes ?? []).find((c) =>
+      /\bptfe\b/i.test(String(c.coating_name ?? '')),
+    ) ??
     null
   const exteriorCoat =
     (structured?.coatings_and_finishes ?? []).find((c) => /hard\s*anodized\s*exterior/i.test(String(c.coating_name ?? ''))) ??
     null
 
   const blob = collectSourceBlob(structured, sources)
+  const primaryEntryResolved = resolvePrimaryContactEntry(primaryRaw)
   const hasTitanium = /titanium/i.test(`${primaryRaw} ${interiorCoat?.coating_name ?? ''} ${blob}`)
-  const hasPtfeStack = /ptfe|nonstick|non-stick|pfa|fep/i.test(`${primaryRaw} ${interiorCoat?.coating_name ?? ''} ${blob}`)
+  const hasPtfeStack = detectsPtfeNonstickComposition(
+    primaryRaw,
+    interiorCoat,
+    blob,
+    primaryEntryResolved,
+  )
   const hasHardAnodized = /hard\s*anodized|hard\s*anodised/i.test(`${primaryRaw} ${exteriorCoat?.coating_name ?? ''} ${blob}`)
 
   /** @type {import('./types.mjs').CanonicalMappingsPayload} */
@@ -139,7 +356,12 @@ function mapCookwareTfalStyle(structured, sources) {
       })
     }
   } else {
-    const primaryEntry = matchTaxonomy(primaryRaw, PRIMARY_CONTACT_MATERIAL_TAXONOMY)
+    const compound = parseCompoundCookwareMaterial(primaryRaw)
+    if (compound.isCompound && compound.primaryContactCanonicalId) {
+      applyCompoundCookwareMappings(out, primaryRaw, pcm, compound, structured)
+      return out
+    }
+    const primaryEntry = primaryEntryResolved ?? resolvePrimaryContactEntry(primaryRaw)
     out.primary_contact_material_id = mappingRow({
       field_key: 'primary_contact_material_id',
       raw_value: primaryRaw,
@@ -150,28 +372,41 @@ function mapCookwareTfalStyle(structured, sources) {
       source_quote: primaryRaw,
       confidence_label: pcm.confidence_label,
     })
-    const substrateEntry = matchTaxonomy(blob, SUBSTRATE_MATERIAL_TAXONOMY)
-    out.substrate_material_id = mappingRow({
-      field_key: 'substrate_material_id',
-      raw_value: exteriorCoat?.coating_name ?? primaryRaw,
-      entry: substrateEntry,
-      forceExpansion: !substrateEntry,
-      taxonomy_file: 'substrate-material-taxonomy.mjs',
-      source_url: exteriorCoat?.source_url ?? pcm.source_url,
-      confidence_label: 'manufacturer_confirmed',
-    })
-    const modEntry = matchTaxonomy(
-      `${interiorCoat?.coating_name ?? ''} ${exteriorCoat?.coating_name ?? ''}`,
-      COATING_MODIFIER_TAXONOMY,
-    )
-    out.coating_modifier_id = mappingRow({
-      field_key: 'coating_modifier_id',
-      raw_value: interiorCoat?.coating_name ?? exteriorCoat?.coating_name ?? '',
-      entry: modEntry,
-      forceExpansion: !modEntry,
-      taxonomy_file: 'coating-modifier-taxonomy.mjs',
-      source_url: interiorCoat?.source_url ?? exteriorCoat?.source_url,
-      confidence_label: 'manufacturer_confirmed',
+    const substrateMapped = mapSubstrateForPrimary(out, primaryRaw, pcm, structured, sources)
+    const substrateEntry = substrateMapped
+      ? null
+      : resolveSubstrateEntry(
+          `${exteriorCoat?.coating_name ?? ''} ${primaryRaw} ${blob}`.trim(),
+        ) ?? matchTaxonomy(`${exteriorCoat?.coating_name ?? ''} ${blob}`, SUBSTRATE_MATERIAL_TAXONOMY)
+    const ceramicMapped =
+      isCeramicNonstickPrimary(out.primary_contact_material_id?.canonical_id) ||
+      isCeramicNonstickMaterialText(primaryRaw)
+    const substrateRaw = ceramicMapped
+      ? isCeramicNonstickMaterialText(exteriorCoat?.coating_name ?? '')
+        ? 'aluminum body (not disclosed)'
+        : (exteriorCoat?.coating_name ??
+          (/\baluminum\b|\baluminium\b/i.test(blob)
+            ? 'aluminum core / body'
+            : 'Substrate not disclosed in reviewed sources'))
+      : isCeramicNonstickMaterialText(primaryRaw)
+        ? 'Substrate not disclosed in reviewed sources'
+        : (exteriorCoat?.coating_name ?? primaryRaw)
+    out.substrate_material_id =
+      substrateMapped ??
+      mappingRow({
+        field_key: 'substrate_material_id',
+        raw_value: substrateRaw,
+        entry: substrateEntry,
+        forceExpansion: !substrateEntry,
+        taxonomy_file: 'substrate-material-taxonomy.mjs',
+        source_url: exteriorCoat?.source_url ?? pcm.source_url,
+        confidence_label: 'manufacturer_confirmed',
+      })
+    out.coating_modifier_id = mapCoatingModifierForPrimary(out, {
+      interiorCoat,
+      exteriorCoat,
+      pcm,
+      primaryRaw,
     })
   }
 
@@ -180,13 +415,231 @@ function mapCookwareTfalStyle(structured, sources) {
 
 /**
  * @param {import('./types.mjs').CanonicalMappingsPayload} cookware
+ * @param {object} ctx
+ */
+function mapCoatingModifierForPrimary(cookware, ctx) {
+  const primaryId = cookware?.primary_contact_material_id?.canonical_id ?? ''
+  const ceramicCoatingContext =
+    isCeramicNonstickPrimary(primaryId) ||
+    isCeramicNonstickMaterialText(ctx.primaryRaw) ||
+    isCeramicNonstickMaterialText(ctx.interiorCoat?.coating_name ?? '') ||
+    isCeramicNonstickMaterialText(ctx.interiorCoat?.coating_type ?? '')
+
+  if (ceramicCoatingContext) {
+    const modEntry = COATING_MODIFIER_TAXONOMY.find(
+      (e) => e.canonical_id === 'ceramic_sol_gel_nonstick_coating',
+    )
+    return mappingRow({
+      field_key: 'coating_modifier_id',
+      raw_value:
+        ctx.interiorCoat?.coating_name ??
+        ctx.interiorCoat?.coating_type ??
+        ctx.primaryRaw ??
+        'ceramic sol-gel nonstick coating',
+      entry: modEntry,
+      forceExpansion: !modEntry,
+      mapping_rule_id: 'cookware_ceramic_sol_gel_modifier_v1',
+      taxonomy_file: 'coating-modifier-taxonomy.mjs',
+      source_url: ctx.interiorCoat?.source_url ?? ctx.pcm?.source_url,
+      confidence_label: 'manufacturer_confirmed',
+    })
+  }
+
+  if (!requiresCoatingModifier(primaryId)) {
+    const entry = COATING_MODIFIER_TAXONOMY.find((e) => e.canonical_id === 'no_coating_modifier')
+    return mappingRow({
+      field_key: 'coating_modifier_id',
+      raw_value: 'uncoated / no coating modifier',
+      entry,
+      mapping_rule_id: 'cookware_no_coating_modifier_v1',
+      source_url: ctx.pcm?.source_url ?? null,
+      confidence_label: 'manufacturer_confirmed',
+    })
+  }
+
+  const modEntry = isCeramicNonstickPrimary(primaryId)
+    ? (COATING_MODIFIER_TAXONOMY.find((e) => e.canonical_id === 'ceramic_sol_gel_nonstick_coating') ??
+      matchTaxonomy(
+        `${ctx.interiorCoat?.coating_name ?? ''} ${ctx.primaryRaw ?? ''}`,
+        COATING_MODIFIER_TAXONOMY,
+      ))
+    : matchTaxonomy(
+        `${ctx.interiorCoat?.coating_name ?? ''} ${ctx.exteriorCoat?.coating_name ?? ''}`,
+        COATING_MODIFIER_TAXONOMY,
+      )
+  return mappingRow({
+    field_key: 'coating_modifier_id',
+    raw_value:
+      ctx.interiorCoat?.coating_name ??
+      ctx.exteriorCoat?.coating_name ??
+      ctx.primaryRaw ??
+      '',
+    entry: modEntry,
+    forceExpansion: !modEntry,
+    taxonomy_file: 'coating-modifier-taxonomy.mjs',
+    source_url: ctx.interiorCoat?.source_url ?? ctx.exteriorCoat?.source_url,
+    confidence_label: 'manufacturer_confirmed',
+  })
+}
+
+/**
+ * @param {import('./types.mjs').CanonicalMappingsPayload} cookware
+ * @param {string} primaryRaw
+ * @param {object} pcm
+ */
+function mapSubstrateForPrimary(cookware, primaryRaw, pcm, structured, sources) {
+  const mappedPrimaryId = cookware?.primary_contact_material_id?.canonical_id ?? ''
+  const resolvedPrimaryId = resolvePrimaryContactEntry(primaryRaw)?.canonical_id
+  const primaryId =
+    resolvedPrimaryId ??
+    (mappedPrimaryId && mappedPrimaryId !== TAXONOMY_EXPANSION_REQUIRED ? mappedPrimaryId : '')
+  const ceramicProduct =
+    isCeramicNonstickPrimary(primaryId) || isCeramicNonstickMaterialText(primaryRaw)
+  if (ceramicProduct) {
+    const blob = collectSourceBlob(structured ?? {}, sources ?? [])
+    const compoundTexts = [
+      primaryRaw,
+      pcm?.material_identity ?? '',
+      ...(structured?.coatings_and_finishes ?? []).flatMap((c) => [
+        c.coating_name ?? '',
+        c.coating_type ?? '',
+      ]),
+      blob,
+    ]
+    for (const text of compoundTexts) {
+      const hint = parseCeramicCoatingSubstrateHint(text)
+      if (hint === 'hard_anodized_aluminum') {
+        const entry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'hard_anodized_aluminum')
+        return mappingRow({
+          field_key: 'substrate_material_id',
+          raw_value: 'hard anodized aluminum body',
+          entry,
+          mapping_rule_id: 'cookware_ceramic_compound_substrate_v1',
+          source_url: pcm.source_url,
+          source_quote: String(text).slice(0, 240),
+          confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+        })
+      }
+      if (hint === 'aluminum_core') {
+        const entry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'aluminum_core')
+        return mappingRow({
+          field_key: 'substrate_material_id',
+          raw_value: 'aluminum core / body',
+          entry,
+          mapping_rule_id: 'cookware_ceramic_compound_substrate_v1',
+          source_url: pcm.source_url,
+          source_quote: String(text).slice(0, 240),
+          confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+        })
+      }
+    }
+    if (/hard\s*anodized|hard\s*anodised/i.test(blob)) {
+      const entry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'hard_anodized_aluminum')
+      return mappingRow({
+        field_key: 'substrate_material_id',
+        raw_value: 'hard anodized aluminum body',
+        entry,
+        mapping_rule_id: 'cookware_ceramic_aluminum_substrate_v1',
+        source_url: pcm.source_url,
+        confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+      })
+    }
+    if (/aluminum|aluminium/i.test(blob.replace(/_/g, ' '))) {
+      const entry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'aluminum_core')
+      return mappingRow({
+        field_key: 'substrate_material_id',
+        raw_value: 'aluminum core / body',
+        entry,
+        mapping_rule_id: 'cookware_ceramic_aluminum_substrate_v1',
+        source_url: pcm.source_url,
+        confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+      })
+    }
+    return mappingRow({
+      field_key: 'substrate_material_id',
+      raw_value: 'Substrate not disclosed in reviewed sources',
+      entry: null,
+      forceExpansion: true,
+      taxonomy_file: 'substrate-material-taxonomy.mjs',
+      source_url: pcm.source_url,
+      confidence_label: pcm.confidence_label ?? 'unknown',
+    })
+  }
+  if (/cast_iron|enameled_cast_iron/.test(primaryId)) {
+    const entry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'cast_iron_body')
+    return mappingRow({
+      field_key: 'substrate_material_id',
+      raw_value: primaryRaw || 'cast iron body',
+      entry,
+      mapping_rule_id: 'cookware_cast_iron_substrate_v1',
+      source_url: pcm.source_url,
+      confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+    })
+  }
+
+  if (isStructurallyPfasFreePrimary(primaryId) && /stainless/.test(primaryId)) {
+    const explicitStainlessSubstrate = resolveStainlessSubstrateFromNormalizedRaw(
+      primaryRaw,
+      SUBSTRATE_MATERIAL_TAXONOMY,
+    )
+    if (explicitStainlessSubstrate) {
+      return mappingRow({
+        field_key: 'substrate_material_id',
+        raw_value: primaryRaw,
+        entry: explicitStainlessSubstrate,
+        mapping_rule_id: 'cookware_stainless_body_v1',
+        source_url: pcm.source_url,
+        confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+      })
+    }
+    const graphiteEvidence = [
+      primaryRaw,
+      ...(structured?.secondary_components ?? []).map((c) => c.material_identity ?? ''),
+    ]
+      .join(' ')
+      .replace(/_/g, ' ')
+    const graphiteEntry =
+      /graphite\s*core|graphite_core|g5\s*graphite/i.test(graphiteEvidence) &&
+      SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'graphite_structural_core')
+    if (graphiteEntry) {
+      return mappingRow({
+        field_key: 'substrate_material_id',
+        raw_value: 'Graphite core + stainless bonded construction',
+        entry: graphiteEntry,
+        mapping_rule_id: 'cookware_graphite_core_v1',
+        source_url: pcm.source_url,
+        confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+      })
+    }
+    const stainlessBody = SUBSTRATE_MATERIAL_TAXONOMY.find(
+      (e) => e.canonical_id === 'stainless_steel_body',
+    )
+    if (stainlessBody) {
+      return mappingRow({
+        field_key: 'substrate_material_id',
+        raw_value: 'Stainless steel bonded body / exterior',
+        entry: stainlessBody,
+        mapping_rule_id: 'cookware_stainless_body_v1',
+        source_url: pcm.source_url,
+        confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+      })
+    }
+  }
+
+  return null
+}
+
+/**
+ * @param {import('./types.mjs').CanonicalMappingsPayload} cookware
  * @param {object} structured
  */
 function isPtfeNonstickCookware(cookware, structured) {
   const primaryId = cookware?.primary_contact_material_id?.canonical_id ?? ''
-  if (PTFE_PRIMARY_IDS.has(primaryId)) return true
+  if (isCeramicNonstickPrimary(primaryId)) return false
+  if (PTFE_PRIMARY_IDS.has(primaryId) || isPtfeFamilyPrimary(primaryId)) return true
   const pcm = String(structured?.primary_contact_material?.material_identity ?? '')
-  return /ptfe|non-?stick/i.test(pcm)
+  if (isCeramicNonstickMaterialText(pcm)) return false
+  return /\bptfe\b/i.test(pcm)
 }
 
 /**
@@ -223,6 +676,46 @@ function mapPfasStatus(structured, sources, cookware) {
       mapping_rule_id: 'pfas_intentionally_added_disclosed_v1',
       source_url: structured?.ingredient_list?.source_url ?? sc.testing_source_url ?? null,
       source_quote: 'Ingredient/disclosure lists PTFE, PFA, FEP (PFAS family).',
+      confidence_label: 'manufacturer_confirmed',
+    })
+  }
+
+  const primaryId = effectivePrimaryCanonicalId(cookware, structured)
+
+  if (isCeramicNonstickPrimary(primaryId)) {
+    if (sc.pfas_free_claim?.claimed && /\bpfas[-\s]?free\b/i.test(`${sc.pfas_free_claim.source_quote ?? ''} ${blob}`)) {
+      const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_free_claimed')
+      return mappingRow({
+        field_key: 'pfas_status_id',
+        raw_value: sc.pfas_free_claim.source_quote ?? 'pfas_free_claim',
+        entry,
+        mapping_rule_id: 'pfas_free_claimed_v1',
+        source_url: sc.pfas_free_claim.source_url,
+        source_quote: sc.pfas_free_claim.source_quote ?? null,
+        confidence_label: 'manufacturer_confirmed',
+      })
+    }
+    const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_not_disclosed')
+    return mappingRow({
+      field_key: 'pfas_status_id',
+      raw_value: 'Ceramic nonstick — PFAS not affirmed in reviewed sources',
+      entry,
+      mapping_rule_id: 'pfas_not_disclosed_v1',
+      source_url: cookware?.primary_contact_material_id?.source_url ?? pcmSource(structured),
+      source_quote: cookware?.primary_contact_material_id?.raw_value ?? primaryId,
+      confidence_label: 'unknown',
+    })
+  }
+
+  if (isStructurallyPfasFreePrimary(primaryId)) {
+    const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_not_present_inert_material')
+    return mappingRow({
+      field_key: 'pfas_status_id',
+      raw_value: 'Inert food-contact material — PFAS not structurally present',
+      entry,
+      mapping_rule_id: 'pfas_not_present_inert_material_v1',
+      source_url: cookware?.primary_contact_material_id?.source_url ?? pcmSource(structured),
+      source_quote: cookware?.primary_contact_material_id?.raw_value ?? primaryId,
       confidence_label: 'manufacturer_confirmed',
     })
   }
@@ -264,7 +757,7 @@ function mapPfasStatus(structured, sources, cookware) {
     })
   }
 
-  if (/ptfe|pfa|fep|pfas/i.test(blob)) {
+  if (blobDisclosesPfasFamilyPresent(blob)) {
     const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_present_disclosed')
     return mappingRow({
       field_key: 'pfas_status_id',
@@ -300,6 +793,8 @@ function mapSafetyClaims(structured, sources, cookware) {
   const sc = structured?.safety_claims ?? {}
   const blob = collectSourceBlob(structured, sources)
   const ptfeProduct = isPtfeNonstickCookware(cookware, structured)
+  const primaryId = effectivePrimaryCanonicalId(cookware, structured)
+  const inertPrimary = isStructurallyPfasFreePrimary(primaryId)
   /** @type {Record<string, import('./types.mjs').CanonicalFieldMapping>} */
   const out = {}
 
@@ -310,10 +805,36 @@ function mapSafetyClaims(structured, sources, cookware) {
       detect: () => /\bno\s+pfoa\b/i.test(blob) || /pfoa[-\s]?free/i.test(blob),
     },
     {
+      key: 'ptfe_free_claim',
+      schemaKey: null,
+      detect: () => {
+        if (ptfeProduct) return false
+        return (
+          /\bptfe[-\s]?free\b/i.test(blob) ||
+          /\bptfe\b[^.\n;]{0,24}\bfree\b/i.test(blob) ||
+          /\bno\s+ptfe\b/i.test(blob)
+        )
+      },
+    },
+    {
+      key: 'pfas_free_claim_structurally_verified',
+      schemaKey: 'pfas_free_claim',
+      detect: () => {
+        if (!inertPrimary || ptfeProduct) return false
+        if (!sc.pfas_free_claim?.claimed) return false
+        if (sc.pfas_free_claim.structural_guarantee === true) return true
+        const q = `${sc.pfas_free_claim.source_quote ?? ''} ${blob}`
+        return (
+          /\bpfas[-\s]?free\b/i.test(q) &&
+          !/pfas[-\s]?free alternative|avoid pfas|guide|comparison/i.test(q)
+        )
+      },
+    },
+    {
       key: 'pfas_free_marketing_claim',
       schemaKey: 'pfas_free_claim',
       detect: () => {
-        if (ptfeProduct) return false
+        if (ptfeProduct || inertPrimary) return false
         if (!sc.pfas_free_claim?.claimed) return false
         const q = `${sc.pfas_free_claim.source_quote ?? ''} ${blob}`
         return (
@@ -348,7 +869,23 @@ function mapSafetyClaims(structured, sources, cookware) {
         ? (blob.match(/pfoa[-\s]?free[^.;]*/i)?.[0] ?? 'PFOA-free (copy)')
         : def.key === 'non_toxic_marketing_claim'
           ? 'non_toxic_claim'
-          : def.key
+          : def.key === 'pfas_free_claim_structurally_verified'
+            ? (schemaField?.source_quote?.trim() ||
+              blob.match(/\bpfas[-\s]?free[^.;]*/i)?.[0] ||
+              'PFAS-free (structurally verified by inert food-contact material)')
+            : def.key
+
+    const sourceUrl = resolveSafetyClaimSourceUrl(structured, sources, def.key)
+    const sourceQuote =
+      def.key === 'pfoa_free_claim'
+        ? (structured?.required_check_results?.find(
+            (r) => r.check_id === 'external.pfoa_vs_pfas_free_distinction',
+          )?.source_quote ??
+          schemaField?.source_quote ??
+          raw)
+        : def.key === 'non_toxic_marketing_claim'
+          ? (schemaField?.source_quote ?? raw)
+          : raw
 
     out[def.key] = {
       ...mappingRow({
@@ -356,9 +893,9 @@ function mapSafetyClaims(structured, sources, cookware) {
         raw_value: raw,
         entry: taxEntry,
         mapping_rule_id: taxEntry?.mapping_rule_id,
-        source_url: schemaField?.source_url ?? pcmSource(structured),
-        source_quote: raw,
-        confidence_label: schemaField ? 'manufacturer_confirmed' : 'retailer_confirmed',
+        source_url: sourceUrl,
+        source_quote: sourceQuote,
+        confidence_label: inferConfidenceForSafetyClaim(def.key, sourceUrl, sources, structured),
       }),
       claimed: true,
     }
@@ -371,7 +908,16 @@ function mapSafetyClaims(structured, sources, cookware) {
  * @param {object} structured
  * @param {object[]} sources
  */
-function mapRegulatoryFlags(structured, sources) {
+/**
+ * @param {object} structured
+ * @param {object[]} sources
+ * @param {import('./types.mjs').CanonicalMappingsPayload} cookware
+ */
+function mapRegulatoryFlags(structured, sources, cookware) {
+  if (!shouldApplyMinnesotaPfasRegulatoryFlag(cookware, structured)) {
+    return []
+  }
+
   const rcBlob = (structured?.required_check_results ?? [])
     .map((r) => `${r.source_quote ?? ''} ${r.detail ?? ''}`)
     .join('\n')
@@ -455,33 +1001,54 @@ export function applyCanonicalMappings(structured, sources = [], options = {}) {
   const sub = structured?.product_identity?.subcategory ?? ''
   const cookware = mapCookwareTfalStyle(structured, sources)
   sanitizePfasFreeClaimMislabel(structured, cookware)
+  stripInferredPfasFreeMarketingClaim(structured)
   cookware.pfas_status_id = mapPfasStatus(structured, sources, cookware)
   cookware.safety_claim_ids = mapSafetyClaims(structured, sources, cookware)
+  const primaryId = cookware?.primary_contact_material_id?.canonical_id ?? ''
   if (isPtfeNonstickCookware(cookware, structured)) {
     delete cookware.safety_claim_ids.pfas_free_marketing_claim
   }
-  cookware.regulatory_flag_ids = mapRegulatoryFlags(structured, sources)
+  if (isStructurallyPfasFreePrimary(primaryId)) {
+    delete cookware.safety_claim_ids.pfas_free_marketing_claim
+  }
+
+  cookware.regulatory_flag_ids = mapRegulatoryFlags(structured, sources, cookware)
   cookware.certification_ids = mapCertifications(structured)
 
   if (options.facts) {
     const factBlob = options.facts.map((f) => `${f.fact_key} ${f.fact_value}`).join('\n')
     if (/pfoa[-\s]?free/i.test(factBlob) && !cookware.safety_claim_ids?.pfoa_free_claim) {
       const taxEntry = SAFETY_CLAIM_TAXONOMY.find((e) => e.canonical_id === 'pfoa_free_claim')
+      const pfoaUrl = resolveSafetyClaimSourceUrl(structured, sources, 'pfoa_free_claim')
       cookware.safety_claim_ids.pfoa_free_claim = {
         ...mappingRow({
           field_key: 'pfoa_free_claim',
           raw_value: factBlob.match(/pfoa[-\s]?free/i)?.[0] ?? 'PFOA-free',
           entry: taxEntry,
-          source_url: pcmSource(structured),
+          source_url: pfoaUrl,
+          confidence_label: inferConfidenceForSafetyClaim(
+            'pfoa_free_claim',
+            pfoaUrl,
+            sources,
+            structured,
+          ),
         }),
         claimed: true,
       }
     }
   }
 
+  reconcileCanonicalMappingsConfidence(cookware, sources, structured)
+  syncStructuredConfidenceFromMappings(structured, cookware)
   cookware.blockers = getCanonicalApprovalBlockers(cookware, { subcategory: sub })
   structured.canonical_mappings = cookware
+  structured.transparency_assessment = assessTransparency(structured, cookware, sources)
   applyRequiredEvidenceValidation(structured, sources, options)
+  if (options.agent_metadata && typeof options.agent_metadata === 'object') {
+    applyOutOfScopeSafetySignalPolicy(structured, options.agent_metadata, sources)
+  } else {
+    applyOutOfScopeSafetySignalPolicy(structured, {}, sources)
+  }
   return cookware
 }
 

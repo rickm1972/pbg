@@ -16,4 +16,4 @@ export const RISK_MEASURE_FACTORS = [
 ] as const
 
 export const RISK_MEASURE_CLOSING =
-  'Risk emerges when all three factors combine. Some products score high overall even when one factor is concerning — for example, cast iron cookware faces harsh use conditions but stays safe because the material is inert.'
+  'Risk emerges when all three factors combine. Some products can still score well even when one factor is concerning — for example, cast iron cookware faces harsh use conditions but remains low concern because the material is inert.'

@@ -2,7 +2,12 @@
  * Check 5 — Why This Score vocabulary options present and valid.
  */
 
-import { allowedOptionsForField } from '../../agent2/why-this-score-vocabulary.mjs'
+import { buildWhyThisScoreOptions } from '../../agent2/why-this-score-map.mjs'
+import {
+  isAllowedWhyOption,
+  NONE,
+  normalizeDisclosureBadge,
+} from '../../../src/shared/why-this-score-vocabulary.mjs'
 
 const FIELD_KEYS = [
   'primary_material_options',
@@ -13,27 +18,41 @@ const FIELD_KEYS = [
   'certifications_options',
 ]
 
+/** @param {string} fieldKey */
+function optionsForValidation(fieldKey, stored, rebuilt) {
+  const source = rebuilt?.[fieldKey]?.length ? rebuilt[fieldKey] : stored
+  if (!Array.isArray(source)) return []
+  return source.filter((item) => {
+    const s = String(item ?? '').trim()
+    if (!s) return false
+    if (fieldKey === 'primary_material_options' && s === NONE) return false
+    return true
+  })
+}
+
 /**
  * @param {object} score — product_scores row
  * @param {object} inputs — scoring_inputs.inputs jsonb
  * @param {object} [scoringInputRow] — full scoring_inputs row
+ * @param {object} [evidence] — approved product_evidence (rebuild options when present)
  */
-export function runExplanationAccuracy(score, inputs, scoringInputRow = null) {
+export function runExplanationAccuracy(score, inputs, scoringInputRow = null, evidence = null) {
   const flags = []
   const issues = []
   const row = scoringInputRow ?? {}
+  const rebuilt =
+    evidence && inputs ? buildWhyThisScoreOptions(evidence, inputs) : null
 
   for (const key of FIELD_KEYS) {
-    const value = row[key]
-    if (!Array.isArray(value) || value.length === 0) {
+    const value = optionsForValidation(key, row[key], rebuilt)
+    if (value.length === 0) {
       flags.push({ code: 'WHY_FIELD_MISSING', message: `${key} is empty` })
       issues.push(`missing ${key}`)
       continue
     }
 
-    const allowed = new Set(allowedOptionsForField(key))
     for (const item of value) {
-      if (!allowed.has(item)) {
+      if (!isAllowedWhyOption(key, item)) {
         flags.push({
           code: 'WHY_OPTION_NOT_IN_VOCABULARY',
           message: `${key} contains non-vocabulary option: ${item}`,
@@ -43,10 +62,14 @@ export function runExplanationAccuracy(score, inputs, scoringInputRow = null) {
     }
   }
 
-  const disclosure = Array.isArray(row.disclosure_quality_options)
-    ? row.disclosure_quality_options[0]
+  const disclosure = Array.isArray(
+    optionsForValidation('disclosure_quality_options', row.disclosure_quality_options, rebuilt),
+  )
+    ? normalizeDisclosureBadge(
+        optionsForValidation('disclosure_quality_options', row.disclosure_quality_options, rebuilt)[0],
+      )
     : null
-  const badge = String(inputs?.layer_4b?.transparency_badge ?? '').trim()
+  const badge = normalizeDisclosureBadge(inputs?.layer_4b?.transparency_badge ?? '')
   if (disclosure && badge && disclosure !== badge) {
     flags.push({
       code: 'DISCLOSURE_BADGE_MISMATCH',

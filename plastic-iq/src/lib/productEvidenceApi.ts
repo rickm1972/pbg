@@ -5,6 +5,10 @@ import {
   filterSourcesHeuristic,
   type PublicProductSource,
 } from './publicSourceDisplay'
+import {
+  buildPublicDisplayContract,
+  type PublicProductDisplayInput,
+} from './publicProductDisplayContract'
 
 export type ProductPageSource = {
   source_type: string
@@ -64,14 +68,19 @@ export async function fetchProductEvidenceDisplayPack(
 /** Sources filtered for public display (approved evidence + Gate 1 eligibility rules). */
 export async function fetchPublicProductSources(
   productId: string,
+  product?: PublicProductDisplayInput | null,
 ): Promise<PublicProductSource[]> {
+  const contract = product ? buildPublicDisplayContract(product, null) : null
   const evidence = await fetchProductEvidenceDisplayPack(productId)
   if (evidence?.sources?.length) {
-    return buildPublicSourcesFromEvidence(evidence)
+    const resolvedContract = buildPublicDisplayContract(product ?? { product_name: '' }, evidence)
+    return buildPublicSourcesFromEvidence(evidence, resolvedContract)
   }
 
   const raw = await fetchProductSources(productId)
-  return filterSourcesHeuristic(raw)
+  const resolvedContract =
+    product != null ? buildPublicDisplayContract(product, null) : contract
+  return filterSourcesHeuristic(raw, resolvedContract)
 }
 
 /** Sources from approved Agent 1 evidence packet (`product_evidence.sources`). */

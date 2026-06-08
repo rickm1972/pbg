@@ -4,6 +4,20 @@
 
 import { StructuredPacketSchema } from './schema.mjs'
 
+async function loadProductIdentityHelpers() {
+  const bust = process.env.AGENT1_RELOAD_MODULES === '1' ? `?t=${Date.now()}` : ''
+  const href = new URL(
+    `../../src/shared/agent1/gate1-product-identity.mjs${bust}`,
+    import.meta.url,
+  ).href
+  const amazonHref = new URL(
+    `../../src/shared/agent1/amazon-source-consistency.mjs${bust}`,
+    import.meta.url,
+  ).href
+  await import(amazonHref)
+  return import(href)
+}
+
 const INGREDIENT_SOURCES = new Set(['manufacturer_label', 'amazon_listing', 'sds_pdf'])
 const FRAGRANCE_VALUES = new Set([
   'synthetic_undisclosed',
@@ -47,6 +61,27 @@ function coerceUrlOrNull(value) {
   const s = String(value).trim()
   if (/^https?:\/\//i.test(s)) return s
   return null
+}
+
+function coerceBoolean(value, fallback = false) {
+  if (typeof value === 'boolean') return value
+  if (value == null || value === '') return fallback
+  const s = String(value).trim().toLowerCase()
+  if (s === 'true' || s === 'yes' || s === '1') return true
+  if (s === 'false' || s === 'no' || s === '0') return false
+  return fallback
+}
+
+function coerceSkuNullCode(productIdentity) {
+  const sku =
+    productIdentity.sku_or_model != null ? String(productIdentity.sku_or_model).trim() : ''
+  if (sku) {
+    productIdentity.sku_or_model = sku
+    delete productIdentity.sku_null_code
+    return
+  }
+  productIdentity.sku_or_model = null
+  productIdentity.sku_null_code = 'NOT_LISTED'
 }
 
 /** LLM often returns a single object instead of a one-element array. */
@@ -221,7 +256,6 @@ function enrichRetailerLinks(links, product) {
 
 function deriveHumanReview(structured) {
   const flags = structured.conflict_and_review
-  if (flags.requires_human_review) return true
   if (flags.class_action_history) return true
   if (flags.conflicting_evidence?.length > 0) return true
   if (structured.primary_contact_material.undisclosed_code === 'PROPRIETARY_NAMED') return true
@@ -238,7 +272,7 @@ function filterAffirmativeSecondaries(components) {
 
 function filterPhantomCoatings(structured) {
   const primary = structured.primary_contact_material.material_identity
-  const isBareMetal = /^(cast_iron|stainless_steel|carbon_steel)/.test(primary)
+  const isBareMetal = /^(cast_iron|stainless|carbon_steel)/.test(primary)
   if (!isBareMetal) return structured.coatings_and_finishes ?? []
   return (structured.coatings_and_finishes ?? []).filter((c) => {
     if (/ptfe|terrabond|proprietary_undisclosed|ceramic_nonstick/.test(c.coating_type)) {
@@ -256,9 +290,7 @@ function coerceStructuredEvidence(se, product) {
   se.product_identity.brand = se.product_identity.brand || product.brand || 'unknown'
   se.product_identity.subcategory =
     se.product_identity.subcategory || product.subcategory || product.category || 'general'
-  if (se.product_identity.sku_or_model == null && !se.product_identity.sku_null_code) {
-    se.product_identity.sku_null_code = 'NOT_LISTED'
-  }
+  coerceSkuNullCode(se.product_identity)
   if (se.product_identity.country_of_origin == null && !se.product_identity.country_null_code) {
     se.product_identity.country_null_code = 'NOT_DISCLOSED'
   }
@@ -275,6 +307,11 @@ function coerceStructuredEvidence(se, product) {
     se.primary_contact_material.material_identity = 'UNKNOWN'
   }
   se.primary_contact_material.source_url = coerceUrlOrNull(se.primary_contact_material.source_url)
+  const pcmId = String(se.primary_contact_material.material_identity ?? '').trim()
+  se.primary_contact_material.material_specs_disclosed = coerceBoolean(
+    se.primary_contact_material.material_specs_disclosed,
+    pcmId.length > 0 && pcmId !== 'UNKNOWN',
+  )
 
   se.certifications = se.certifications ?? {}
   se.certifications.claimed_certifications = coerceToArray(
@@ -334,14 +371,28 @@ function coerceStructuredEvidence(se, product) {
  * @param {object} parsed — raw LLM JSON
  * @param {object} product
  */
-export function normalizeStructuredPacket(parsed, product) {
+export async function normalizeStructuredPacket(parsed, product) {
   const se = parsed.structured_evidence ?? parsed
+  const sources = parsed.sources ?? []
   coerceStructuredEvidence(se, product)
+  const {
+    alignProductIdentityToPrimaryRetailer,
+    applyRetailerSkuPrecedence,
+    reconcileProductIdentityWarnings,
+  } = await loadProductIdentityHelpers()
+  alignProductIdentityToPrimaryRetailer(se, product, sources)
+  applyRetailerSkuPrecedence(se, sources)
+
+  const warnings = reconcileProductIdentityWarnings(
+    parsed.agent_metadata?.warnings ?? [],
+    se,
+    product,
+  )
 
   const packet = StructuredPacketSchema.parse({
     structured_evidence: se,
-    sources: parsed.sources ?? [],
-    agent_metadata: parsed.agent_metadata ?? { warnings: [] },
+    sources,
+    agent_metadata: { ...(parsed.agent_metadata ?? {}), warnings },
   })
 
   return packet

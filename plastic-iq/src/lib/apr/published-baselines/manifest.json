@@ -1,0 +1,38 @@
+{
+  "version": "0.25.0",
+  "published_at": "2026-06-02T00:00:00.000Z",
+  "baselines": [
+    {
+      "product_id": "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8",
+      "slug": "lodge",
+      "snapshot_id": "baseline-lodge",
+      "content_hash": "6da44491914b737811c5901d30ed413ee239851bee70ce7f4db95eee48420ca8",
+      "file": "published-baselines/lodge.json",
+      "approved_score_source": "product_scores"
+    },
+    {
+      "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+      "slug": "all-clad",
+      "snapshot_id": "baseline-all-clad",
+      "content_hash": "5c867fcfed37815f060517c360110b0992692fc2fb68a652c23e1d389d35c60b",
+      "file": "published-baselines/all-clad.json",
+      "approved_score_source": "product_scores"
+    },
+    {
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "slug": "caraway",
+      "snapshot_id": "baseline-caraway",
+      "content_hash": "230424ebf7550307ca0bad4a4615bc51a9771844bf01963ecf4bea60d3dd0d1a",
+      "file": "published-baselines/caraway.json",
+      "approved_score_source": "product_scores"
+    },
+    {
+      "product_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+      "slug": "t-fal",
+      "snapshot_id": "baseline-t-fal",
+      "content_hash": "b9cf1383bdb0cf4ba84a6618d9ab3275236b1f0cc9248182686869dc9314be4f",
+      "file": "published-baselines/t-fal.json",
+      "approved_score_source": "product_scores"
+    }
+  ]
+}

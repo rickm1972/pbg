@@ -15,6 +15,7 @@ import {
   insertProductScore,
   updateAgentStatus,
 } from './supabase.mjs'
+import { getProductTypeRegistryPreflightError } from '../../src/shared/product-type-registry/preflight.mjs'
 
 export async function runAgent3({ productId, productName, dryRun = false }) {
   const supabase = createServiceClient()
@@ -65,6 +66,15 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
     evidence = await fetchApprovedEvidence(supabase, id)
   } catch {
     console.log('Step 2b: (no approved evidence bundle — pathway from normalization fields only)')
+  }
+
+  const registryPreflightError = getProductTypeRegistryPreflightError({ product, evidence })
+  if (registryPreflightError) {
+    console.log(`Stopped: ${registryPreflightError}`)
+    if (!dryRun) {
+      await updateAgentStatus(supabase, id, 'normalization_approved')
+    }
+    return { ok: false, product, reason: registryPreflightError }
   }
 
   const result = scoreNormalization(inputs, {

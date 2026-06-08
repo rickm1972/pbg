@@ -187,7 +187,10 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
         onError(outcome.message ?? 'Agent 4 run failed')
         return
       }
-      onNotice(outcome.message ?? 'QA complete — awaiting review.')
+      onNotice(
+        outcome.message ??
+          'QA checks recomputed — refresh the review panel if score sanity still looks stale.',
+      )
       await load()
       setListFilter('review')
       setSelectedId(productId)
@@ -425,6 +428,7 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               rejecting={rejecting}
               rejectNotes={rejectNotes}
               onRejectNotesChange={setRejectNotes}
+              onRefreshChecks={() => handleRun(selectedReviewItem.product.product_id)}
               onApprove={handleApprove}
               onRejectOpen={() => setRejecting(true)}
               onRejectCancel={() => {
@@ -539,6 +543,7 @@ function QaReviewPanel({
   rejecting,
   rejectNotes,
   onRejectNotesChange,
+  onRefreshChecks,
   onApprove,
   onRejectOpen,
   onRejectCancel,
@@ -553,6 +558,7 @@ function QaReviewPanel({
   rejecting: boolean
   rejectNotes: string
   onRejectNotesChange: (v: string) => void
+  onRefreshChecks?: () => void
   onApprove: () => void
   onRejectOpen: () => void
   onRejectCancel: () => void
@@ -597,6 +603,16 @@ function QaReviewPanel({
               ? 'All checks passed — human approval still required before publish.'
               : `${flaggedCount} check(s) flagged — review flags below before approving.`}
           </p>
+        ) : null}
+        {!readOnly && onRefreshChecks ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onRefreshChecks}
+            className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {busy ? 'Recomputing…' : 'Recompute QA checks'}
+          </button>
         ) : null}
       </header>
 
@@ -779,13 +795,23 @@ function checkSummary(
     return `${check.positives_audited} positive · ${check.negatives_audited} negative · net ${check.net_adjustment_reported} (recomputed ${check.net_adjustment_recomputed})`
   }
   if (key === 'score_sanity' && 'peer_count' in check) {
+    if (check.status === 'not_applicable') {
+      return (
+        check.message ??
+        'Insufficient current peers for score sanity check (informational only)'
+      )
+    }
     if (check.status === 'skip') {
       return check.skip_reason === 'insufficient_peers'
-        ? 'Skipped — fewer than 2 peer scores in subcategory'
+        ? 'Skipped — fewer than 5 current approved peer scores in subcategory'
         : 'Skipped'
     }
     if (check.peer_median != null && check.delta_from_median != null) {
-      return `Score ${check.product_score} vs peer median ${check.peer_median} (Δ${Math.round(check.delta_from_median)}, ${check.peer_count} peers)`
+      const names =
+        check.peer_products?.map((p) => p.product_name ?? p.product_id.slice(0, 8)).join(', ') ??
+        ''
+      const peerList = names ? ` · peers: ${names}` : ''
+      return `Score ${check.product_score} vs peer median ${check.peer_median} (Δ${Math.round(check.delta_from_median)}, ${check.peer_count} current peers)${peerList}`
     }
     return `Score ${check.product_score}`
   }
@@ -839,9 +865,11 @@ function CheckStatusChip({ status }: { status: QaCheckStatus }) {
       ? 'bg-emerald-100 text-emerald-900'
       : status === 'flag'
         ? 'bg-amber-100 text-amber-900'
-        : status === 'skip'
-          ? 'bg-slate-100 text-slate-600'
-          : 'bg-red-100 text-red-900'
+        : status === 'not_applicable'
+          ? 'bg-slate-100 text-slate-700'
+          : status === 'skip'
+            ? 'bg-slate-100 text-slate-600'
+            : 'bg-red-100 text-red-900'
 
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${styles}`}>

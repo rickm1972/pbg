@@ -98,9 +98,9 @@ export async function executeRequiredCheckRetrieval(params) {
   }
 
   for (const checkId of PTFE_REQUIRED_EXTERNAL_CHECK_IDS) {
-    if (!triggers.has('ptfe_primary_contact') && !triggers.has('pfoa_pfas_distinction')) continue
     const task = getRetrievalTaskForCheck(checkId)
     if (!task || !hasRetrievalRunner(checkId) || seen.has(checkId)) continue
+    if (!isRetrievalTaskTriggered(task, triggers)) continue
     tasksToRun.push(task)
     seen.add(checkId)
   }

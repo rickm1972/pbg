@@ -17,6 +17,7 @@ import {
   updateProductQa,
   updateAgentStatus,
 } from './supabase.mjs'
+import { getProductTypeRegistryPreflightError } from '../../src/shared/product-type-registry/preflight.mjs'
 
 export async function runAgent4({
   productId,
@@ -33,7 +34,10 @@ export async function runAgent4({
   const id = product.product_id
   console.log(`\n=== Agent 4 QA: ${product.product_name} (${id}) ===\n`)
 
-  if (!AGENT4_SEQUENTIAL_RUN_STATUSES.has(product.agent_status)) {
+  const allowQaRefresh =
+    replaceExisting &&
+    (product.agent_status === 'qa_awaiting_review' || product.agent_status === 'qa_in_progress')
+  if (!AGENT4_SEQUENTIAL_RUN_STATUSES.has(product.agent_status) && !allowQaRefresh) {
     const reason = `Agent 4 requires a score ready for QA. Current: ${product.agent_status}`
     console.log(`Stopped: ${reason}`)
     return { ok: false, product, reason }
@@ -41,6 +45,13 @@ export async function runAgent4({
 
   const evidence = await fetchApprovedEvidence(supabase, id)
   const scoringInput = await fetchApprovedScoringInputs(supabase, id)
+
+  const registryPreflightError = getProductTypeRegistryPreflightError({ product, evidence })
+  if (registryPreflightError) {
+    console.log(`Stopped: ${registryPreflightError}`)
+    return { ok: false, product, reason: registryPreflightError }
+  }
+
   const score = await fetchScoreToAudit(supabase, id, scoreId)
 
   const existingQa = await findExistingQaForScore(supabase, score.score_id)
@@ -56,15 +67,12 @@ export async function runAgent4({
   }
 
   const peerRows = await fetchSubcategoryPeerScores(supabase, product, score.score_id)
-  const peerScores = peerRows.map((p) => ({
-    score: p.score,
-    inputs: p.inputs,
-  }))
+  const peerScores = peerRows
 
   console.log(
     `Loaded: evidence ${evidence.evidence_id}, input ${scoringInput.input_id}, score ${score.score_id} (${score.pac_safety_score} ${score.tier})`,
   )
-  console.log(`Subcategory peers (approved): ${peerScores.length}`)
+  console.log(`Subcategory peers (current active pipeline): ${peerScores.length}`)
 
   const report = runAllQaChecks({
     product,

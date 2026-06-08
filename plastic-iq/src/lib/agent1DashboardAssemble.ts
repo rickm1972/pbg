@@ -1,4 +1,3 @@
-import { isAgent1HeldFromAwaitingReviewTab } from './agent1RunTabOnly'
 import type { Agent1DashboardData, ProductEvidence, ProductPipelineRow } from '../types/agent'
 
 export type PendingReviewEntry = Agent1DashboardData['pendingReview'][number] & {
@@ -25,7 +24,6 @@ export function assembleAgent1Dashboard(
 
   for (const product of products) {
     if (product.agent_status === 'evidence_awaiting_review') {
-      if (isAgent1HeldFromAwaitingReviewTab(product.product_id)) continue
       const pending = latestSubmitted.get(product.product_id)
       if (pending) {
         pendingReview.push({ product, evidence: pending })

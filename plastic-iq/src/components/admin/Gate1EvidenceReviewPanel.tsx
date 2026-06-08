@@ -30,7 +30,9 @@ import {
 } from '../../lib/canonicalEvidenceMapping'
 import { PipelineStatusBar } from './PipelineStatusBar'
 import { Gate1CanonicalMappingsPanel } from './Gate1CanonicalMappingsPanel'
+import { Gate1SourcesReviewedPanel } from './Gate1SourcesReviewedPanel'
 import { Gate1RequiredEvidenceChecklist } from './Gate1RequiredEvidenceChecklist'
+import { Gate1OutOfScopeSafetySignals } from './Gate1OutOfScopeSafetySignals'
 import { Gate1RequiredCheckResultsPanel } from './Gate1RequiredCheckResultsPanel'
 import { applyRequiredEvidenceValidation } from '../../lib/requiredEvidenceValidation'
 import {
@@ -112,7 +114,9 @@ export function Gate1EvidenceReviewPanel({
     const structured = getStructuredEvidence(meta)
     if (structured && !isLegacyEvidenceBundle(initialEvidence)) {
       const clone = JSON.parse(JSON.stringify(structured)) as StructuredEvidencePayload
-      ensureCanonicalMappingsOnStructured(clone, initialEvidence.sources ?? [], initialEvidence.facts ?? [])
+      ensureCanonicalMappingsOnStructured(clone, initialEvidence.sources ?? [], initialEvidence.facts ?? [], {
+        agent_metadata: initialEvidence.agent_metadata ?? { warnings: [] },
+      })
       setEvidence({
         ...initialEvidence,
         agent_metadata: { ...meta, structured_evidence: clone },
@@ -392,9 +396,26 @@ export function Gate1EvidenceReviewPanel({
             <dd className="font-medium">{identity?.product_name ?? product.product_name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">ASIN / SKU</dt>
-            <dd>{identity?.amazon_asin ?? structured?.product_identity?.sku_or_model ?? '—'}</dd>
+            <dt className="text-xs text-slate-500">
+              {structured?.product_identity?.manufacturer_context_sku
+                ? 'Retailer SKU'
+                : 'ASIN / SKU'}
+            </dt>
+            <dd>
+              {identity?.amazon_asin ??
+                structured?.product_identity?.sku_or_model ??
+                '—'}
+            </dd>
           </div>
+          {structured?.product_identity?.manufacturer_context_sku ? (
+            <div>
+              <dt className="text-xs text-slate-500">Manufacturer / context model</dt>
+              <dd className="text-slate-700">
+                {structured.product_identity.manufacturer_context_sku}
+                <span className="ml-1 text-xs text-slate-500">(comparable SKU, not primary)</span>
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-xs text-slate-500">Variant / subcategory</dt>
             <dd>
@@ -508,10 +529,19 @@ export function Gate1EvidenceReviewPanel({
             </p>
           ) : null}
 
+          {!legacy ? (
+            <div className="mt-4">
+              <Gate1OutOfScopeSafetySignals
+                signals={structuredForReview?.out_of_scope_safety_signals}
+                transparencyAssessment={structuredForReview?.transparency_assessment}
+              />
+            </div>
+          ) : null}
+
           {warnings.length > 0 || (requiredEvidenceValidation?.summary?.non_score_gaps ?? 0) > 0 ? (
             <section className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
               <h4 className="text-sm font-semibold text-amber-950">
-                Validation warnings / acknowledgment
+                PAC validation warnings / acknowledgment
               </h4>
               <p className="mt-1 text-xs text-amber-900">
                 Score-blocking gaps are listed in the decision summary and checklist. Non-score
@@ -566,14 +596,22 @@ export function Gate1EvidenceReviewPanel({
 
           <div className="mt-4">{identityCard}</div>
 
+          {!legacy ? <Gate1SourcesReviewedPanel evidence={displayEvidence} /> : null}
+
           {!legacy ? <Gate1RequiredEvidenceChecklist validation={requiredEvidenceValidation} /> : null}
 
-          {!legacy ? <Gate1RequiredCheckResultsPanel results={requiredCheckResults} /> : null}
+          {!legacy ? (
+            <Gate1RequiredCheckResultsPanel
+              results={requiredCheckResults}
+              canonicalMappings={canonicalMappings}
+            />
+          ) : null}
 
           {!legacy ? (
             <div className="mt-4">
               <Gate1CanonicalMappingsPanel
                 mappings={canonicalMappings}
+                sources={displayEvidence.sources ?? []}
                 structuredForContradictions={structuredForReview}
                 editable={editable && !legacy}
                 confirmedKeys={canonicalConfirmedKeys}

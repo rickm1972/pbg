@@ -49,6 +49,10 @@ export const WHY_THIS_SCORE_BY_MATERIAL_ROLE: Record<string, MaterialRoleMap> = 
     primary_food_contact: 'Proprietary ceramic coating (undisclosed)',
     coating: 'Proprietary ceramic nonstick (undisclosed)',
   },
+  ceramic_nonstick_sol_gel: {
+    primary_food_contact: 'Ceramic nonstick sol-gel coating',
+    coating: 'Ceramic nonstick sol-gel coating',
+  },
   thermolon_ceramic: {
     primary_food_contact: 'Thermolon ceramic coating',
     coating: 'Thermolon ceramic nonstick coating',
@@ -80,6 +84,8 @@ export const WHY_THIS_SCORE_BY_MATERIAL_ROLE: Record<string, MaterialRoleMap> = 
   },
   silicone_over_riveted_base: { handle: 'Silicone-coated handle' },
   aluminum_core: { structural: 'Aluminum core' },
+  graphite_core: { structural: 'Graphite core' },
+  graphite_structural_core: { structural: 'Graphite core' },
   tempered_glass_lid: { lid: 'Tempered glass lid' },
   plastic_lid_unspecified: { lid: 'Plastic lid resin unspecified' },
   bpa_free_plastic_lid: { lid: 'BPA-free plastic lid' },
@@ -122,6 +128,11 @@ export function whyThisScoreLabelForComponent(
     return map.primary_food_contact ?? map.formulation ?? null
   }
   if (field === 'secondary') {
+    if (role === 'structural') {
+      if (map.structural) return map.structural
+      if (/graphite/i.test(String(materialId ?? ''))) return 'Graphite core'
+      if (materialId === 'aluminum_core') return 'Aluminum core'
+    }
     return (map as Record<string, string>)[role] ?? null
   }
   return null

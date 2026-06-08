@@ -146,6 +146,8 @@ export type StructuredProductIdentity = {
   brand?: string
   subcategory?: string
   sku_or_model?: string | null
+  manufacturer_context_sku?: string | null
+  manufacturer_context_sku_source_url?: string | null
 }
 
 export type StructuredRetailerLinks = {
@@ -184,6 +186,26 @@ export type StructuredEvidencePayload = {
   required_evidence_validation?: RequiredEvidenceValidationPayload
   /** Phase 3.7: Agent 1 targeted retrieval results for required external checks. */
   required_check_results?: RequiredCheckResult[]
+  /** Non-PAC safety signals (Prop 65 metals, heavy-metal allegations) — not score-blocking. */
+  out_of_scope_safety_signals?: Array<{
+    signal_id: string
+    category: string
+    summary: string
+    source_url?: string | null
+    source_quote?: string | null
+    pac_score_relevant?: false
+    display_label?: string
+    scope_note?: string
+  }>
+  /** Gate 1 transparency preview for Agent 2 layer_4b. */
+  transparency_assessment?: {
+    transparency_badge: string
+    badge_justification: string
+    fully_disclosed_eligible: boolean
+    score_driving_via_third_party: boolean
+    proprietary_coating_composition: boolean
+    evaluated_at: string
+  }
 }
 
 export type RequiredCheckResult = {
@@ -407,6 +429,9 @@ export type NormalizationInputs = {
   normalization_metadata?: NormalizationMetadata
   /** Step 7 — deterministic copy for public product page */
   product_description?: string | null
+  product_description_status?: 'generated' | 'warning' | 'fallback_generated'
+  product_description_warnings?: string[]
+  description_word_count?: number
   status?: string
   flagged_missing_fields?: string[]
 }
@@ -458,7 +483,7 @@ export type ProductScoreRow = {
   review_notes: string | null
 }
 
-export type QaCheckStatus = 'pass' | 'flag' | 'skip' | 'error'
+export type QaCheckStatus = 'pass' | 'flag' | 'skip' | 'error' | 'not_applicable'
 
 export type QaFlag = {
   code: string
@@ -491,6 +516,22 @@ export type ProductQaChecks = {
     peer_count: number
     delta_from_median: number | null
     skip_reason?: string
+    informational?: boolean
+    message?: string
+    peer_products?: Array<{
+      product_id: string
+      product_name: string | null
+      score_id: string
+      pac_safety_score: number
+      tier: string | null
+      category: string | null
+      subcategory: string | null
+      score_review_status: string
+      evidence_id: string | null
+      input_id: string | null
+      publish_status: string | null
+      active: boolean
+    }>
   }
   evidence_gaps: {
     status: QaCheckStatus
@@ -559,6 +600,22 @@ export type Agent3DashboardData = {
   latestScoreByProductId: Record<string, ProductScoreRow>
   /** Layer 4A from linked scoring_inputs (keyed by input_id). */
   layer4aByInputId: Record<string, NormalizationLayer4a | undefined>
+  /** Extra normalization fields for score math breakdown (keyed by input_id). */
+  scoreMathContextByInputId: Record<
+    string,
+    {
+      layer4b?: NormalizationLayer4b
+      normalizationComponents?: NormalizationComponent[]
+      whyThisScoreFields?: import('./whyThisScoreApi').WhyThisScoreFields | null
+      layer4aVerified?: Array<{
+        adjustment?: string
+        matched?: boolean
+        value?: number
+        action_taken?: string
+        canonical_label?: string
+      }>
+    }
+  >
   runnable: ProductPipelineRow[]
   statusCounts: Record<string, number>
 }

@@ -39,6 +39,10 @@ export const WHY_THIS_SCORE_BY_MATERIAL_ROLE = {
     primary_food_contact: 'Proprietary ceramic coating (undisclosed)',
     coating: 'Proprietary ceramic nonstick (undisclosed)',
   },
+  ceramic_nonstick_sol_gel: {
+    primary_food_contact: 'Ceramic nonstick sol-gel coating',
+    coating: 'Ceramic nonstick sol-gel coating',
+  },
   thermolon_ceramic: {
     primary_food_contact: 'Thermolon ceramic coating',
     coating: 'Thermolon ceramic nonstick coating',
@@ -52,7 +56,7 @@ export const WHY_THIS_SCORE_BY_MATERIAL_ROLE = {
     coating: 'PTFE nonstick coating',
   },
   ptfe_nonstick_titanium_reinforced: {
-    primary_food_contact: 'PTFE coating',
+    primary_food_contact: 'PTFE nonstick coating, titanium reinforced',
     coating: 'PTFE nonstick coating',
   },
   vitreous_enamel: {
@@ -116,6 +120,16 @@ export function whyThisScoreLabelForComponent(materialId, role, field) {
     return map.primary_food_contact ?? map.formulation ?? null
   }
   if (field === 'secondary') {
+    if (role === 'handle') {
+      return map.handle ?? (/stainless/i.test(materialId) ? 'Stainless steel handle' : null)
+    }
+    if (role === 'rivet') return map.rivet ?? null
+    if (role === 'lid') return map.lid ?? null
+    if (role === 'gasket') return map.gasket ?? null
+    if (role === 'packaging') return map.packaging ?? null
+    if (role === 'structural') {
+      return map.structural ?? (materialId === 'aluminum_core' ? 'Aluminum core' : null)
+    }
     return map[role] ?? null
   }
   return null

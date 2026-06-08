@@ -2,6 +2,14 @@
 
 /** @type {TaxonomyEntry[]} */
 export const COMPONENT_TYPE_TAXONOMY = [
+  {
+    canonical_id: 'structural',
+    display_label: 'Structural / core layer',
+    description: 'Internal bonded core or structural layer (not primary food-contact surface).',
+    aliases: [/structural/i, /core\s*layer/i, /bonded\s*core/i, /graphite\s*core/i],
+    mapping_rule_id: 'component_structural_v1',
+    taxonomy_file: 'component-type-taxonomy.mjs',
+  },
   { canonical_id: 'handle', display_label: 'Handle', description: 'Cookware handle component.', aliases: [/handle/i], mapping_rule_id: 'component_handle_v1', taxonomy_file: 'component-type-taxonomy.mjs' },
   { canonical_id: 'lid', display_label: 'Lid', description: 'Cookware lid.', aliases: [/lid/i], mapping_rule_id: 'component_lid_v1', taxonomy_file: 'component-type-taxonomy.mjs' },
   { canonical_id: 'rivet', display_label: 'Rivet', description: 'Riveted attachment.', aliases: [/rivet/i], mapping_rule_id: 'component_rivet_v1', taxonomy_file: 'component-type-taxonomy.mjs' },

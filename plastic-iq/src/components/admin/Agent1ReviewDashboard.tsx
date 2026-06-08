@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatSupabaseUnknownError } from '../../lib/supabaseClient'
 import {
   approveEvidence,
-  AGENT1_VALIDATION_RERUN_PRODUCT_IDS,
   AGENT1_TFAL_PRODUCT_ID,
   canRerunAgent1FromReviewCard,
+  agent1RunTabDisplayStatus,
   canShowOnAgent1RunTab,
+  requiresFullPipelineResetBeforeAgent1Run,
   showAgent1RetestResetButton,
   resetAgent1ForRetestRemote,
   isAgent1ValidationRerunProduct,
@@ -13,8 +14,6 @@ import {
   fetchLatestPendingEvidenceForProduct,
   humanizeAgentStatus,
   rejectEvidence,
-  CACHE_TEST_AGENT1_BATCH_PRODUCT_IDS,
-  PIPELINE_CATALOG_EXPECTED_COUNT,
   runAgent1Batch,
   runAgent1Remote,
 } from '../../lib/agent1Review'
@@ -63,8 +62,10 @@ export function Agent1ReviewDashboard({
     null,
   )
   const [loadingPendingEvidence, setLoadingPendingEvidence] = useState(false)
-  /** T-Fal: show on Awaiting review only after a Run-tab Agent 1 completes (not stale DB rows). */
+  /** Keeps just-finished runs visible on Awaiting review before dashboard reload catches up. */
   const [postRunReviewEntries, setPostRunReviewEntries] = useState<PendingReviewEntry[]>([])
+  /** Avoid re-applying pipeline focus selection on every dashboard reload. */
+  const [appliedInitialProductId, setAppliedInitialProductId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,11 +121,6 @@ export function Agent1ReviewDashboard({
       })
   }, [data])
 
-  const tfalRunProduct = useMemo(
-    () => runnableProducts.find((p) => p.product_id === AGENT1_TFAL_PRODUCT_ID) ?? null,
-    [runnableProducts],
-  )
-
   useEffect(() => {
     if (!data) return
     const tfal = data.products.find((p) => p.product_id === AGENT1_TFAL_PRODUCT_ID)
@@ -147,7 +143,7 @@ export function Agent1ReviewDashboard({
     return runnableProducts.filter((p) => selectedRunIds.has(p.product_id))
   }, [data, runnableProducts, selectedRunIds])
 
-  const batchBusy = batchProgress !== null
+  const batchBusy = batchProgress !== null || busyId !== null
 
   const selectedProduct = useMemo(() => {
     if (!data || !selectedId) return null
@@ -224,11 +220,19 @@ export function Agent1ReviewDashboard({
     selectedPendingEvidence ?? resolvedPendingEvidence ?? viewApprovedEvidence ?? undefined
 
   useEffect(() => {
-    if (initialProductId) {
-      setSelectedId(initialProductId)
-      setListFilter('review')
+    if (!initialProductId || !data || appliedInitialProductId === initialProductId) return
+    const row = data.products.find((p) => p.product_id === initialProductId)
+    if (row && canShowOnAgent1RunTab(row)) {
+      setListFilter('run')
+      setSelectedRunIds(new Set([initialProductId]))
+      setSelectedId(null)
+      setAppliedInitialProductId(initialProductId)
+      return
     }
-  }, [initialProductId])
+    setSelectedId(initialProductId)
+    setListFilter('review')
+    setAppliedInitialProductId(initialProductId)
+  }, [initialProductId, data, appliedInitialProductId])
 
   useEffect(() => {
     if (!data || selectedId) return
@@ -306,11 +310,19 @@ export function Agent1ReviewDashboard({
       data?.products.find((p) => p.product_id === productId) ??
       ({ agent_status: 'unscored', product_name: productName ?? 'this product' } as ProductPipelineRow)
 
+    if (requiresFullPipelineResetBeforeAgent1Run(product.agent_status)) {
+      onError(
+        `${product.product_name} is past Gate 1 (${humanizeAgentStatus(product.agent_status)}). Wipe agents 1–4 before re-running Agent 1 from scratch.`,
+      )
+      return
+    }
+
     const needsFreshReset = showAgent1RetestResetButton(product.agent_status, productId)
 
     setBusyId(productId)
+    setBatchProgress({ current: 0, total: 1, name: product.product_name })
     onError(null)
-    onNotice(null)
+    onNotice(`Starting Agent 1 for ${product.product_name}…`)
     try {
       if (needsFreshReset) {
         const outcome = await resetAgent1ForRetestRemote(productId)
@@ -351,6 +363,7 @@ export function Agent1ReviewDashboard({
       setListFilter('run')
     } finally {
       setBusyId(null)
+      setBatchProgress(null)
     }
   }
 
@@ -362,25 +375,6 @@ export function Agent1ReviewDashboard({
       else next.add(productId)
       return next
     })
-  }
-
-  function selectAllRunnable() {
-    setSelectedRunIds(new Set(runnableProducts.map((p) => p.product_id)))
-  }
-
-  function selectValidationBatch() {
-    const ids = AGENT1_VALIDATION_RERUN_PRODUCT_IDS.filter((id) =>
-      runnableProducts.some((p) => p.product_id === id),
-    )
-    setSelectedRunIds(new Set(ids))
-  }
-
-  function selectCacheTestBatch() {
-    const ids = CACHE_TEST_AGENT1_BATCH_PRODUCT_IDS.filter((id) =>
-      runnableProducts.some((p) => p.product_id === id),
-    )
-    setSelectedRunIds(new Set(ids))
-    if (listFilter !== 'run') switchListFilter('run')
   }
 
   function clearRunSelection() {
@@ -406,16 +400,35 @@ export function Agent1ReviewDashboard({
 
   async function handleRunBatch() {
     if (selectedRunnable.length === 0) {
-      onError('Select at least one product to run.')
+      if (selectedRunIds.size > 0) {
+        onError(
+          'Checked product(s) are not runnable here — only unscored or failed Agent 1 rows appear on Run Agent 1. Open All products for other statuses, or use Retest from Awaiting review.',
+        )
+      } else {
+        onError('No product selected. Check one or more products below, then click Run Agent 1.')
+      }
+      onNotice(null)
+      return
+    }
+    const pipelineBlocked = selectedRunnable.find((p) =>
+      requiresFullPipelineResetBeforeAgent1Run(p.agent_status),
+    )
+    if (pipelineBlocked) {
+      onError(
+        `${pipelineBlocked.product_name} is past Gate 1 (${humanizeAgentStatus(pipelineBlocked.agent_status)}). Wipe agents 1–4 before re-running Agent 1.`,
+      )
       return
     }
     const freshResets = selectedRunnable.filter((p) =>
       showAgent1RetestResetButton(p.agent_status, p.product_id),
     )
 
+    const firstName = selectedRunnable[0]?.product_name ?? ''
     onError(null)
-    onNotice(null)
-    setBatchProgress({ current: 0, total: selectedRunnable.length, name: '' })
+    setBatchProgress({ current: 0, total: selectedRunnable.length, name: firstName })
+    onNotice(
+      `Starting Agent 1 for ${selectedRunnable.map((p) => p.product_name).join(', ')}…`,
+    )
 
     try {
       for (const p of freshResets) {
@@ -429,10 +442,17 @@ export function Agent1ReviewDashboard({
       })
 
       const succeeded = results.filter((r) => r.ok).length
-      const failed = results.length - succeeded
-      onNotice(
-        `Batch complete: ${succeeded} submitted for review${failed > 0 ? `, ${failed} did not submit` : ''}.`,
-      )
+      const failures = results.filter((r) => !r.ok)
+      if (failures.length > 0) {
+        const reasons = failures
+          .map((r) => `${r.productName}: ${r.message ?? 'run failed'}`)
+          .join(' · ')
+        onError(
+          `Batch complete: ${succeeded} submitted for review, ${failures.length} did not submit. ${reasons}`,
+        )
+      } else {
+        onNotice(`Batch complete: ${succeeded} submitted for review.`)
+      }
       setSelectedRunIds(new Set())
       await load()
       const firstOk = results.find((r) => r.ok)
@@ -574,65 +594,39 @@ export function Agent1ReviewDashboard({
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    All <strong>{PIPELINE_CATALOG_EXPECTED_COUNT}</strong> catalog products (re-run is fine). After
-                    you approve on <strong>Awaiting review</strong>, that product moves to Agent 2 only.
+                    Check one or more products, then click <strong>Run Agent 1</strong>. To re-run
+                    after a finished pass, use <strong>Re-run Agent 1</strong> on the Awaiting
+                    review card (clears the bundle and returns here as unscored).
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={batchBusy || runnableProducts.length === 0}
-                      onClick={selectAllRunnable}
-                      className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-                    >
-                      Select all catalog ({runnableProducts.length})
-                    </button>
-                    <button
-                      type="button"
-                      disabled={batchBusy}
-                      onClick={selectValidationBatch}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Select validation (3)
-                    </button>
-                    {tfalRunProduct ? (
-                      <button
-                        type="button"
-                        disabled={batchBusy}
-                        onClick={() => {
-                          setSelectedId(null)
-                          setSelectedRunIds(new Set([AGENT1_TFAL_PRODUCT_ID]))
-                        }}
-                        className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-                      >
-                        Select T-Fal
-                      </button>
-                    ) : null}
+                  {selectedRunIds.size > 0 ? (
+                    <p className="text-[11px] font-semibold text-violet-800">
+                      {selectedRunnable.length} selected
+                      {selectedRunnable.length !== selectedRunIds.size
+                        ? ` (${selectedRunIds.size - selectedRunnable.length} not runnable on this tab)`
+                        : ''}
+                    </p>
+                  ) : null}
+                  {selectedRunIds.size > 0 ? (
                     <button
                       type="button"
                       disabled={batchBusy}
-                      onClick={selectCacheTestBatch}
-                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
-                    >
-                      Select cache test (4)
-                    </button>
-                    <button
-                      type="button"
-                      disabled={batchBusy || selectedRunIds.size === 0}
                       onClick={clearRunSelection}
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
-                      Clear
+                      Clear selection
                     </button>
-                  </div>
+                  ) : null}
                   <button
                     type="button"
                     disabled={batchBusy || selectedRunnable.length === 0}
-                    onClick={handleRunBatch}
+                    onClick={() => void handleRunBatch()}
                     className="w-full rounded-xl bg-ink-900 px-3 py-2 text-xs font-semibold text-white hover:bg-ink-700 disabled:opacity-60"
                   >
                     {batchBusy
                       ? batchProgress
-                        ? `Running ${batchProgress.current}/${batchProgress.total}: ${batchProgress.name}`
+                        ? batchProgress.current === 0
+                          ? `Starting Agent 1 (${batchProgress.total})…`
+                          : `Running ${batchProgress.current}/${batchProgress.total}: ${batchProgress.name}`
                         : 'Running…'
                       : selectedRunnable.length === 1
                         ? 'Run Agent 1'
@@ -647,7 +641,7 @@ export function Agent1ReviewDashboard({
                   {listFilter === 'review'
                     ? 'Nothing awaiting review.'
                     : listFilter === 'run'
-                      ? 'Nothing to run. New or reset products and retries after reject appear here.'
+                      ? 'Nothing to run. Unscored, failed, or awaiting-review products appear here.'
                       : 'No products found.'}
                 </li>
               ) : (
@@ -661,18 +655,13 @@ export function Agent1ReviewDashboard({
                     <>
                       <div className="font-semibold text-ink-900">{p.product_name}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
-                        {listFilter === 'run' &&
-                        isAgent1ValidationRerunProduct(p.product_id) &&
-                        (p.agent_status === 'evidence_awaiting_review' ||
-                          p.agent_status === 'evidence_in_progress') ? (
-                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-950">
-                            {p.agent_status === 'evidence_in_progress'
-                              ? 'Run stalled — select and Run Agent 1'
-                              : 'Prior run finished — select and Run Agent 1'}
-                          </span>
-                        ) : (
-                          <StatusPill status={p.agent_status} />
-                        )}
+                        <StatusPill
+                          status={
+                            listFilter === 'run'
+                              ? agent1RunTabDisplayStatus(p.agent_status)
+                              : p.agent_status
+                          }
+                        />
                         {listFilter !== 'run' && hasEvidence ? (
                           <span className="text-[10px] font-semibold text-violet-700">
                             Ready to review
@@ -697,7 +686,7 @@ export function Agent1ReviewDashboard({
                         }`}
                       >
                         {listFilter === 'run' && runnable ? (
-                          <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 px-3 py-3">
+                          <label className="flex w-full cursor-pointer items-start gap-2 px-3 py-3">
                             <input
                               type="checkbox"
                               checked={checked}

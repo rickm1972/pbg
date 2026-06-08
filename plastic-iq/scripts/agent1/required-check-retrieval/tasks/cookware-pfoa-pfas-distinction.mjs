@@ -1,4 +1,5 @@
 import { fetchPageText } from '../../../lib/fetch-page-text.mjs'
+import { isCeramicNonstickPrimary } from '../../../../src/shared/canonical-taxonomy/ceramic-nonstick-structural.mjs'
 import { PTFE_PRIMARY_IDS } from '../../../../src/shared/required-evidence-matrix/pattern-triggers.mjs'
 import { getRetrievalTaskForCheck } from '../../../../src/shared/required-evidence-retrieval/retrieval-task-registry.mjs'
 import { fillQueryTemplate, runPerplexityQuery } from '../perplexity-query.mjs'
@@ -124,12 +125,12 @@ export async function runCookwarePfoaPfasDistinctionRetrieval(ctx) {
 
     if (!pfasStatusOk && pfasStatusId === 'pfas_free_claimed') {
       status = 'failed'
-      detail = `PFAS-present product must not use pfas_free_claimed without PFAS-free marketing source. ${claimRecord}`
+      detail = `PFAS-present product must not use pfas_free_claimed without PFAS-free marketing source. pfas_status=${pfasStatusId || 'n/a'}. ${claimRecord}`
     } else {
       status = 'passed'
       detail = analysis.pfoa.claimed
-        ? `PFOA-free documented with source; PFAS-free marketing not claimed or inferred from PFOA-only copy. pfas_status=${pfasStatusId || 'unchanged'}. ${claimRecord}`
-        : `No PFOA-free marketing claim found (recorded); PFAS-free not inferred. pfas_status=${pfasStatusId || 'unchanged'}. ${claimRecord}`
+        ? `PFOA-free documented with source; PFAS-free marketing not claimed or inferred from PFOA-only copy. pfas_status=${pfasStatusId || 'n/a'}. ${claimRecord}`
+        : `No PFOA-free marketing claim found (recorded); PFAS-free not inferred. pfas_status=${pfasStatusId || 'n/a'}. ${claimRecord}`
       source_url = analysis.pfoa.source_url
       source_quote = analysis.pfoa.source_quote
       if (analysis.pfoa.claimed && !mappings.safety_claim_ids?.pfoa_free_claim) {
@@ -138,7 +139,7 @@ export async function runCookwarePfoaPfasDistinctionRetrieval(ctx) {
     }
   } else {
     status = 'passed'
-    detail = `PFOA/PFAS distinction documented for non-PTFE trigger context. ${claimRecord}`
+    detail = `PFOA/PFAS distinction documented for non-PTFE trigger context. pfas_status=${pfasStatusId || 'n/a'}. ${claimRecord}`
     source_url = analysis.pfoa.source_url ?? analysis.pfas_free_marketing.source_url
     source_quote = analysis.pfoa.source_quote ?? analysis.pfas_free_marketing.source_quote
   }

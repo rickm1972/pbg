@@ -1,5 +1,6 @@
 import type { ProductPageScore } from './productScoresApi'
 import { rewriteLegacyInertPublicDescription } from './nonPacInertMaterials'
+import { humanizePublicMaterialProse } from './publicMaterialProse'
 
 /** Public lists only show products with an approved numeric PAC score. */
 export function hasPublicDisplayScore(product: {
@@ -84,7 +85,7 @@ export function softenPublicDescription(text: string): string {
       'conditions associated with greater migration potential from coatings',
     )
 
-  return rewriteLegacyInertPublicDescription(softened)
+  return humanizePublicMaterialProse(rewriteLegacyInertPublicDescription(softened))
 }
 
 export const PUBLIC_SCORE_PENDING_MESSAGE = 'Product not yet reviewed'

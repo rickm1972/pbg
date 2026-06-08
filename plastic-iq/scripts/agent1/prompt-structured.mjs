@@ -31,7 +31,8 @@ CERTIFICATIONS (certifying bodies ONLY):
 
 SAFETY CLAIMS (marketing / structural):
 - PFAS-Free, BPA-free, Non-toxic, etc. go in safety_claims objects with source_url — NOT in claimed_certifications.
-- structural_guarantee true when structurally implied (cast iron→pfas_free; cast iron/stainless→non_toxic; glass→bpa_free).
+- pfas_free_claim.claimed only when manufacturer/retailer copy explicitly states PFAS-free (quote required). Bare stainless / uncoated inference is PFAS status only — do not set pfas_free_claim or structural_guarantee for that.
+- structural_guarantee for non_toxic_claim or bpa_free_claim only when structurally implied (cast iron/stainless→non_toxic; glass→bpa_free).
 
 JSON shape:
 {
@@ -82,6 +83,7 @@ ${JSON.stringify(retrieval.searches, null, 2)}
 
 Instructions:
 1. retailer_links.amazon_url and manufacturer_direct_url are required (from snippets).
+7. sku_or_model: when the catalog primary retailer is a non-Amazon PDP, use the SKU/item number from that retailer listing — not the manufacturer collection model number (e.g. GR112.55) unless the retailer page shows the same value.
 2. primary_contact_material must be populated (material or undisclosed_code).
 3. No secondary component for parts explicitly absent.
 4. claimed_certifications = certifying-body names only; marketing claims in safety_claims with source_url.

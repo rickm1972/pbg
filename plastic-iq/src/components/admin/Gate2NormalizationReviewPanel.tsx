@@ -6,7 +6,6 @@ import {
 } from '../../lib/scoringInputsVersionApi'
 import type { ProductPipelineRow, ScoringInputRow } from '../../types/agent'
 import { PipelineStatusBar } from './PipelineStatusBar'
-import { Gate4PublishControls } from './Gate4PublishControls'
 import {
   getNormalizationWarnings,
   NormalizationReadOnlyBody,
@@ -25,7 +24,6 @@ type Props = {
   onRejectConfirm: () => void
   onRerun?: () => void
   onNavigateToGate1?: (productId: string) => void
-  onRefresh?: () => void
 }
 
 export function Gate2NormalizationReviewPanel({
@@ -41,7 +39,6 @@ export function Gate2NormalizationReviewPanel({
   onRejectConfirm,
   onRerun,
   onNavigateToGate1,
-  onRefresh,
 }: Props) {
   const [scoringInput, setScoringInput] = useState(initialInput)
   const [versions, setVersions] = useState<ScoringInputRow[]>([])
@@ -209,14 +206,6 @@ export function Gate2NormalizationReviewPanel({
           </p>
 
           <NormalizationReadOnlyBody scoringInput={displayInput} inputs={inputs} />
-
-          <div className="mt-6">
-            <Gate4PublishControls
-              productId={product.product_id}
-              refreshKey={displayInput.input_id}
-              onPublished={onRefresh}
-            />
-          </div>
 
           <footer className="sticky bottom-0 mt-6 flex flex-wrap gap-2 border-t border-slate-100 bg-white pt-4">
             {editable ? (

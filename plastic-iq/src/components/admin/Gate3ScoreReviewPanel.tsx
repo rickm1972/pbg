@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { colorForTier } from '../../lib/score'
+import { buildScoreMathBreakdown } from '../../lib/scoreMathBreakdown'
 import { setPipelineFocus } from '../../lib/adminPipelineNav'
 import {
   fetchProductScoreVersionsForProduct,
@@ -9,7 +10,10 @@ import type { ProductPipelineRow, ProductScoreRow, NormalizationLayer4a } from '
 import type { ProductTier } from '../../types'
 import { Layer4aBreakdown } from './Layer4aBreakdown'
 import { PipelineStatusBar } from './PipelineStatusBar'
-import { Gate4PublishControls } from './Gate4PublishControls'
+import { ScoreMathBreakdownPanel } from './ScoreMathBreakdownPanel'
+import { Gate2Section } from './gate2NormalizationDisplay'
+import { WhyThisScoreAdmin } from '../WhyThisScoreAdmin'
+import type { WhyThisScoreFields } from '../../lib/whyThisScoreApi'
 
 type Props = {
   product: ProductPipelineRow
@@ -25,7 +29,12 @@ type Props = {
   onRejectConfirm: () => void
   onRerun?: () => void
   onNavigateToGate2?: (productId: string) => void
-  onRefresh?: () => void
+  scoreMathContext?: {
+    layer4b?: import('../../types/agent').NormalizationLayer4b
+    normalizationComponents?: import('../../types/agent').NormalizationComponent[]
+    whyThisScoreFields?: WhyThisScoreFields | null
+    layer4aVerified?: import('../../lib/scoreMathBreakdown').Layer4aVerifiedRow[]
+  }
 }
 
 export function Gate3ScoreReviewPanel({
@@ -42,7 +51,7 @@ export function Gate3ScoreReviewPanel({
   onRejectConfirm,
   onRerun,
   onNavigateToGate2,
-  onRefresh,
+  scoreMathContext,
 }: Props) {
   const [score, setScore] = useState(initialScore)
   const [versions, setVersions] = useState<ProductScoreRow[]>([])
@@ -83,6 +92,23 @@ export function Gate3ScoreReviewPanel({
     versions.find((v) => v.review_status === 'approved')?.score_id ?? null
   const tierStyles = colorForTier(displayScore.tier as ProductTier)
   const components = displayScore.component_nprs?.components ?? []
+
+  const scoreMathBreakdown = useMemo(
+    () =>
+      buildScoreMathBreakdown(displayScore, {
+        layer4a,
+        layer4b: scoreMathContext?.layer4b,
+        layer4aVerified: scoreMathContext?.layer4aVerified,
+        normalizationComponents: scoreMathContext?.normalizationComponents,
+      }),
+    [
+      displayScore,
+      layer4a,
+      scoreMathContext?.layer4b,
+      scoreMathContext?.layer4aVerified,
+      scoreMathContext?.normalizationComponents,
+    ],
+  )
 
   useEffect(() => {
     if (!displayScore.input_id) return
@@ -208,11 +234,29 @@ export function Gate3ScoreReviewPanel({
               label="Transparency badge"
               value={displayScore.transparency_badge ?? '—'}
             />
-            <MetricCard label="Weighted NPR" value={String(displayScore.weighted_npr)} />
+            <MetricCard
+              label="Weighted NPR"
+              value={
+                displayScore.weighted_npr != null && Number.isFinite(Number(displayScore.weighted_npr))
+                  ? Number(displayScore.weighted_npr).toFixed(4)
+                  : '—'
+              }
+            />
             {displayScore.escalator_applied ? (
               <MetricCard label="Escalator applied" value={displayScore.escalator_applied} />
             ) : null}
           </section>
+
+          <ScoreMathBreakdownPanel breakdown={scoreMathBreakdown} />
+
+          {scoreMathContext?.whyThisScoreFields ? (
+            <Gate2Section title="Why this score (structured)">
+              <WhyThisScoreAdmin
+                fields={scoreMathContext.whyThisScoreFields}
+                className="mt-2 border-0 p-0 shadow-none"
+              />
+            </Gate2Section>
+          ) : null}
 
           {layer4a ? (
             <Layer4aBreakdown layer4a={layer4a} />
@@ -246,14 +290,6 @@ export function Gate3ScoreReviewPanel({
               ))}
             </ul>
           </section>
-
-          <div className="mt-6">
-            <Gate4PublishControls
-              productId={product.product_id}
-              refreshKey={displayScore.score_id}
-              onPublished={onRefresh}
-            />
-          </div>
 
           <footer className="sticky bottom-0 mt-6 flex flex-wrap gap-2 border-t border-slate-100 bg-white pt-4">
             {editable ? (

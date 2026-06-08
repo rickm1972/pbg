@@ -1,16 +1,16 @@
 /**
- * Map product_identity.subcategory (display) → matrix key.
- * @param {string | null | undefined} subcategory
+ * Map product identity → Agent 1 required-evidence matrix key via product-type registry.
+ * No fallback defaults — unconfigured types return null (preflight blocks).
  */
-export function resolveSubcategoryKey(subcategory) {
-  const s = String(subcategory ?? '').trim().toLowerCase()
-  if (!s) return 'cookware'
-  if (/cutting\s*board/.test(s)) return 'cutting_boards'
-  if (/food\s*storage|food_storage/.test(s)) return 'food_storage'
-  if (/water\s*bottle|drinkware|drink\s*ware/.test(s)) return 'water_bottles_drinkware'
-  if (/cooking\s*utensil|utensil/.test(s) && !/cookware/.test(s)) return 'cooking_utensils'
-  if (/cookware/.test(s)) return 'cookware'
-  return 'cookware'
+
+import { resolveMatrixKeyFromRegistry } from '../product-type-registry/index.mjs'
+
+/**
+ * @param {string | null | undefined} subcategory
+ * @param {{ category?: string | null, product_type?: string | null }} [ctx]
+ */
+export function resolveSubcategoryKey(subcategory, ctx = {}) {
+  return resolveMatrixKeyFromRegistry(subcategory, ctx)
 }
 
 /** Active launch pipeline — formulation products archived (0019). */
@@ -24,5 +24,7 @@ export const MATRIX_SUBCATEGORY_KEYS = [
   'food_storage',
   'water_bottles_drinkware',
   'cooking_utensils',
-  'cutting_boards',
+  'textiles',
+  'infant_oral',
+  'rinse_off',
 ]

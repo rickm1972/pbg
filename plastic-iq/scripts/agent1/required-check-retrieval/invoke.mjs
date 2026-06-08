@@ -1,6 +1,10 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { PTFE_REQUIRED_EXTERNAL_CHECK_IDS } from '../../../src/shared/required-evidence-retrieval/retrieval-task-registry.mjs'
+import {
+  getRetrievalTaskForCheck,
+  isRetrievalTaskTriggered,
+  PTFE_REQUIRED_EXTERNAL_CHECK_IDS,
+} from '../../../src/shared/required-evidence-retrieval/retrieval-task-registry.mjs'
 
 const RETRIEVAL_DIR = dirname(fileURLToPath(import.meta.url))
 const EXECUTE_HREF = pathToFileURL(join(RETRIEVAL_DIR, 'execute-required-retrieval.mjs')).href
@@ -38,13 +42,12 @@ export async function invokeRequiredCheckRetrieval(params) {
  * @param {Set<string>} triggers
  */
 export function assertRequiredExternalRetrievalComplete(structured, triggers) {
-  const ptfeContext =
-    triggers.has('ptfe_primary_contact') || triggers.has('pfoa_pfas_distinction')
-  if (!ptfeContext) return
-
   const blockers = []
 
   for (const checkId of PTFE_REQUIRED_EXTERNAL_CHECK_IDS) {
+    const task = getRetrievalTaskForCheck(checkId)
+    if (!task || !isRetrievalTaskTriggered(task, triggers)) continue
+
     const row = structured.required_check_results?.find((r) => r.check_id === checkId)
     if (row && STALE_RUNNER_STUB_RE.test(row.detail ?? '')) {
       blockers.push(
@@ -52,7 +55,7 @@ export function assertRequiredExternalRetrievalComplete(structured, triggers) {
       )
       continue
     }
-    if (!row || row.status !== 'passed') {
+    if (!row || (row.status !== 'passed' && row.status !== 'not_applicable')) {
       blockers.push(
         `${checkId}: ${row?.status ?? 'missing'} — ${row?.detail ?? 'no retrieval result'}`,
       )
@@ -61,6 +64,8 @@ export function assertRequiredExternalRetrievalComplete(structured, triggers) {
 
   const checklist = structured.required_evidence_validation?.checklist_items ?? []
   for (const checkId of PTFE_REQUIRED_EXTERNAL_CHECK_IDS) {
+    const task = getRetrievalTaskForCheck(checkId)
+    if (!task || !isRetrievalTaskTriggered(task, triggers)) continue
     const item = checklist.find((i) => i.id === checkId)
     if (item?.score_driving && item.status !== 'passed' && item.status !== 'not_applicable') {
       blockers.push(`${checkId} checklist: ${item.status} — ${item.detail ?? ''}`)
@@ -69,7 +74,7 @@ export function assertRequiredExternalRetrievalComplete(structured, triggers) {
 
   if (blockers.length) {
     throw new Error(
-      `Agent 1 retrieval pipeline error (PTFE required checks). ${blockers.join(' | ')}`,
+      `Agent 1 retrieval pipeline error (required external checks). ${blockers.join(' | ')}`,
     )
   }
 }

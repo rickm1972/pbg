@@ -144,7 +144,7 @@ export function agent2ApiBase(): string {
 
 /** Must match scripts/agent2/deterministic/product-description-generate.mjs */
 export const EXPECTED_AGENT2_DESCRIPTION_GENERATOR_VERSION =
-  '2026-06-01-hazard-sort-acronym'
+  '2026-06-03-output-contract'
 
 function agent2Secret(): string {
   return import.meta.env.VITE_ADMIN_PASSWORD ?? ''
@@ -221,6 +221,12 @@ export function showOnAgent2RunTab(
   latestScoring?: Pick<ScoringInputRow, 'review_status'> | null,
 ): boolean {
   if (product.agent_status === 'normalization_in_progress') return true
+  if (
+    isAgent2ValidationRerunProduct(product.product_id) &&
+    isAgent2OnAwaitingReviewTab(product.agent_status, latestScoring)
+  ) {
+    return true
+  }
   return (
     canRunAgent2Sequential(product.agent_status) ||
     isAgent2FailedDraftStuck(product.agent_status, latestScoring)
@@ -297,17 +303,26 @@ export type Agent2BatchRunResult = {
 export async function runAgent2Remote(productId: string): Promise<Agent2RunOutcome> {
   const secret = agent2Secret()
   if (!secret) {
-    throw new Error('VITE_ADMIN_PASSWORD is not set (required to call Agent 2 API).')
+    throw new Error(
+      'VITE_ADMIN_PASSWORD is not set in .env — restart npm run dev after adding it.',
+    )
   }
 
-  const res = await fetch(`${agent2ApiBase()}/run`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Agent-Secret': secret,
-    },
-    body: JSON.stringify({ product_id: productId }),
-  })
+  let res: Response
+  try {
+    res = await fetch(`${agent2ApiBase()}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Agent-Secret': secret,
+      },
+      body: JSON.stringify({ product_id: productId }),
+    })
+  } catch {
+    throw new Error(
+      'Cannot reach Agent 2 API. Start the dev server: cd plastic-iq && npm run dev (port 5173), then refresh Admin.',
+    )
+  }
 
   const body = (await res.json().catch(() => ({}))) as {
     error?: string

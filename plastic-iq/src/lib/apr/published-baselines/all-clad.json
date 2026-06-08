@@ -1,0 +1,163 @@
+{
+  "contract_version": "0.25.0",
+  "published_at": "2026-06-02T00:00:00.000Z",
+  "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+  "evidence_content_hash": "",
+  "normalization_content_hash": "",
+  "display_content_hash": "",
+  "score_content_hash": "",
+  "assembled_content_hash": "",
+  "display": {
+    "input_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+    "evidence_id": "",
+    "evidence_content_hash": "",
+    "normalization_content_hash": "",
+    "product_title": "All-Clad G5 Graphite Core Stainless-Steel Fry Pan with Lid, 12 inch",
+    "primary_material": "Stainless steel of unspecified grade",
+    "disclosure_sentence": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+    "product_description": "All-Clad uses stainless steel of unspecified grade as its food-contact surface. stainless steel of unspecified grade is not a plastic- or PFAS-based food-contact material, so PAC exposure concern remains minimal even with typical household use. The PAC Safety Score reflects disclosed materials and typical cookware use conditions.",
+    "secondary_materials": [
+      {
+        "name": "Aluminum core",
+        "note": null
+      },
+      {
+        "name": "Graphite core",
+        "note": "Internal bonded core — not a food-contact surface."
+      }
+    ],
+    "coatings": "None",
+    "use_conditions": [
+      "Oven heat with fat exposure",
+      "Stovetop heat with fat exposure"
+    ],
+    "disclosure_quality": "Documentation Incomplete",
+    "cert_line": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+    "risk_bars": [
+      {
+        "id": "material",
+        "label": "Contact material: Stainless steel of unspecified grade",
+        "fill_percent": 97,
+        "color_token": "emerald",
+        "status_label": "Minimal PAC concern"
+      },
+      {
+        "id": "migration",
+        "label": "Migration",
+        "fill_percent": 98,
+        "color_token": "emerald",
+        "status_label": "Low migration"
+      },
+      {
+        "id": "use_conditions",
+        "label": "Use conditions",
+        "fill_percent": 4,
+        "color_token": "red",
+        "status_label": "Harsh"
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://www.williams-sonoma.com/products/all-clad-g5-graphite-fry-pan-lid/",
+        "group": "Retailer",
+        "label": "Williams Sonoma — All-Clad G5 Graphite Core Stainless-Steel Fry Pan with Lid, 12 inch",
+        "public_source_eligible": true,
+        "source_role": "retailer_primary",
+        "variant_mismatch": false,
+        "footnote": null
+      }
+    ],
+    "why_this_score": {
+      "primary_material": "Stainless steel of unspecified grade",
+      "secondary_materials": [
+        "Aluminum core",
+        "Graphite core"
+      ],
+      "coatings": "None",
+      "use_conditions": [
+        "Oven heat with fat exposure",
+        "Stovetop heat with fat exposure"
+      ],
+      "disclosure_quality": "Documentation Incomplete",
+      "cert_line": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+      "sections": [
+        {
+          "title": "Primary material",
+          "items": [
+            {
+              "text": "Stainless steel of unspecified grade",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Secondary materials",
+          "items": [
+            {
+              "text": "Aluminum core",
+              "note": null
+            },
+            {
+              "text": "Graphite core",
+              "note": "Internal bonded core — not a food-contact surface."
+            }
+          ]
+        },
+        {
+          "title": "Coatings & finishes",
+          "items": [
+            {
+              "text": "None",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Use conditions",
+          "items": [
+            {
+              "text": "Oven heat with fat exposure",
+              "note": null
+            },
+            {
+              "text": "Stovetop heat with fat exposure",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Disclosure quality",
+          "items": [
+            {
+              "text": "Documentation Incomplete",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Certifications & testing",
+          "items": [
+            {
+              "text": "No third-party certification found; material family is identified, but the exact stainless steel grade/spec is not fully disclosed.",
+              "note": null
+            }
+          ]
+        }
+      ]
+    },
+    "badge_summary": "Documentation Incomplete — most materials are known; minor details (grade, finish) are unconfirmed.",
+    "buy_section_title": "Where to buy",
+    "retailer_caution_note": null,
+    "sources_intro": "Sources used for this score, including retailer sources where applicable.",
+    "safer_alternatives_subhead": "Higher PAC Safety Scores in this category.",
+    "safer_alternatives_footer": "These alternatives have higher PAC Safety Scores."
+  },
+  "score": {
+    "pac_safety_score": 99,
+    "tier": "Excellent",
+    "displayed_confidence_range": "96–99",
+    "transparency_badge": "Documentation Incomplete"
+  },
+  "snapshot_id": "baseline-all-clad",
+  "content_hash": "5c867fcfed37815f060517c360110b0992692fc2fb68a652c23e1d389d35c60b"
+}

@@ -1,7 +1,9 @@
-import type { RequiredCheckResult } from '../../types/agent'
+import type { CanonicalMappingsPayload, RequiredCheckResult } from '../../types/agent'
+import { isStructurallyPfasFreePrimary } from '../../lib/canonicalEvidenceMapping'
 
 type Props = {
   results: RequiredCheckResult[] | null | undefined
+  canonicalMappings?: CanonicalMappingsPayload | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -11,7 +13,28 @@ const STATUS_STYLES: Record<string, string> = {
   not_applicable: 'text-slate-600 bg-slate-50 border-slate-200',
 }
 
-export function Gate1RequiredCheckResultsPanel({ results }: Props) {
+const CHECK_TITLES: Record<string, string> = {
+  'external.regulatory_pfas_minnesota_review': 'Minnesota PFAS regulatory review',
+  'external.pfoa_vs_pfas_free_distinction': 'PFOA/PFAS claim distinction (marketing copy)',
+  'external.pfas_nonstick_disclosure': 'PFAS / nonstick disclosure',
+}
+
+function checkTitle(checkId: string, sourceUrl?: string | null): string {
+  if (checkId === 'external.pfoa_vs_pfas_free_distinction' && sourceUrl && /amazon\./i.test(sourceUrl)) {
+    return 'PFAS-free claim check (Amazon listing)'
+  }
+  return CHECK_TITLES[checkId] ?? checkId
+}
+
+function isInertCookwarePrimary(mappings?: CanonicalMappingsPayload | null): boolean {
+  const primaryId = mappings?.primary_contact_material_id?.canonical_id ?? ''
+  return isStructurallyPfasFreePrimary(primaryId)
+}
+
+export function Gate1RequiredCheckResultsPanel({ results, canonicalMappings }: Props) {
+  const inertPrimary = isInertCookwarePrimary(canonicalMappings)
+  const hasPfoaCheck = results?.some((r) => r.check_id === 'external.pfoa_vs_pfas_free_distinction')
+
   if (!results?.length) {
     return (
       <section className="mt-4 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-600">
@@ -27,9 +50,17 @@ export function Gate1RequiredCheckResultsPanel({ results }: Props) {
         Required-check retrieval results (Phase 3.7)
       </h4>
       <p className="text-xs text-slate-600">
-        Targeted retrieval for external matrix checks (e.g. Minnesota PFAS regulatory, PFOA vs
-        PFAS-free distinction).
+        Targeted retrieval for external matrix checks (e.g. Minnesota PFAS regulatory, PFOA/PFAS
+        marketing-claim distinction).
       </p>
+      {inertPrimary && hasPfoaCheck ? (
+        <p className="rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-700">
+          <span className="font-semibold text-ink-900">Non-PTFE inert cookware:</span> this is not a
+          PTFE/PFAS material-risk check. The PFOA/PFAS distinction run only documents retailer
+          marketing copy so PFAS-free claims are not confused with PFOA-free copy. No Minnesota PFAS
+          regulatory flag applies for this inert food-contact surface.
+        </p>
+      ) : null}
       <ul className="space-y-3">
         {results.map((r) => (
           <li key={`${r.check_id}-${r.timestamp}`} className="rounded-lg border border-slate-200 bg-white p-3">
@@ -39,6 +70,7 @@ export function Gate1RequiredCheckResultsPanel({ results }: Props) {
               >
                 {r.status}
               </span>
+              <span className="text-xs font-semibold text-ink-900">{checkTitle(r.check_id, r.source_url)}</span>
               <span className="font-mono text-[10px] text-slate-500">{r.check_id}</span>
               <span className="text-[10px] text-slate-400">{new Date(r.timestamp).toLocaleString()}</span>
             </div>

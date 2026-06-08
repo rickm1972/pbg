@@ -47,12 +47,25 @@ export function isStructuralSafetyClaimValid(evidence, components) {
   const safety = getSafetyClaims(evidence)
   if (!safety) return false
 
+  const mappings = evidence?.structured_evidence?.canonical_mappings
+  if (
+    mappings?.safety_claim_ids?.pfas_free_claim_structurally_verified?.claimed &&
+    !hasDisclosedFluoropolymer(components)
+  ) {
+    const inertPrimary = (components ?? []).some((c) => {
+      const role = c.component_role ?? c.role
+      if (role !== 'primary_food_contact' && role !== 'formulation') return false
+      return /cast_iron|carbon_steel|glass|stainless|vitreous|borosilicate/i.test(`${c.material_id ?? ''}`)
+    })
+    if (inertPrimary) return true
+  }
+
   if (safety.pfas_free_claim?.structural_guarantee) {
     if (hasDisclosedFluoropolymer(components)) return false
     const inertPrimary = (components ?? []).some((c) => {
       const role = c.component_role ?? c.role
       if (role !== 'primary_food_contact' && role !== 'formulation') return false
-      return /cast_iron|glass|stainless|vitreous/i.test(`${c.material_id ?? ''}`)
+      return /cast_iron|carbon_steel|glass|stainless|vitreous|borosilicate/i.test(`${c.material_id ?? ''}`)
     })
     if (!inertPrimary) return false
   }

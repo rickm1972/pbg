@@ -39,4 +39,8 @@ export const TRUSTED_MATERIAL_CONFIDENCES = new Set([
 ])
 
 export const SCORE_SANITY_DELTA_THRESHOLD = 15
+/** Minimum valid subcategory peers (current active pipeline) before median outlier pass/fail. */
+export const SCORE_SANITY_MIN_PEERS = 5
+/** Minimum peers sharing product material family for family-scoped comparison (optional path). */
+export const SCORE_SANITY_MIN_FAMILY_PEERS = 3
 export const PRIMARY_CONTACT_CI_THRESHOLD = 0.7

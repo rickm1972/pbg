@@ -1,0 +1,154 @@
+{
+  "contract_version": "0.25.0",
+  "published_at": "2026-06-02T00:00:00.000Z",
+  "product_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+  "evidence_content_hash": "",
+  "normalization_content_hash": "",
+  "display_content_hash": "",
+  "score_content_hash": "",
+  "assembled_content_hash": "",
+  "display": {
+    "input_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+    "evidence_id": "",
+    "evidence_content_hash": "",
+    "normalization_content_hash": "",
+    "product_title": "T-Fal Ultimate Hard Anodized Nonstick Fry Pan Set 3 Piece",
+    "primary_material": "PTFE nonstick coating, titanium reinforced",
+    "disclosure_sentence": "No third-party certification found; the food-contact coating is identified as PTFE nonstick.",
+    "product_description": "T-Fal uses PTFE nonstick coating, titanium reinforced as its food-contact surface. T-Fal markets this product as non-toxic, but manufacturer disclosures list PTFE nonstick coating in the food-contact layer, which contradicts that marketing claim. It is used with oven and stovetop heat, including fat exposure, conditions associated with greater release potential for PFAS-related nonstick coatings.",
+    "secondary_materials": [
+      {
+        "name": "Hard anodized aluminum",
+        "note": null
+      }
+    ],
+    "coatings": "PTFE nonstick coating",
+    "use_conditions": [
+      "Oven heat with fat exposure",
+      "Stovetop heat with fat exposure"
+    ],
+    "disclosure_quality": "Documentation Incomplete",
+    "cert_line": "No third-party certification found; the food-contact coating is identified as PTFE nonstick.",
+    "risk_bars": [
+      {
+        "id": "material",
+        "label": "Contact material: PTFE coating",
+        "fill_percent": 15,
+        "color_token": "red",
+        "status_label": "High concern · PTFE coating"
+      },
+      {
+        "id": "migration",
+        "label": "Migration",
+        "fill_percent": 25,
+        "color_token": "red",
+        "status_label": "High migration"
+      },
+      {
+        "id": "use_conditions",
+        "label": "Use conditions",
+        "fill_percent": 4,
+        "color_token": "red",
+        "status_label": "Harsh"
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://www.amazon.com/T-fal-Ultimate-Anodized-Nonstick-10-25-Inch/dp/B08S1TV68Y",
+        "group": "Retailer",
+        "label": "Amazon — T-Fal Ultimate Hard Anodized Nonstick Fry Pan Set 3 Piece",
+        "public_source_eligible": true,
+        "source_role": "retailer_primary",
+        "variant_mismatch": false,
+        "footnote": null
+      }
+    ],
+    "why_this_score": {
+      "primary_material": "PTFE nonstick coating, titanium reinforced",
+      "secondary_materials": [
+        "Hard anodized aluminum"
+      ],
+      "coatings": "PTFE nonstick coating",
+      "use_conditions": [
+        "Oven heat with fat exposure",
+        "Stovetop heat with fat exposure"
+      ],
+      "disclosure_quality": "Documentation Incomplete",
+      "cert_line": "No third-party certification found; the food-contact coating is identified as PTFE nonstick.",
+      "sections": [
+        {
+          "title": "Primary material",
+          "items": [
+            {
+              "text": "PTFE nonstick coating, titanium reinforced",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Secondary materials",
+          "items": [
+            {
+              "text": "Hard anodized aluminum",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Coatings & finishes",
+          "items": [
+            {
+              "text": "PTFE nonstick coating",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Use conditions",
+          "items": [
+            {
+              "text": "Oven heat with fat exposure",
+              "note": null
+            },
+            {
+              "text": "Stovetop heat with fat exposure",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Disclosure quality",
+          "items": [
+            {
+              "text": "Documentation Incomplete",
+              "note": null
+            }
+          ]
+        },
+        {
+          "title": "Certifications & testing",
+          "items": [
+            {
+              "text": "No third-party certification found; the food-contact coating is identified as PTFE nonstick.",
+              "note": null
+            }
+          ]
+        }
+      ]
+    },
+    "badge_summary": "Documentation Incomplete — most materials are known; minor details (grade, finish) are unconfirmed.",
+    "buy_section_title": "Product listings",
+    "retailer_caution_note": "This product is rated High Risk by PlasticBegone.",
+    "sources_intro": "Sources used for this score, including retailer sources where applicable.",
+    "safer_alternatives_subhead": "Higher PAC Safety Scores in this category.",
+    "safer_alternatives_footer": "These alternatives have higher PAC Safety Scores."
+  },
+  "score": {
+    "pac_safety_score": 2,
+    "tier": "High Risk",
+    "displayed_confidence_range": "0–5",
+    "transparency_badge": "Documentation Incomplete"
+  },
+  "snapshot_id": "baseline-t-fal",
+  "content_hash": "b9cf1383bdb0cf4ba84a6618d9ab3275236b1f0cc9248182686869dc9314be4f"
+}

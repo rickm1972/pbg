@@ -6,22 +6,85 @@ import { detectMaterialId, getMaterial, requireMaterial } from './material-taxon
 import { factByKey, factSource, factValue, getFacts } from './evidence-facts.mjs'
 import { resolveConfidenceLabel } from './source-hierarchy.mjs'
 import {
+  evidenceSupportsTriPlyConstruction,
+  isSecondaryComponentEvidenceSupported,
+  structuralComponentDisplayName,
+} from './cookware-evidence-helpers.mjs'
+import {
   getCoatingsFromSchema,
   getIngredientList,
   getPrimaryContact,
   getSecondaryComponentsFromSchema,
   getStructuredEvidence,
   getStructuredSubcategory,
+  getSubstrateCanonical,
   hasStructuredEvidence,
+  hasValidCanonicalPrimaryContact,
 } from './schema-input.mjs'
 
+/** Bump when extraction rules change — visible in component_extraction_log for Gate 2 review. */
+export const COMPONENT_EXTRACT_VERSION = '2026-06-03-ptfe-canonical-dedup-v2'
+
 const COMPOUND_MATERIAL_RE = /^([a-z0-9_]+)_on_([a-z0-9_]+)$/i
+
+/** Generic PTFE ids from legacy detectMaterialId — must not duplicate canonical PTFE primaries. */
+const GENERIC_PTFE_PRIMARY_IDS = new Set(['ptfe_coating', 'ptfe_nonstick'])
+
+function isPtfeFamilyPrimaryMaterialId(materialId) {
+  const id = String(materialId ?? '')
+  return GENERIC_PTFE_PRIMARY_IDS.has(id) || /^ptfe_nonstick/i.test(id) || id === 'ptfe_nonstick_coating'
+}
+
+function isGenericPtfePrimaryMaterialId(materialId) {
+  return GENERIC_PTFE_PRIMARY_IDS.has(String(materialId ?? ''))
+}
+
+function hasPtfeFamilyPrimary(components) {
+  return components.some(
+    (c) =>
+      (c.role === 'primary_food_contact' || c.role === 'coating') &&
+      isPtfeFamilyPrimaryMaterialId(c.material_id),
+  )
+}
+
+/** Drop generic PTFE primaries when a specific PTFE-family primary already exists. */
+function dedupePtfeFamilyPrimaries(components) {
+  const primaries = components.filter((c) => c.role === 'primary_food_contact')
+  const hasSpecificPtfe = primaries.some(
+    (c) => isPtfeFamilyPrimaryMaterialId(c.material_id) && !isGenericPtfePrimaryMaterialId(c.material_id),
+  )
+  if (!hasSpecificPtfe) return components
+  return components.filter(
+    (c) =>
+      !(
+        c.role === 'primary_food_contact' && isGenericPtfePrimaryMaterialId(c.material_id)
+      ),
+  )
+}
+
+function shouldSkipLegacyPrimaryMaterial(evidence, components, matId) {
+  if (hasValidCanonicalPrimaryContact(evidence)) return true
+  if (isGenericPtfePrimaryMaterialId(matId) && hasPtfeFamilyPrimary(components)) return true
+  return false
+}
+
+function primaryCookingComponentName(mat, substrateCanonical) {
+  const substrateId = substrateCanonical?.agent2_material_id ?? substrateCanonical?.canonical_id
+  const substrateMat = substrateId && getMaterial(substrateId) ? requireMaterial(substrateId) : null
+  if (substrateMat) {
+    return `Cooking Surface (${mat.name}, over ${substrateMat.name} body)`
+  }
+  return `Cooking Surface and Body (${mat.name})`
+}
 
 /** @param {string} materialId */
 function parseCompoundMaterialId(materialId) {
   const m = COMPOUND_MATERIAL_RE.exec(String(materialId ?? '').trim())
   if (!m) return null
-  return { coatingId: m[1], bodyId: m[2] }
+  const coatingId = m[1]
+  const bodyId = m[2]
+  if (!getMaterial(coatingId) || !getMaterial(bodyId)) return null
+  return { coatingId, bodyId }
 }
 
 function pushCompoundMaterialComponents(
@@ -65,11 +128,16 @@ const PEAKS_AFFIRMATIVE =
 const TERRABOND_AFFIRMATIVE = /terrabond|terra\s*bond|proprietary.*ceramic.*nonstick|ceramic.*nonstick.*valley/i
 
 function hasPrimaryCookingMaterial(components, materialId) {
-  return components.some(
+  const hasExact = components.some(
     (c) =>
       (c.role === 'primary_food_contact' || c.role === 'coating') &&
       c.material_id === materialId,
   )
+  if (hasExact) return true
+  if (GENERIC_PTFE_PRIMARY_IDS.has(materialId) && hasPtfeFamilyPrimary(components)) {
+    return true
+  }
+  return false
 }
 
 function draftPeaksComponent({ fact_key, excerpt, source_url, confidence, materialText }) {
@@ -180,8 +248,9 @@ function addPrimaryFromStructuredContact(evidence, components) {
 
   if (getMaterial(matId) && !hasPrimaryCookingMaterial(components, matId)) {
     const mat = requireMaterial(matId)
+    const substrate = getSubstrateCanonical(evidence)
     components.push({
-      component_name: `Cooking Surface and Body (${mat.name})`,
+      component_name: primaryCookingComponentName(mat, substrate),
       role: 'primary_food_contact',
       material_id: matId,
       material: primary.material_identity,
@@ -192,7 +261,39 @@ function addPrimaryFromStructuredContact(evidence, components) {
       },
       data_confidence: primary.confidence,
     })
+    addSubstrateStructuralFromCanonical(evidence, components, matId, primary)
   }
+}
+
+/**
+ * When Gate 1 substrate canonical differs from food-contact coating, score body as structural component.
+ * @param {object} evidence
+ * @param {import('./component-extract.mjs').DraftComponent[]} components
+ * @param {string} primaryMatId
+ * @param {ReturnType<typeof getPrimaryContact>} primary
+ */
+function addSubstrateStructuralFromCanonical(evidence, components, primaryMatId, primary) {
+  const substrate = getSubstrateCanonical(evidence)
+  const substrateId = substrate?.agent2_material_id ?? substrate?.canonical_id ?? ''
+  if (!substrateId || !getMaterial(substrateId) || substrateId === primaryMatId) return
+  if (components.some((c) => c.role === 'structural' && c.material_id === substrateId)) return
+
+  const bodyMat = requireMaterial(substrateId)
+  const displayName =
+    structuralComponentDisplayName(substrateId, 'pan_body', substrate.raw_value ?? '') ??
+    `Pan Body — ${bodyMat.name}`
+  components.push({
+    component_name: displayName,
+    role: 'structural',
+    material_id: substrateId,
+    material: substrate.raw_value ?? bodyMat.name,
+    evidence_source: {
+      fact_key: 'substrate_material_id',
+      excerpt: substrate.source_quote ?? substrate.raw_value ?? '',
+      source_url: substrate.source_url ?? primary.source_url,
+    },
+    data_confidence: primary.confidence,
+  })
 }
 
 function addPrimaryFromSchemaCoatings(evidence, components) {
@@ -227,6 +328,7 @@ function addPrimaryFromSchemaCoatings(evidence, components) {
 }
 
 function addPrimaryFromLegacyFacts(evidence, components) {
+  const skipLegacyPrimaryKeys = hasValidCanonicalPrimaryContact(evidence)
   const legacyKeys = [
     'primary_material',
     'primary_contact_surface',
@@ -241,8 +343,14 @@ function addPrimaryFromLegacyFacts(evidence, components) {
     const confidence = resolveConfidenceLabel(evidence, row)
 
     if (key === 'primary_material' || key === 'primary_contact_surface') {
+      if (skipLegacyPrimaryKeys) continue
       const matId = detectMaterialId(text.replace(/_/g, ' '))
-      if (matId && getMaterial(matId) && !hasPrimaryCookingMaterial(components, matId)) {
+      if (
+        matId &&
+        getMaterial(matId) &&
+        !shouldSkipLegacyPrimaryMaterial(evidence, components, matId) &&
+        !hasPrimaryCookingMaterial(components, matId)
+      ) {
         const mat = requireMaterial(matId)
         components.push({
           component_name: `Cooking Surface and Body (${mat.name})`,
@@ -364,7 +472,7 @@ function extractAllPrimaryCookingSurfaces(evidence, product) {
   addPrimaryFromSchemaCoatings(evidence, components)
   addPrimaryFromLegacyFacts(evidence, components)
   addHybridDualSurfacePeaks(evidence, product, components)
-  return components
+  return dedupePtfeFamilyPrimaries(components)
 }
 
 /** Segments that deny presence of a part — never create components. */
@@ -587,7 +695,7 @@ function extractCookwarePrimary(evidence, product) {
     if (d && !hasPrimaryCookingMaterial(components, d.material_id)) components.push(d)
   }
 
-  if (/aluminum core|aluminium core/i.test(material)) {
+  if (/aluminum core|aluminium core|aluminum_core|on_aluminum_core/i.test(material)) {
     const d = draftFromFact(
       evidence,
       materialRow,
@@ -595,10 +703,22 @@ function extractCookwarePrimary(evidence, product) {
       'Pan Body — Aluminum Core',
       material,
     )
-    if (d) components.push({ ...d, material_id: 'aluminum_core', material: 'Aluminum core (tri-ply construction)' })
+    if (d) {
+      components.push({
+        ...d,
+        material_id: 'aluminum_core',
+        material: evidenceSupportsTriPlyConstruction(evidence)
+          ? 'Aluminum core (tri-ply construction per disclosed evidence)'
+          : 'Aluminum core',
+      })
+    }
   }
 
-  if (/stainless.*exterior|tri.ply.*stainless/i.test(material) && !components.some((c) => c.role === 'structural' && /exterior/i.test(c.component_name))) {
+  if (
+    evidenceSupportsTriPlyConstruction(evidence) &&
+    /stainless.*exterior|tri.ply.*stainless/i.test(material) &&
+    !components.some((c) => c.role === 'structural' && /exterior/i.test(c.component_name))
+  ) {
     const confidence = resolveConfidenceLabel(evidence, materialRow)
     components.push({
       component_name: 'Pan Body — Tri-Ply Stainless Steel Exterior',
@@ -734,8 +854,10 @@ function extractFromStructuredSchema(evidence, product) {
   const cookingSurfaces = extractAllPrimaryCookingSurfaces(evidence, product)
   components.push(...cookingSurfaces)
   log.push({ step: 'primary_cooking_surfaces', count: cookingSurfaces.length })
+  log.push({ step: 'component_extract_version', version: COMPONENT_EXTRACT_VERSION })
 
   for (const sec of getSecondaryComponentsFromSchema(evidence) ?? []) {
+    if (!isSecondaryComponentEvidenceSupported(sec)) continue
     const role = ROLE_TO_INTERNAL[sec.component_role] ?? sec.component_role
     let materialId = sec.material_id
     if (!getMaterial(materialId)) {
@@ -762,14 +884,15 @@ function extractFromStructuredSchema(evidence, product) {
       confidence = 'inferred from category pattern'
     }
     const mat = getMaterial(materialId)
-    let component_name = componentNameForRole(sec.component_role)
-    if (role === 'structural' && mat) {
-      component_name =
-        materialId === 'aluminum_core'
-          ? `Tri-ply Body (${mat.name})`
-          : materialId === 'stainless_steel_unspecified'
-            ? `Body (${mat.name})`
-            : component_name
+    let component_name =
+      structuralComponentDisplayName(materialId, sec.component_role, sec.material_identity) ??
+      componentNameForRole(sec.component_role)
+    if (role === 'structural' && mat && materialId === 'aluminum_core') {
+      component_name = structuralComponentDisplayName(
+        materialId,
+        sec.component_role,
+        sec.material_identity,
+      ) ?? `Pan Body — ${mat.name}`
     }
     if (role === 'handle' && materialId === 'stay_cool_handle_undisclosed') {
       component_name = 'Handle (Stay-Cool)'

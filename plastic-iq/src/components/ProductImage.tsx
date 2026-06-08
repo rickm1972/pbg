@@ -6,11 +6,14 @@ export function ProductImage({
   name,
   className,
   fit = 'contain',
+  decorative = false,
 }: {
   src: string | null
   name: string
   className?: string
   fit?: 'contain' | 'cover'
+  /** When true, alt is empty (adjacent visible title is the label). */
+  decorative?: boolean
 }) {
   const [broken, setBroken] = useState(false)
 
@@ -31,7 +34,7 @@ export function ProductImage({
     return (
       <img
         src={src ?? undefined}
-        alt={name}
+        alt={decorative ? '' : name}
         loading="lazy"
         className={cn(
           'h-full w-full bg-transparent',

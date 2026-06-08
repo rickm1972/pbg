@@ -3,7 +3,16 @@
  * Used for public CTAs — fail closed when mismatch is detectable.
  */
 
-const SIZE_IN_TEXT_RE = /(\d+(?:\.\d+)?)\s*(?:-|inch|in\.?|")\b/gi
+const SIZE_IN_TEXT_RE = /(\d+(?:\.\d+)?)\s*(?:inch|in\.?|")\b/gi
+/** Slug form: `12-inch`, `10-25-inch` — not bare `5-graphite` from product lines like G5. */
+const SIZE_HYPHEN_INCH_SLUG_RE = /(\d+(?:\.\d+)?)-inch\b/gi
+/** Fractional inch slugs: `10-1-4` → 10.25 (10¼″). Must run before two-part slug decimal. */
+const FRACTIONAL_QUARTER_INCH_SLUG_RE = /\b(\d{1,2})-1-4\b/gi
+const FRACTIONAL_HALF_INCH_SLUG_RE = /\b(\d{1,2})-1-2\b/gi
+const FRACTIONAL_THREE_QUARTER_INCH_SLUG_RE = /\b(\d{1,2})-3-4\b/gi
+/** Size before cookware noun: `Seasoned-12-Skillet`, `10-25-cast-iron-skillet`. */
+const SLUG_SIZE_BEFORE_COOKWARE_RE =
+  /(?:^|[-/])(\d+(?:\.\d+)?)-(?:cast[-/])?(?:iron[-/])?(?:skillet|pan|frypan|frying|wok|griddle|pot|dutch-oven|cookware)\b/gi
 const PIECE_COUNT_RE = /(\d+)\s*[-\s]?(?:piece|pc|pk)\b/gi
 
 const STOP_TOKENS = new Set([
@@ -66,6 +75,26 @@ export function extractInchSizes(text: string): number[] {
     const n = Number(match[1])
     if (Number.isFinite(n)) sizes.push(n)
   }
+  for (const match of t.matchAll(SIZE_HYPHEN_INCH_SLUG_RE)) {
+    const n = Number(match[1])
+    if (Number.isFinite(n)) sizes.push(n)
+  }
+  for (const match of t.matchAll(FRACTIONAL_QUARTER_INCH_SLUG_RE)) {
+    const n = Number(match[1])
+    if (Number.isFinite(n)) sizes.push(n + 0.25)
+  }
+  for (const match of t.matchAll(FRACTIONAL_HALF_INCH_SLUG_RE)) {
+    const n = Number(match[1])
+    if (Number.isFinite(n)) sizes.push(n + 0.5)
+  }
+  for (const match of t.matchAll(FRACTIONAL_THREE_QUARTER_INCH_SLUG_RE)) {
+    const n = Number(match[1])
+    if (Number.isFinite(n)) sizes.push(n + 0.75)
+  }
+  for (const match of t.matchAll(SLUG_SIZE_BEFORE_COOKWARE_RE)) {
+    const n = Number(match[1])
+    if (Number.isFinite(n) && n >= 4 && n <= 20) sizes.push(n)
+  }
   for (const match of t.matchAll(SIZE_LIST_BEFORE_INCH_RE)) {
     for (const part of match[1].split(',')) {
       const n = Number(part.trim())
@@ -105,6 +134,42 @@ function hasConflictingProductLine(productName: string, haystack: string): boole
 }
 
 /**
+ * True only when variant conflict is confirmed (product line, piece count, or credible inch size).
+ * Approved listings fail open when the matcher cannot confirm a mismatch.
+ */
+export function retailerListingHasConfirmedVariantMismatch(
+  productName: string,
+  url: string,
+  contextText = '',
+): boolean {
+  const name = String(productName ?? '').trim()
+  const haystack = `${url} ${contextText}`.trim()
+  if (!name || !haystack) return false
+
+  if (hasConflictingProductLine(name, haystack)) return true
+
+  const nameSizes = extractInchSizes(name)
+  const urlSizes = extractInchSizes(haystack)
+
+  if (nameSizes.length && urlSizes.length) {
+    const primary = nameSizes[0]
+    if (!urlSizes.some((s) => Math.abs(s - primary) < 0.15)) return true
+    // Multi-size products: require every listed size only when the URL also lists multiple sizes.
+    if (nameSizes.length > 1 && urlSizes.length > 1) {
+      for (const s of nameSizes) {
+        if (!urlSizes.some((u) => Math.abs(u - s) < 0.15)) return true
+      }
+    }
+  }
+
+  const namePieces = extractPieceCount(name)
+  const urlPieces = extractPieceCount(haystack)
+  if (namePieces != null && urlPieces != null && namePieces !== urlPieces) return true
+
+  return false
+}
+
+/**
  * @param productName — catalog product title
  * @param url — retailer listing URL
  * @param contextText — Gate 1 row title, source title, etc.
@@ -116,31 +181,20 @@ export function retailerListingMatchesProductVariant(
   contextText = '',
   options: { strictMissingSize?: boolean } = {},
 ): boolean {
+  if (retailerListingHasConfirmedVariantMismatch(productName, url, contextText)) {
+    return false
+  }
+
   const name = String(productName ?? '').trim()
   const haystack = `${url} ${contextText}`.trim()
   if (!name || !haystack) return false
 
-  if (hasConflictingProductLine(name, haystack)) return false
-
   const nameSizes = extractInchSizes(name)
   const urlSizes = extractInchSizes(haystack)
 
-  if (nameSizes.length) {
-    if (!urlSizes.length) {
-      return options.strictMissingSize ? false : true
-    }
-    const primary = nameSizes[0]
-    if (!urlSizes.some((s) => Math.abs(s - primary) < 0.15)) return false
-    if (nameSizes.length > 1) {
-      for (const s of nameSizes) {
-        if (!urlSizes.some((u) => Math.abs(u - s) < 0.15)) return false
-      }
-    }
+  if (nameSizes.length && !urlSizes.length && options.strictMissingSize) {
+    return false
   }
-
-  const namePieces = extractPieceCount(name)
-  const urlPieces = extractPieceCount(haystack)
-  if (namePieces != null && urlPieces != null && namePieces !== urlPieces) return false
 
   return true
 }

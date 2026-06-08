@@ -445,12 +445,16 @@ export function Agent3ReviewDashboard({
                   ? () => handleRun(selectedScoreView.product.product_id)
                   : undefined
               }
+              scoreMathContext={
+                selectedScoreView.productScore.input_id
+                  ? data?.scoreMathContextByInputId[selectedScoreView.productScore.input_id]
+                  : undefined
+              }
               onNavigateToGate2={
                 onNavigateToGate
                   ? (productId) => onNavigateToGate('agent2', productId)
                   : undefined
               }
-              onRefresh={() => void load()}
             />
           ) : selectedScoreView?.product ? (
             <div className="flex min-h-[320px] flex-col justify-center rounded-2xl border border-slate-200 bg-white p-8 shadow-card">

@@ -149,7 +149,23 @@ export function buildFieldProvenance(
       null,
     )
     if (pi.sku_or_model) {
-      add('product_identity.sku_or_model', pi.sku_or_model, s.retailer_links?.amazon_url, null, null)
+      add(
+        'product_identity.sku_or_model',
+        pi.sku_or_model,
+        s.retailer_links?.amazon_url,
+        'retailer_confirmed',
+        null,
+      )
+    }
+    const mfrCtx = pi as { manufacturer_context_sku?: string; manufacturer_context_sku_source_url?: string }
+    if (mfrCtx.manufacturer_context_sku) {
+      add(
+        'product_identity.manufacturer_context_sku',
+        mfrCtx.manufacturer_context_sku,
+        mfrCtx.manufacturer_context_sku_source_url ?? s.retailer_links?.manufacturer_direct_url,
+        'manufacturer_context',
+        null,
+      )
     }
     if (pi.subcategory) {
       add('product_identity.subcategory', pi.subcategory, s.retailer_links?.amazon_url, null, null)

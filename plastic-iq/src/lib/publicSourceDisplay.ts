@@ -1,6 +1,11 @@
 import { buildGate1SourcesReview, type Gate1SourceRow } from './gate1SourcesReview'
 import type { ProductEvidence } from '../types/agent'
 import { isPrimaryRetailerReviewerLabel } from './publicRetailerHostLabels'
+import {
+  applyPublicDisplayContractToSources,
+  heuristicPublicSourcesFromRaw,
+  type PublicDisplayContract,
+} from './publicProductDisplayContract'
 
 export type PublicSourceLabel = 'Manufacturer' | 'Retailer' | 'Regulatory' | 'Context'
 
@@ -19,6 +24,8 @@ export type PublicProductSource = {
   title: string
   public_label: PublicSourceLabel
   public_status: PublicSourceStatus
+  /** Set by display contract before public render; ineligible sources are omitted. */
+  public_source_eligible?: boolean
 }
 
 const HIDDEN_SOURCE_TYPES =
@@ -151,6 +158,7 @@ export function resolvePublicSourceEligibility(row: Gate1SourceRow): PublicSourc
 /** Build consumer-facing sources from approved evidence using Gate 1 audit rules. */
 export function buildPublicSourcesFromEvidence(
   evidence: ProductEvidence,
+  contract?: PublicDisplayContract | null,
 ): PublicProductSource[] {
   const model = buildGate1SourcesReview(evidence)
   const seen = new Set<string>()
@@ -175,49 +183,18 @@ export function buildPublicSourcesFromEvidence(
     })
   }
 
-  return out.sort((a, b) => a.title.localeCompare(b.title))
+  return applyPublicDisplayContractToSources(
+    out.sort((a, b) => a.title.localeCompare(b.title)),
+    contract,
+  )
 }
 
 /** Heuristic fallback when evidence display pack is unavailable (unpublished dev, pre-migration). */
 export function filterSourcesHeuristic(
   sources: Array<{ source_type: string; url: string; title: string | null }>,
+  contract?: PublicDisplayContract | null,
 ): PublicProductSource[] {
-  const seen = new Set<string>()
-  const out: PublicProductSource[] = []
-
-  for (const source of sources) {
-    const url = source.url?.trim()
-    if (!url) continue
-    const type = (source.source_type ?? '').toLowerCase()
-    if (HIDDEN_SOURCE_TYPES.test(type)) continue
-    if (HIDDEN_HOST_RE.test(hostOf(url))) continue
-    const key = normalizeUrlKey(url)
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    let public_label: PublicSourceLabel = 'Context'
-    if (type === 'amazon' || /amazon\.(com|ca)/i.test(hostOf(url))) public_label = 'Retailer'
-    else if (
-      type === 'manufacturer' ||
-      type === 'ingredient_page' ||
-      type === 'faq' ||
-      type === 'spec_sheet'
-    ) {
-      public_label = 'Manufacturer'
-    } else if (type === 'regulatory' || type === 'government' || /\.gov$/i.test(hostOf(url))) {
-      public_label = 'Regulatory'
-    }
-
-    out.push({
-      source_type: source.source_type,
-      url,
-      title: source.title?.trim() || hostOf(url) || url,
-      public_label,
-      public_status: public_label === 'Context' ? 'context' : 'supporting',
-    })
-  }
-
-  return out
+  return heuristicPublicSourcesFromRaw(sources, contract)
 }
 
 export { normalizeUrlKey, hostOf }

@@ -35,7 +35,9 @@ export function evaluateExternalCheck(structured, sources, mappings, triggers, c
         : missing('No evidence sources recorded')
 
     case 'external.pfas_nonstick_disclosure': {
-      if (!triggers.has('ptfe_primary_contact')) return notApplicable()
+      if (!triggers.has('ptfe_primary_contact') && !triggers.has('ceramic_nonstick_coating')) {
+        return notApplicable()
+      }
       const pfas = mappings?.pfas_status_id
       const coatingOk = (structured?.coatings_and_finishes ?? []).some(
         (c) => c.composition_disclosed && /ptfe|nonstick/i.test(`${c.coating_name} ${c.coating_type}`),

@@ -51,6 +51,26 @@ function importFresh(relativeFromScripts, { dev }) {
   return import(`${href}?t=${Date.now()}`)
 }
 
+/** Bust src/ modules — static imports in agent1 scripts otherwise stay on first-loaded version. */
+function importFreshProject(relativeFromPlasticIq, { dev }) {
+  const href = pathToFileURL(join(scriptsDir, '..', relativeFromPlasticIq)).href
+  if (!dev) return import(href)
+  return import(`${href}?t=${Date.now()}`)
+}
+
+async function bustAgent1SharedModules({ dev }) {
+  const shared = [
+    'src/shared/agent1/amazon-source-consistency.mjs',
+    'src/shared/agent1/gate1-product-identity.mjs',
+    'src/shared/canonical-taxonomy/inert-cookware-structural.mjs',
+    'src/shared/canonical-taxonomy/map-structured-evidence.mjs',
+    'src/shared/canonical-taxonomy/compound-cookware-material.mjs',
+  ]
+  for (const rel of shared) {
+    await importFreshProject(rel, { dev })
+  }
+}
+
 export function agentsApiPlugin() {
   return {
     name: 'agents-api',
@@ -416,16 +436,26 @@ export function agentsApiPlugin() {
           }
 
           if (pathname === '/api/agent1/run') {
-            // Bust transitive imports (execute-required-retrieval.mjs) — importFresh on runner.mjs alone is not enough.
+            console.log(`[agent1-api] POST /run product_id=${body.product_id}`)
+            // Bust Agent 1 subgraph — runner import alone leaves structured-normalize/research cached.
             process.env.AGENT1_RELOAD_MODULES = '1'
+            await bustAgent1SharedModules({ dev })
+            await importFresh('agent1/schema.mjs', { dev })
+            await importFresh('agent1/structured-normalize.mjs', { dev })
+            await importFresh('agent1/research.mjs', { dev })
+            await importFresh('agent1/required-check-retrieval/invoke.mjs', { dev })
             await importFresh('agent1/required-check-retrieval/task-runners.mjs', { dev })
             await importFresh('agent1/required-check-retrieval/execute-required-retrieval.mjs', {
               dev,
             })
+            await importFresh('agent1/assert-canonical-materials.mjs', { dev })
             const { runAgent1, formatPacketSummary } = await importFresh('agent1/runner.mjs', {
               dev,
             })
             const result = await runAgent1({ productId: body.product_id })
+            console.log(
+              `[agent1-api] /run done product_id=${body.product_id} ok=${result.ok} evidence_id=${result.evidence?.evidence_id ?? 'none'}`,
+            )
             sendJson(res, result.ok ? 200 : 422, {
               ok: result.ok,
               summary: formatPacketSummary(result),
@@ -439,6 +469,32 @@ export function agentsApiPlugin() {
           }
 
           if (pathname === '/api/agent2/run') {
+            if (dev) {
+              const { runAgent2JsonSubprocess } = await importFresh('agent2/run-subprocess.mjs', {
+                dev,
+              })
+              const payload = await runAgent2JsonSubprocess(body.product_id)
+              if (!payload.ok) {
+                sendJson(res, 422, {
+                  ok: false,
+                  reason: payload.reason,
+                  product_id: payload.product_id,
+                })
+                return
+              }
+              sendJson(res, 200, {
+                ok: true,
+                summary: payload.summary,
+                product_id: payload.product_id,
+                evidence_id: payload.evidence_id,
+                input_id: payload.input_id,
+                human_review_required: payload.human_review_required,
+                description_generator_version: payload.description_generator_version,
+                product_description_preview: payload.product_description_preview,
+              })
+              return
+            }
+
             const { runAgent2, formatNormalizationSummary } = await importFresh(
               'agent2/runner.mjs',
               { dev },

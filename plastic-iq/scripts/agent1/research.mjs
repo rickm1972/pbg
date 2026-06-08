@@ -11,7 +11,6 @@ import {
 } from './prompt-structured.mjs'
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompt.mjs'
 import { AGENT_VERSION as SCHEMA_AGENT_VERSION } from './schema.mjs'
-import { normalizeStructuredPacket } from './structured-normalize.mjs'
 import { bridgeLegacyFacts, bridgeCertificationsVerified } from './bridge-legacy.mjs'
 import { StructuredPacketSchema } from './schema.mjs'
 import {
@@ -30,6 +29,7 @@ import {
   MAX_FACT_EXCERPT_CHARS,
   MAX_PAGE_EXCERPT_CHARS,
 } from './confidence-enforce.mjs'
+import { reconcileAmazonRetrievalWarnings } from '../../src/shared/agent1/amazon-source-consistency.mjs'
 
 const DEFAULT_MAX_WEB_SEARCH_USES = 12
 /** Cap synthesis generation — smaller JSON target (~3k output tokens). */
@@ -190,16 +190,24 @@ function buildEvidencePacketFromRawText(rawText, { model, provider, apiUsage }) 
   return packet
 }
 
+async function normalizeStructuredPacketLive(parsed, product) {
+  const href = new URL('./structured-normalize.mjs', import.meta.url).href
+  const url =
+    process.env.AGENT1_RELOAD_MODULES === '1' ? `${href}?t=${Date.now()}` : href
+  const mod = await import(url)
+  return await mod.normalizeStructuredPacket(parsed, product)
+}
+
 /** Structured schema v1 packet for runner + threshold (replaces legacy-only builder). */
-function buildStructuredEvidencePacketFromRawText(
+async function buildStructuredEvidencePacketFromRawText(
   rawText,
-  { model, provider, apiUsage },
+  { model, provider, apiUsage, amazonRetrieval },
   product,
 ) {
   const parsed = extractJsonObject(rawText)
   const runTimestamp = new Date().toISOString()
 
-  const normalized = normalizeStructuredPacket(parsed, product)
+  const normalized = await normalizeStructuredPacketLive(parsed, product)
   const structured = normalized.structured_evidence
 
   let sources = (normalized.sources ?? []).map((source) => ({ ...source }))
@@ -210,12 +218,18 @@ function buildStructuredEvidencePacketFromRawText(
   sources = applySourceExcerptPolicy(sources, facts)
   facts = applyFactExcerptCaps(facts)
 
-  const warnings = [...(normalized.agent_metadata?.warnings ?? [])]
+  let warnings = [...(normalized.agent_metadata?.warnings ?? [])]
   if (upgrades.length) {
     warnings.push(
       `Server upgraded ${upgrades.length} fact confidence label(s) to match manufacturer-tier sources`,
     )
   }
+  warnings = reconcileAmazonRetrievalWarnings(
+    warnings,
+    structured,
+    amazonRetrieval,
+    sources,
+  )
 
   const agent_metadata = {
     model,
@@ -340,7 +354,7 @@ async function researchWithPerplexitySearchAndClaude(product, env) {
         amazonAnthropic,
         mergedSynth,
       )
-      buildStructuredEvidencePacketFromRawText(
+      await buildStructuredEvidencePacketFromRawText(
         synth.rawText,
         {
           model: synth.model,
@@ -511,12 +525,13 @@ export async function researchProduct(product) {
     claude_estimated_cost_usd: 0,
   }
 
-  return buildStructuredEvidencePacketFromRawText(
+  return await buildStructuredEvidencePacketFromRawText(
     result.rawText,
     {
       model: result.model,
       provider: result.provider,
       apiUsage,
+      amazonRetrieval: result.retrieval?.amazon_anthropic_web_search,
     },
     product,
   )

@@ -8,12 +8,16 @@ export const INFERRED_CONFIDENCES = new Set([
   'inferred from category pattern',
   'unknown',
   'proprietary or undisclosed',
+  'third-party review citing manufacturer',
+  'third-party context source',
+  'manufacturer claim via secondary source',
+  'retailer confirmed',
 ])
 
 export const PRIMARY_CONTACT_CI_THRESHOLD = 0.7
 
 export const BADGES = {
-  FULL_DISCLOSED: 'Full Disclosed',
+  FULL_DISCLOSED: 'Fully Disclosed',
   DOCUMENTATION_INCOMPLETE: 'Documentation Incomplete',
   MATERIAL_UNCERTAIN: 'Material Uncertain',
   OPAQUE: 'Opaque',
@@ -66,10 +70,14 @@ export function hasPackagingOnlyInference(inputs) {
   )
 }
 
-/** Trust Agent 2 Full Disclosed when primary contact materials are fully disclosed. */
+function isFullDisclosedBadge(badge) {
+  return /^full(y)?\s+disclosed$/i.test(String(badge ?? '').trim())
+}
+
+/** Trust Agent 2 Fully Disclosed when primary contact materials are fully disclosed. */
 function shouldHonorAgent2FullDisclosed(inputs) {
   const agent2Badge = inputs.layer_4b?.transparency_badge
-  if (agent2Badge !== BADGES.FULL_DISCLOSED) return false
+  if (!isFullDisclosedBadge(agent2Badge)) return false
   if (Boolean(inputs.layer_4a?.unknown_coating_cap_applies)) return false
   if (hasNegativeLayer4a(inputs)) return false
   if (hasPrimaryInferredComponent(inputs)) return false

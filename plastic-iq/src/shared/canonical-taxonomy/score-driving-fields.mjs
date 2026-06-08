@@ -1,4 +1,5 @@
 import { isExpansionRequired } from './constants.mjs'
+import { requiresCoatingModifier, UNCOATED_COATING_MODIFIER_IDS } from './inert-cookware-structural.mjs'
 
 /** Cookware Gate 1 required canonical fields (Phase 3.5). */
 export const COOKWARE_SCORE_DRIVING_FIELDS = [
@@ -10,6 +11,7 @@ export const COOKWARE_SCORE_DRIVING_FIELDS = [
 
 export const SAFETY_CLAIM_FIELD_KEYS = [
   'pfoa_free_claim',
+  'pfas_free_claim_structurally_verified',
   'pfas_free_marketing_claim',
   'non_toxic_marketing_claim',
   'bpa_free_claim',
@@ -39,10 +41,23 @@ export function getCanonicalApprovalBlockers(mappings, ctx = {}) {
     // Default pipeline catalog is cookware-heavy; still enforce when mappings present.
   }
 
+  const primaryId = mappings.primary_contact_material_id?.canonical_id ?? ''
+
   for (const req of COOKWARE_SCORE_DRIVING_FIELDS) {
     const row = mappings[req.field_key]
     if (!row) {
       blockers.push(`${req.label}: canonical mapping missing.`)
+      continue
+    }
+    if (req.field_key === 'coating_modifier_id' && !requiresCoatingModifier(primaryId)) {
+      if (
+        isExpansionRequired(row.canonical_id) ||
+        !UNCOATED_COATING_MODIFIER_IDS.has(row.canonical_id)
+      ) {
+        blockers.push(
+          `${req.label}: uncoated/inert primary requires no_coating_modifier or not_applicable (got: ${row.canonical_id}).`,
+        )
+      }
       continue
     }
     if (isExpansionRequired(row.canonical_id)) {

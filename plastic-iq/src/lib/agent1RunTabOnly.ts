@@ -1,16 +1,29 @@
-/** T-Fal — Agent 1 testing: Run tab + reset; hidden from Awaiting review until a new run finishes. */
+import { requiresFullPipelineResetBeforeAgent1Run } from './pipelineCatalog'
+
+/** T-Fal — validation product; may re-run from Run tab (reset + run). */
 export const AGENT1_TFAL_PRODUCT_ID = '7a457a86-ab62-4cbf-90b9-ccaeafe06896'
 
-export function isAgent1HeldFromAwaitingReviewTab(productId: string): boolean {
-  return productId === AGENT1_TFAL_PRODUCT_ID
-}
+/** Lodge cast iron — validation duo + inert-cookware calibration. */
+export const AGENT1_LODGE_PRODUCT_ID = '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8'
 
-export function canAgent1RetestReset(productId: string): boolean {
-  return isAgent1HeldFromAwaitingReviewTab(productId)
-}
+/** HexClad — Lodge validation duo (materials-science pair). */
+export const AGENT1_HEXCLAD_PRODUCT_ID = 'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5'
 
-/** Prior run or stalled in_progress — Run Agent 1 clears evidence first, then runs (T-Fal testing). */
-export function showAgent1RetestResetButton(agentStatus: string, productId: string): boolean {
-  if (!canAgent1RetestReset(productId)) return false
+/** Lodge + HexClad — Agent 1 re-run batch (not T-Fal). */
+export const AGENT1_VALIDATION_DUO_PRODUCT_IDS: readonly string[] = [
+  AGENT1_LODGE_PRODUCT_ID,
+  AGENT1_HEXCLAD_PRODUCT_ID,
+] as const
+
+/**
+ * Partial Agent 1 evidence wipe before re-run (any product not requiring full pipeline reset).
+ */
+export function canAgent1RetestReset(agentStatus: string): boolean {
+  if (requiresFullPipelineResetBeforeAgent1Run(agentStatus)) return false
   return agentStatus !== 'unscored'
+}
+
+/** Prior run or stalled in_progress — Run Agent 1 clears evidence first, then runs. */
+export function showAgent1RetestResetButton(agentStatus: string, _productId?: string): boolean {
+  return canAgent1RetestReset(agentStatus)
 }

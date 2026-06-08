@@ -27,6 +27,15 @@ export const PFAS_STATUS_TAXONOMY = [
     taxonomy_file: 'pfas-status-taxonomy.mjs',
   },
   {
+    canonical_id: 'pfas_not_present_inert_material',
+    display_label: 'PFAS not present (inert food-contact material)',
+    description:
+      'Food-contact material is structurally not PFAS-based (uncoated metal, glass, inert ceramic/enamel).',
+    aliases: [],
+    mapping_rule_id: 'pfas_not_present_inert_material_v1',
+    taxonomy_file: 'pfas-status-taxonomy.mjs',
+  },
+  {
     canonical_id: 'pfas_not_disclosed',
     display_label: 'PFAS not disclosed',
     description: 'No affirmative PFAS disclosure in reviewed sources.',

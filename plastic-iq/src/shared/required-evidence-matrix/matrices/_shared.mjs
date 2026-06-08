@@ -35,7 +35,7 @@ export function baseRetailerLinks() {
   return [
     {
       id: 'links.amazon_url',
-      label: 'Amazon / retailer URL',
+      label: 'Primary retailer URL (Amazon or catalog retailer)',
       category: 'product_identity',
       field_path: 'retailer_links.amazon_url',
       required: true,

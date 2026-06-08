@@ -48,6 +48,17 @@ export const MATERIAL_TAXONOMY = {
     coatingOptions: ['Natural vegetable oil seasoning'],
     inertProtection: true,
   },
+  carbon_steel: {
+    name: 'Carbon steel',
+    hazard: 0.03,
+    migration: 0.035,
+    tier: 'Inert',
+    hazardTableEntry: 'carbon steel — 0.03 (Inert band)',
+    migrationTableEntry: 'Inert range 0.02–0.05; midpoint 0.035',
+    roles: ['primary_food_contact'],
+    primaryOptions: ['Carbon steel'],
+    inertProtection: true,
+  },
   plant_mineral_formulation: {
     name: 'Plant- and mineral-based aqueous formulation',
     hazard: 0.08,
@@ -141,6 +152,17 @@ export const MATERIAL_TAXONOMY = {
     primaryOptions: ['Proprietary ceramic coating (undisclosed)'],
     coatingOptions: ['Proprietary ceramic nonstick (undisclosed)'],
     unknownFoodContactCoating: true,
+  },
+  ceramic_nonstick_sol_gel: {
+    name: 'Ceramic nonstick sol-gel coating',
+    hazard: 0.35,
+    migration: 0.38,
+    tier: 'Moderate Risk',
+    hazardTableEntry: 'Ceramic nonstick sol-gel — 0.35',
+    migrationTableEntry: 'Ceramic nonstick sol-gel — 0.38',
+    roles: ['primary_food_contact', 'coating'],
+    primaryOptions: ['Ceramic nonstick sol-gel coating'],
+    coatingOptions: ['Ceramic nonstick sol-gel coating'],
   },
   thermolon_ceramic: {
     name: 'Thermolon ceramic coating',
@@ -252,7 +274,7 @@ export const MATERIAL_TAXONOMY = {
     coatingOptions: ['Hard anodized finish'],
   },
   aluminum_core: {
-    name: 'Aluminum core (tri-ply)',
+    name: 'Aluminum core',
     hazard: 0.22,
     migration: 0.25,
     tier: 'Lower Risk Synthetics',
@@ -261,6 +283,18 @@ export const MATERIAL_TAXONOMY = {
     roles: ['structural'],
     primaryOptions: ['Aluminum core'],
     secondaryOptions: ['Aluminum core'],
+  },
+  graphite_core: {
+    name: 'Graphite structural core',
+    hazard: 0.02,
+    migration: 0.02,
+    tier: 'Inert',
+    hazardTableEntry: 'Graphite bonded core — structural (not food-contact)',
+    migrationTableEntry: 'Inert: internal structural layer 0.02',
+    roles: ['structural'],
+    primaryOptions: ['Graphite core (structural)'],
+    secondaryOptions: ['Graphite core layer'],
+    inertProtection: true,
   },
   tempered_glass_lid: {
     name: 'Tempered glass lid',
@@ -488,7 +522,13 @@ export const MATERIAL_DETECTORS = [
   { id: 'synthetic_surfactant_formulation', pattern: /sles|sodium lauryl sulfate|synthetic surfactant|mit\/bit preservative/i },
   { id: 'cast_iron_seasoned', pattern: /cast iron.*(?:season|vegetable oil)|pre.seasoned.*cast iron/i },
   { id: 'cast_iron', pattern: /cast iron|cast-iron/i },
+  { id: 'carbon_steel', pattern: /carbon steel|blue steel/i },
   { id: 'terrabond_proprietary', pattern: /terrabond|terra\s*bond|proprietary.*ceramic.*nonstick/i },
+  {
+    id: 'ceramic_nonstick_sol_gel',
+    pattern:
+      /ceramic_nonstick_sol_gel|sol_gel_ceramic_nonstick|sol[-\s]?gel.*ceramic.*nonstick|ceramic.*non[-\s]?stick.*sol[-\s]?gel|ceramic.*non[-\s]?stick/i,
+  },
   { id: 'thermolon_ceramic', pattern: /thermolon/i },
   { id: 'ptfe_coating', pattern: /\bptfe\b|teflon/i, negative: /ptfe-free|without ptfe|no ptfe|pfas-free.*ptfe-free/i },
   { id: 'vitreous_enamel', pattern: /vitreous enamel|enameled cast iron/i },
@@ -497,7 +537,7 @@ export const MATERIAL_DETECTORS = [
   { id: 'stainless_steel_304', pattern: /\b304\b|18\/8|18-8/i },
   { id: 'stainless_steel_unspecified', pattern: /stainless steel|stainless/i },
   { id: 'hard_anodized_aluminum', pattern: /hard anodized|hard anodised/i },
-  { id: 'aluminum_core', pattern: /aluminum core|aluminium core|tri.ply.*aluminum/i },
+  { id: 'aluminum_core', pattern: /aluminum core|aluminium core|aluminum_core|on_aluminum_core/i },
   { id: 'tempered_glass_lid', pattern: /tempered glass lid/i },
   { id: 'tempered_glass', pattern: /tempered glass/i },
   { id: 'borosilicate_glass', pattern: /borosilicate/i },
@@ -572,6 +612,17 @@ export function isUnknownFoodContactCoatingMaterial(materialId) {
   return Boolean(MATERIAL_TAXONOMY[materialId]?.unknownFoodContactCoating)
 }
 
+/** Primary food-contact material that is itself a coating (not bare metal/glass). */
+export function isFoodContactCoatingPrimaryMaterial(materialId) {
+  const id = String(materialId ?? '')
+  if (!id) return false
+  if (isUnknownFoodContactCoatingMaterial(id)) return true
+  const mat = MATERIAL_TAXONOMY[id]
+  if (!mat) return /^ptfe|ceramic_nonstick|ceramic.*nonstick/i.test(id)
+  const roles = mat.roles ?? []
+  return roles.includes('primary_food_contact') && roles.includes('coating')
+}
+
 /** Cap-triggering materials dominate Risk Dashboard Material/Migration fills (not CI-averaged down). */
 export function isRiskDashboardDominantMaterial(materialId) {
   const m = MATERIAL_TAXONOMY[materialId]
@@ -582,6 +633,7 @@ export function isRiskDashboardDominantMaterial(materialId) {
 const CATEGORY_FOR_DESCRIPTION_BY_ID = {
   cast_iron: 'inert material',
   cast_iron_seasoned: 'inert material',
+  carbon_steel: 'inert material',
   cast_iron_integrated_handle: 'inert material',
   stainless_steel_304: 'inert material',
   stainless_steel_316: 'inert material',

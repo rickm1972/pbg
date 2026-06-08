@@ -1,9 +1,13 @@
 import { isExpansionRequired } from '../canonical-taxonomy/constants.mjs'
-
-const PTFE_PRIMARY_IDS = new Set([
-  'ptfe_nonstick_coating',
-  'ptfe_nonstick_titanium_reinforced',
-])
+import {
+  isCeramicNonstickMaterialText,
+  isCeramicNonstickPrimary,
+} from '../canonical-taxonomy/ceramic-nonstick-structural.mjs'
+import {
+  isInertFoodContactPrimary,
+  isPtfeFamilyPrimary,
+  PTFE_FAMILY_PRIMARY_IDS,
+} from '../canonical-taxonomy/inert-cookware-structural.mjs'
 
 /**
  * @param {object} structured
@@ -22,9 +26,16 @@ export function detectPatternTriggers(structured, mappings, sources = []) {
 
   const triggers = new Set()
 
+  if (isCeramicNonstickPrimary(primaryId) || isCeramicNonstickMaterialText(pcmRaw)) {
+    triggers.add('ceramic_nonstick_coating')
+  }
+
   if (
-    PTFE_PRIMARY_IDS.has(primaryId) ||
-    /ptfe|nonstick|non-stick|pfoa|pfas/i.test(pcmRaw)
+    isPtfeFamilyPrimary(primaryId) ||
+    (!isInertFoodContactPrimary(primaryId) &&
+      !isCeramicNonstickPrimary(primaryId) &&
+      !isCeramicNonstickMaterialText(pcmRaw) &&
+      /\bptfe\b/i.test(pcmRaw))
   ) {
     triggers.add('ptfe_primary_contact')
   }
@@ -33,11 +44,18 @@ export function detectPatternTriggers(structured, mappings, sources = []) {
     triggers.add('pfoa_pfas_distinction')
   }
 
+  const ceramicDisclosed =
+    isCeramicNonstickPrimary(primaryId) ||
+    isCeramicNonstickMaterialText(pcmRaw) ||
+    (structured?.coatings_and_finishes ?? []).some((c) =>
+      isCeramicNonstickMaterialText(`${c.coating_name ?? ''} ${c.coating_type ?? ''}`),
+    )
   if (
-    undisclosed === 'PROPRIETARY_NAMED' ||
-    undisclosed === 'UNKNOWN' ||
-    /proprietary|undisclosed/i.test(pcmRaw) ||
-    (structured?.coatings_and_finishes ?? []).some((c) => c.coating_type === 'proprietary_undisclosed')
+    !ceramicDisclosed &&
+    (undisclosed === 'PROPRIETARY_NAMED' ||
+      undisclosed === 'UNKNOWN' ||
+      /proprietary|undisclosed/i.test(pcmRaw) ||
+      (structured?.coatings_and_finishes ?? []).some((c) => c.coating_type === 'proprietary_undisclosed'))
   ) {
     triggers.add('proprietary_coating')
   }
@@ -78,7 +96,10 @@ export function detectPatternTriggers(structured, mappings, sources = []) {
  * @param {{ primaryId: string, pfasStatusId: string, pcmRaw: string }} ctx
  */
 function detectPfoaPfasDistinctionPattern(structured, mappings, sources, ctx) {
-  if (PTFE_PRIMARY_IDS.has(ctx.primaryId)) return true
+  if (isInertFoodContactPrimary(ctx.primaryId)) return false
+  if (ctx.pfasStatusId === 'pfas_not_present_inert_material') return false
+  if (isCeramicNonstickPrimary(ctx.primaryId)) return true
+  if (isPtfeFamilyPrimary(ctx.primaryId)) return true
   if (
     ctx.pfasStatusId === 'pfas_present_disclosed' ||
     ctx.pfasStatusId === 'pfas_intentionally_added_disclosed'
@@ -110,4 +131,4 @@ function collectMaterialBlob(structured) {
   return parts.filter(Boolean).join('\n').toLowerCase()
 }
 
-export { PTFE_PRIMARY_IDS, isExpansionRequired }
+export { PTFE_FAMILY_PRIMARY_IDS as PTFE_PRIMARY_IDS, isExpansionRequired }

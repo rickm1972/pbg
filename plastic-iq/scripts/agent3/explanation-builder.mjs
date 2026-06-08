@@ -140,7 +140,11 @@ function whatMakesItCleanYou(component, inputs, pathway, confidenceInterval, lay
   const text = componentText(component)
   const brand = brandLabel?.trim() || 'The brand'
 
-  if (confidenceInterval <= 0 && (layer4b?.transparency_badge === 'Full Disclosed' || !layer4b?.transparency_badge)) {
+  if (
+    confidenceInterval <= 0 &&
+    (/^full(y)?\s+disclosed$/i.test(String(layer4b?.transparency_badge ?? '')) ||
+      !layer4b?.transparency_badge)
+  ) {
     if (/cast iron/i.test(text)) {
       return `${brand} names the cast iron and seasoning approach openly, and there is no hidden nonstick layer between your food and the pan.`
     }

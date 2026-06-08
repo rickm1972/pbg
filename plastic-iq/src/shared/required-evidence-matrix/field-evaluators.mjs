@@ -1,4 +1,24 @@
 import { isExpansionRequired } from '../canonical-taxonomy/constants.mjs'
+import { resolvePrimaryContactEntry } from '../canonical-taxonomy/map-structured-evidence.mjs'
+import {
+  isInertFoodContactPrimary,
+  requiresCoatingModifier,
+  UNCOATED_COATING_MODIFIER_IDS,
+} from '../canonical-taxonomy/inert-cookware-structural.mjs'
+
+/**
+ * @param {object} structured
+ */
+function effectivePrimaryContactCanonicalId(structured) {
+  const mappings = structured?.canonical_mappings
+  let primaryId = mappings?.primary_contact_material_id?.canonical_id ?? ''
+  if (!isExpansionRequired(primaryId)) return primaryId
+  const raw =
+    mappings?.primary_contact_material_id?.raw_value ??
+    structured?.primary_contact_material?.material_identity ??
+    ''
+  return resolvePrimaryContactEntry(raw)?.canonical_id ?? primaryId
+}
 
 /**
  * @param {object} obj
@@ -50,6 +70,19 @@ export function evaluateFieldRequirement(structured, req) {
   }
 
   if (req.field_path === 'coatings_and_finishes') {
+    const mappings = structured?.canonical_mappings
+    const primaryId = effectivePrimaryContactCanonicalId(structured)
+    const coatingMod = mappings?.coating_modifier_id?.canonical_id ?? ''
+    const uncoatedInert =
+      isInertFoodContactPrimary(primaryId) &&
+      !requiresCoatingModifier(primaryId) &&
+      (UNCOATED_COATING_MODIFIER_IDS.has(coatingMod) || coatingMod === 'no_coating_modifier')
+    if (uncoatedInert) {
+      return {
+        status: 'passed',
+        detail: 'No applied coating — uncoated/all-metal food-contact construction',
+      }
+    }
     const arr = structured?.coatings_and_finishes
     if (!Array.isArray(arr) || arr.length === 0) {
       return required ? { status: 'missing', detail: 'No coatings/finishes listed' } : { status: 'not_applicable', detail: null }

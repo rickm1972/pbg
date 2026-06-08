@@ -21,7 +21,7 @@ import {
 import { AGENT_STATUSES } from '../../types/agent'
 import type { Agent2DashboardData, ProductPipelineRow, ScoringInputRow } from '../../types/agent'
 import { Gate2NormalizationReviewPanel } from './Gate2NormalizationReviewPanel'
-import { WhyThisScore } from '../WhyThisScore'
+import { WhyThisScoreAdmin } from '../WhyThisScoreAdmin'
 import {
   Gate2Section,
   NormalizationComponentBlock,
@@ -67,6 +67,9 @@ export function Agent2ReviewDashboard({
     ok: boolean
     description_generator_version?: string | null
   } | null>(null)
+  /** Visible on Run tab when batch/single run needs a clearer nudge than top-of-page error. */
+  const [runTabHint, setRunTabHint] = useState<string | null>(null)
+  const [runTabBusy, setRunTabBusy] = useState(false)
 
   const loadApiHealth = useCallback(async () => {
     const health = await checkAgent2ServerHealth()
@@ -274,8 +277,10 @@ export function Agent2ReviewDashboard({
 
   async function handleRunAgent2(productId: string) {
     setBusyId(productId)
+    setRunTabBusy(true)
     onError(null)
     onNotice(null)
+    setRunTabHint('Agent 2 running… leave this tab open (about 1–2 minutes).')
     try {
       onNotice('Agent 2 running… this may take 1–2 minutes.')
       const outcome = await runAgent2Remote(productId)
@@ -288,26 +293,33 @@ export function Agent2ReviewDashboard({
       void loadApiHealth()
       if (outcome.ok) {
         setReadyForReviewAfterRunIds((prev) => new Set(prev).add(productId))
+        setRunTabHint('Done — open Awaiting review to approve normalization.')
         setListFilter('review')
         setSelectedId(productId)
       } else {
+        setRunTabHint(outcome.message ?? 'Agent 2 finished with issues.')
         setListFilter('run')
       }
     } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : 'Agent 2 run failed')
+      const msg = e instanceof Error ? e.message : 'Agent 2 run failed'
+      onError(msg)
+      setRunTabHint(msg)
       setListFilter('run')
     } finally {
       setBusyId(null)
+      setRunTabBusy(false)
     }
   }
 
   function toggleRunSelection(productId: string) {
+    setRunTabHint(null)
     setSelectedRunIds((prev) => {
       const next = new Set(prev)
       if (next.has(productId)) next.delete(productId)
       else next.add(productId)
       return next
     })
+    setSelectedId(productId)
   }
 
   function selectAllRunnable() {
@@ -335,6 +347,7 @@ export function Agent2ReviewDashboard({
     setListFilter(filter)
     setRejecting(false)
     setRejectNotes('')
+    setRunTabHint(null)
     if (filter === 'run') {
       setSelectedId(null)
     } else if (filter === 'review' && reviewQueue.length > 0) {
@@ -346,18 +359,40 @@ export function Agent2ReviewDashboard({
     }
   }
 
+  const runPanelProduct = useMemo(() => {
+    if (!data || listFilter !== 'run') return null
+    if (selectedRunnable.length === 1) return selectedRunnable[0]
+    if (selectedRunnable.length > 1) return null
+    if (!selectedId) return null
+    const p = data.products.find((row) => row.product_id === selectedId)
+    if (!p) return null
+    if (!showOnAgent2RunTab(p, readyForReviewAfterRunIds, latestScoringFor(p.product_id))) {
+      return null
+    }
+    return p
+  }, [data, listFilter, selectedRunnable, selectedId, readyForReviewAfterRunIds, latestScoringFor])
+
   async function handleRunBatch() {
-    if (selectedRunnable.length === 0) {
-      onError('Select at least one product to run.')
+    let targets = selectedRunnable
+    if (targets.length === 0 && runPanelProduct) {
+      targets = [runPanelProduct]
+    }
+    if (targets.length === 0) {
+      const msg = 'Check a product row on the left (checkbox), then click Run.'
+      onError(msg)
+      setRunTabHint(msg)
       return
     }
     onError(null)
     onNotice(null)
-    setBatchProgress({ current: 0, total: selectedRunnable.length, name: '' })
+    setRunTabBusy(true)
+    setRunTabHint(`Starting Agent 2 on ${targets.length} product(s)…`)
+    setBatchProgress({ current: 0, total: targets.length, name: targets[0]?.product_name ?? '' })
 
     try {
-      const results = await runAgent2Batch(selectedRunnable, (current, total, name) => {
+      const results = await runAgent2Batch(targets, (current, total, name) => {
         setBatchProgress({ current, total, name })
+        setRunTabHint(`Running ${current}/${total}: ${name}`)
       })
 
       const succeeded = results.filter((r) => r.ok).length
@@ -370,11 +405,14 @@ export function Agent2ReviewDashboard({
           .slice(0, 3)
           .map((r) => `${r.productName}: ${r.message ?? 'failed'}`)
           .join(' · ')
-        onError(
+        const errMsg =
           failed.length === results.length
-            ? `Agent 2 did not run — nothing saved. ${detail}${failed.length > 3 ? ' …' : ''} Check dev server /api/agent2 and restart Vite on port 5173.`
-            : `Failed: ${detail}${failed.length > 3 ? ` (+${failed.length - 3} more)` : ''}`,
-        )
+            ? `Agent 2 did not run. ${detail} — is npm run dev running on port 5173?`
+            : `Some failed: ${detail}${failed.length > 3 ? ` (+${failed.length - 3} more)` : ''}`
+        onError(errMsg)
+        setRunTabHint(errMsg)
+      } else {
+        setRunTabHint('Batch complete — open Awaiting review.')
       }
       setSelectedRunIds(new Set())
       await load()
@@ -391,9 +429,12 @@ export function Agent2ReviewDashboard({
         setListFilter('run')
       }
     } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : 'Batch run failed')
+      const msg = e instanceof Error ? e.message : 'Batch run failed'
+      onError(msg)
+      setRunTabHint(msg)
     } finally {
       setBatchProgress(null)
+      setRunTabBusy(false)
     }
   }
 
@@ -437,6 +478,19 @@ export function Agent2ReviewDashboard({
 
   return (
     <div className="mt-6 space-y-6">
+
+      {apiHealth && !apiHealth.ok ? (
+        <div
+          role="alert"
+          className="rounded-2xl border-2 border-red-400 bg-red-50 p-4 text-sm text-red-950"
+        >
+          <p className="font-semibold">Agent 2 API health check failed</p>
+          <p className="mt-1">
+            Run may still work — try Run Agent 2. If it fails, the error will show below the Run
+            button.
+          </p>
+        </div>
+      ) : null}
 
       {apiHealth && !isAgent2DescriptionGeneratorCurrent(apiHealth.description_generator_version) ? (
         <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-950">
@@ -565,9 +619,14 @@ export function Agent2ReviewDashboard({
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
                     Only <strong>evidence approved</strong> (or <strong>normalization rejected</strong>)
-                    . After a successful run, products move to <strong>Awaiting review</strong>; after
-                    approval they leave Agent 2 for Agent 3.
+                    . Check the box or click the row to select, then run. After success, products move to{' '}
+                    <strong>Awaiting review</strong>.
                   </p>
+                  {runTabHint ? (
+                    <p className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950" role="alert">
+                      {runTabHint}
+                    </p>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -596,15 +655,22 @@ export function Agent2ReviewDashboard({
                   </div>
                   <button
                     type="button"
-                    disabled={batchBusy || selectedRunnable.length === 0}
-                    onClick={handleRunBatch}
+                    disabled={
+                      batchBusy ||
+                      (selectedRunnable.length === 0 && !runPanelProduct)
+                    }
+                    onClick={() => void handleRunBatch()}
                     className="w-full rounded-xl bg-ink-900 px-3 py-2 text-xs font-semibold text-white hover:bg-ink-700 disabled:opacity-60"
                   >
                     {batchBusy
                       ? batchProgress
                         ? `Running ${batchProgress.current}/${batchProgress.total}: ${batchProgress.name}`
                         : 'Running…'
-                      : `Run Agent 2 on selected (${selectedRunnable.length})`}
+                      : selectedRunnable.length > 0
+                        ? `Run Agent 2 on selected (${selectedRunnable.length})`
+                        : runPanelProduct
+                          ? `Run Agent 2 on ${runPanelProduct.product_name.split(' ').slice(0, 3).join(' ')}…`
+                          : 'Run Agent 2 on selected (0)'}
                   </button>
                 </div>
               ) : null}
@@ -622,12 +688,56 @@ export function Agent2ReviewDashboard({
                 </li>
               ) : (
                 listProducts.map((p) => {
-                  const isSelected = p.product_id === selectedId
                   const scoringInput = scoringInputByProductId.get(p.product_id)
                   const latestScoring = latestScoringFor(p.product_id)
                   const failedDraft = isAgent2FailedDraftStuck(p.agent_status, latestScoring)
                   const runnable = showOnAgent2RunTab(p, readyForReviewAfterRunIds, latestScoring)
                   const checked = selectedRunIds.has(p.product_id)
+                  const isSelected =
+                    listFilter === 'run' && runnable ? checked : p.product_id === selectedId
+                  const rowBody = (
+                    <>
+                      <div className="font-semibold text-ink-900">{p.product_name}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <NormalizationStatusPill status={p.agent_status} />
+                        {p.agent_status === 'in_testing_queue' ? (
+                          <span className="text-[10px] font-semibold text-amber-800">
+                            Testing queue
+                          </span>
+                        ) : failedDraft ? (
+                          <span className="text-[10px] font-semibold text-red-800">
+                            Agent 2 failed — re-run
+                          </span>
+                        ) : scoringInput &&
+                          p.agent_status === 'normalization_awaiting_review' &&
+                          scoringInput.review_status === 'pending_review' ? (
+                          <span className="text-[10px] font-semibold text-violet-700">
+                            Ready to review
+                          </span>
+                        ) : runnable ? (
+                          <span className="text-[10px] font-semibold text-emerald-800">
+                            Ready to run
+                          </span>
+                        ) : hasNormalizationRun(p.agent_status) ? (
+                          <span className="text-[10px] font-semibold text-slate-600">
+                            Normalization run
+                          </span>
+                        ) : p.agent_status === 'evidence_awaiting_review' ? (
+                          <span className="text-[10px] font-semibold text-amber-800">
+                            Agent 1 review first
+                          </span>
+                        ) : null}
+                        {scoringInput?.human_review_required ? (
+                          <span className="text-[10px] font-semibold text-amber-800">
+                            Human review flagged
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {p.brand ?? '—'} · {p.category ?? '—'}
+                      </p>
+                    </>
+                  )
                   return (
                     <li key={p.product_id}>
                       <div
@@ -636,66 +746,30 @@ export function Agent2ReviewDashboard({
                         }`}
                       >
                         {listFilter === 'run' && runnable ? (
-                          <label className="flex shrink-0 cursor-pointer items-start px-3 pt-4">
+                          <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 px-3 py-3">
                             <input
                               type="checkbox"
                               checked={checked}
                               disabled={batchBusy}
                               onChange={() => toggleRunSelection(p.product_id)}
-                              className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
                             />
+                            <span className="min-w-0 flex-1 text-left">{rowBody}</span>
                           </label>
-                        ) : null}
-                        <button
-                          type="button"
-                          disabled={batchBusy}
-                          onClick={() => {
-                            setSelectedId(p.product_id)
-                            setRejecting(false)
-                            setRejectNotes('')
-                          }}
-                          className="min-w-0 flex-1 px-4 py-3 text-left disabled:opacity-60"
-                        >
-                          <div className="font-semibold text-ink-900">{p.product_name}</div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <NormalizationStatusPill status={p.agent_status} />
-                            {p.agent_status === 'in_testing_queue' ? (
-                              <span className="text-[10px] font-semibold text-amber-800">
-                                Testing queue
-                              </span>
-                            ) : failedDraft ? (
-                              <span className="text-[10px] font-semibold text-red-800">
-                                Agent 2 failed — re-run
-                              </span>
-                            ) : scoringInput &&
-                              p.agent_status === 'normalization_awaiting_review' &&
-                              scoringInput.review_status === 'pending_review' ? (
-                              <span className="text-[10px] font-semibold text-violet-700">
-                                Ready to review
-                              </span>
-                            ) : runnable ? (
-                              <span className="text-[10px] font-semibold text-emerald-800">
-                                Ready to run
-                              </span>
-                            ) : hasNormalizationRun(p.agent_status) ? (
-                              <span className="text-[10px] font-semibold text-slate-600">
-                                Normalization run
-                              </span>
-                            ) : p.agent_status === 'evidence_awaiting_review' ? (
-                              <span className="text-[10px] font-semibold text-amber-800">
-                                Agent 1 review first
-                              </span>
-                            ) : null}
-                            {scoringInput?.human_review_required ? (
-                              <span className="text-[10px] font-semibold text-amber-800">
-                                Human review flagged
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 text-xs text-slate-600">
-                            {p.brand ?? '—'} · {p.category ?? '—'}
-                          </p>
-                        </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={batchBusy}
+                            onClick={() => {
+                              setSelectedId(p.product_id)
+                              setRejecting(false)
+                              setRejectNotes('')
+                            }}
+                            className="min-w-0 flex-1 px-4 py-3 text-left disabled:opacity-60"
+                          >
+                            {rowBody}
+                          </button>
+                        )}
                       </div>
                     </li>
                   )
@@ -708,20 +782,13 @@ export function Agent2ReviewDashboard({
         <div className="lg:col-span-8">
           {listFilter === 'run' ? (
             <Agent2RunTabPanel
-              selectedProduct={
-                selectedProduct &&
-                showOnAgent2RunTab(
-                  selectedProduct,
-                  readyForReviewAfterRunIds,
-                  latestScoringFor(selectedProduct.product_id),
-                )
-                  ? selectedProduct
-                  : null
-              }
+              selectedProduct={runPanelProduct}
               selectedRunnable={selectedRunnable}
               batchProgress={batchProgress}
               busyId={busyId}
-              onRunSingle={(productId) => handleRunAgent2(productId)}
+              runTabHint={runTabHint}
+              runTabBusy={runTabBusy || batchBusy}
+              onRunSingle={(productId) => void handleRunAgent2(productId)}
             />
           ) : !selectedProduct ? (
             <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">
@@ -768,7 +835,6 @@ export function Agent2ReviewDashboard({
                   ? (productId) => onNavigateToGate('agent1', productId)
                   : undefined
               }
-              onRefresh={() => void load()}
             />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
@@ -787,7 +853,7 @@ export function Agent2ReviewDashboard({
                         selectedProduct.agent_status,
                         latestScoringFor(selectedProduct.product_id),
                       )
-                    ? 'Agent 2 failed (description or taxonomy). Complete Agent 1 evidence, then re-run from the Run tab.'
+                    ? 'Agent 2 failed (description or taxonomy). Re-run from the Run tab.'
                     : selectedProduct.agent_status === 'normalization_awaiting_review'
                       ? 'Normalization is awaiting review but could not be loaded. Sign in with Supabase Auth and refresh.'
                   : selectedProduct.agent_status === 'normalization_approved'
@@ -819,8 +885,9 @@ export function Agent2ReviewDashboard({
       </div>
 
       <p className="text-xs text-slate-500">
-        Awaiting review: <strong>pending_review</strong> normalization only. Failed Agent 2 drafts return to{' '}
-        <strong>Run</strong>. Tier-change holds: <strong>Testing queue</strong>.
+        Run tab keeps products at <strong>evidence_approved</strong> until you submit for review.
+        Awaiting review: submitted <strong>pending_review</strong> packets only. Tier-change holds:{' '}
+        <strong>Testing queue</strong>.
       </p>
     </div>
   )
@@ -924,7 +991,7 @@ function TestingQueueDetailPanel({
           ) : null}
 
           {scoringInput && whyFieldsFromScoringInput(scoringInput, inputs?.components) ? (
-            <WhyThisScore
+            <WhyThisScoreAdmin
               fields={whyFieldsFromScoringInput(scoringInput, inputs?.components)!}
               className="border-0 p-0 shadow-none"
             />
@@ -950,15 +1017,28 @@ function Agent2RunTabPanel({
   selectedRunnable,
   batchProgress,
   busyId,
+  runTabHint,
+  runTabBusy,
   onRunSingle,
 }: {
   selectedProduct: ProductPipelineRow | null
   selectedRunnable: ProductPipelineRow[]
   batchProgress: { current: number; total: number; name: string } | null
   busyId: string | null
+  runTabHint: string | null
+  runTabBusy: boolean
   onRunSingle: (productId: string) => void
 }) {
-  if (batchProgress) {
+  if (runTabBusy && !batchProgress && runTabHint) {
+    return (
+      <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50/50 p-8 text-center shadow-card">
+        <p className="text-sm font-semibold text-ink-900">Agent 2 running</p>
+        <p className="mt-2 text-sm text-slate-700">{runTabHint}</p>
+      </div>
+    )
+  }
+
+  if (runTabBusy && batchProgress) {
     return (
       <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-card">
         <p className="text-sm font-semibold text-ink-900">Running Agent 2</p>
@@ -989,6 +1069,11 @@ function Agent2RunTabPanel({
           Agent 2 converts approved evidence into scoring inputs. Review and approval happen under{' '}
           <strong>Awaiting review</strong>.
         </p>
+        {runTabHint ? (
+          <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950" role="alert">
+            {runTabHint}
+          </p>
+        ) : null}
         <button
           type="button"
           disabled={busy}
@@ -1015,6 +1100,11 @@ function Agent2RunTabPanel({
         <p className="mt-4 text-sm text-slate-600">
           Use <strong>Run Agent 2 on selected</strong> in the left panel to start the batch.
         </p>
+        {runTabHint ? (
+          <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950" role="alert">
+            {runTabHint}
+          </p>
+        ) : null}
       </div>
     )
   }

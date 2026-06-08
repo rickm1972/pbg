@@ -13,13 +13,27 @@ export {
   getCanonicalApprovalBlockers,
 } from './score-driving-fields.mjs'
 export { applyCanonicalMappings } from './map-structured-evidence.mjs'
+export {
+  reconcileCanonicalMappingsConfidence,
+  inferConfidenceForSafetyClaim,
+} from './confidence-label-consistency.mjs'
+
+export {
+  isInertFoodContactPrimary,
+  isStructurallyPfasFreePrimary,
+  isPtfeFamilyPrimary,
+  requiresCoatingModifier,
+  shouldApplyMinnesotaPfasRegulatoryFlag,
+  PTFE_FAMILY_PRIMARY_IDS,
+  STRUCTURALLY_PFAS_FREE_PRIMARY_IDS,
+} from './inert-cookware-structural.mjs'
 
 export const CANONICAL_TAXONOMY_COUNTS = {
-  primary_contact_material: 5,
+  primary_contact_material: 14,
   substrate_material: 3,
-  coating_modifier: 2,
-  safety_claim: 6,
-  pfas_status: 4,
+  coating_modifier: 4,
+  safety_claim: 7,
+  pfas_status: 5,
   regulatory_flag: 1,
   component_type: 4,
 }

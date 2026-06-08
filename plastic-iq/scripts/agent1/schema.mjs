@@ -20,6 +20,9 @@ export const CONFIDENCE_LABELS_SCHEMA = z.enum([
   'manufacturer_confirmed',
   'retailer_confirmed',
   'fully_disclosed_by_manufacturer',
+  'third_party_review_citing_manufacturer',
+  'third_party_context_source',
+  'manufacturer_claim_via_secondary_source',
   'inferred_from_description',
   'inferred_from_category_pattern',
   'unknown',
@@ -35,6 +38,9 @@ export const CONFIDENCE_TO_LEGACY = {
   inferred_from_category_pattern: 'inferred from category pattern',
   unknown: 'unknown',
   proprietary_or_undisclosed: 'proprietary or undisclosed',
+  third_party_review_citing_manufacturer: 'third-party review citing manufacturer',
+  third_party_context_source: 'third-party context source',
+  manufacturer_claim_via_secondary_source: 'manufacturer claim via secondary source',
 }
 
 export const COMPONENT_ROLES = z.enum([
@@ -70,12 +76,34 @@ export const COATING_TYPES = z.enum([
 
 const urlOrNull = z.union([z.string().url(), z.null()])
 
+/** LLM often returns string booleans — coerce before Zod rejects the packet. */
+function preprocessBoolean(value) {
+  if (typeof value === 'boolean') return value
+  if (value == null || value === '') return false
+  const s = String(value).trim().toLowerCase()
+  if (s === 'true' || s === 'yes' || s === '1') return true
+  if (s === 'false' || s === 'no' || s === '0') return false
+  return false
+}
+
+/** LLM invents sku null labels — only NOT_LISTED is valid when SKU is absent. */
+function preprocessSkuNullCode(value) {
+  if (value === 'NOT_LISTED') return value
+  if (value == null || value === '') return undefined
+  return 'NOT_LISTED'
+}
+
 export const ProductIdentitySchema = z.object({
   product_name: z.string().min(1),
   brand: z.string().min(1),
   subcategory: z.string().min(1),
   sku_or_model: z.string().nullable(),
-  sku_null_code: z.enum(['NOT_LISTED']).nullable().optional(),
+  manufacturer_context_sku: z.string().nullable().optional(),
+  manufacturer_context_sku_source_url: urlOrNull.optional(),
+  sku_null_code: z.preprocess(
+    preprocessSkuNullCode,
+    z.enum(['NOT_LISTED']).nullable().optional(),
+  ),
   country_of_origin: z.string().nullable(),
   country_null_code: z.enum(['MFR_NOT_DISCLOSED', 'NOT_DISCLOSED']).nullable().optional(),
 })
@@ -85,7 +113,7 @@ export const PrimaryContactMaterialSchema = z.object({
   undisclosed_code: z.enum(PRIMARY_UNDISCLOSED_CODES).nullable().optional(),
   source_url: urlOrNull,
   confidence_label: CONFIDENCE_LABELS_SCHEMA,
-  material_specs_disclosed: z.boolean(),
+  material_specs_disclosed: z.preprocess(preprocessBoolean, z.boolean()),
 })
 
 export const SecondaryComponentSchema = z.object({
@@ -196,6 +224,33 @@ export const StructuredEvidenceSchema = z.object({
   retailer_links: RetailerLinksSchema,
   product_use_case: z.string().min(1),
   care_and_use_instructions: z.string().nullable(),
+  out_of_scope_safety_signals: z
+    .array(
+      z.object({
+        signal_id: z.string(),
+        category: z.string(),
+        summary: z.string(),
+        source_url: z.string().url().nullable().optional(),
+        source_quote: z.string().nullable().optional(),
+        pac_score_relevant: z.literal(false).optional(),
+        display_label: z.string().optional(),
+        scope_note: z.string().optional(),
+      }),
+    )
+    .optional(),
+  transparency_assessment: z
+    .object({
+      transparency_badge: z.string(),
+      badge_justification: z.string(),
+      fully_disclosed_eligible: z.boolean(),
+      score_driving_via_third_party: z.boolean(),
+      proprietary_coating_composition: z.boolean(),
+      evaluated_at: z.string(),
+    })
+    .optional(),
+  canonical_mappings: z.any().optional(),
+  required_evidence_validation: z.any().optional(),
+  required_check_results: z.array(z.any()).optional(),
 })
 
 export const StructuredPacketSchema = z.object({

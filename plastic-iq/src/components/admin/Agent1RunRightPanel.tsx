@@ -28,7 +28,9 @@ export function Agent1RunRightPanel({
         <p className="text-sm font-semibold text-ink-900">Running Agent 1</p>
         <p className="mt-2 text-sm text-slate-600">
           {batchProgress
-            ? `${batchProgress.current} of ${batchProgress.total}${runningName ? `: ${runningName}` : ''}`
+            ? batchProgress.current === 0
+              ? `Starting ${batchProgress.total} product${batchProgress.total === 1 ? '' : 's'}${runningName ? `: ${runningName}` : ''}…`
+              : `${batchProgress.current} of ${batchProgress.total}${runningName ? `: ${runningName}` : ''}`
             : runningName || 'Starting…'}
         </p>
         <p className="mt-4 max-w-md text-xs text-slate-500">
@@ -47,10 +49,7 @@ export function Agent1RunRightPanel({
         <p className="text-sm font-semibold text-ink-900">Ready to run</p>
         <p className="mt-2 text-sm text-slate-600">
           {selectedRunnable.length} product{selectedRunnable.length === 1 ? '' : 's'} selected —
-          click <strong>Run Agent 1</strong> in the left column
-          {runnableCount > selectedRunnable.length
-            ? ` (or select all ${runnableCount}).`
-            : '.'}
+          click <strong>Run Agent 1</strong> above the list.
         </p>
       </div>
     )

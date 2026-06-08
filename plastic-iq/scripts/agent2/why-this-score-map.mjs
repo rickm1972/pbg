@@ -4,11 +4,24 @@
  */
 
 import { isPacRelevant, resolveCertEntry } from '../../src/shared/certification-taxonomy.mjs'
-import { isUnknownFoodContactCoatingMaterial } from './deterministic/material-taxonomy.mjs'
+import { isExpansionRequired } from '../../src/shared/canonical-taxonomy/constants.mjs'
+import {
+  isFoodContactCoatingPrimaryMaterial,
+  isUnknownFoodContactCoatingMaterial,
+} from './deterministic/material-taxonomy.mjs'
+import { getCanonicalMappings } from './deterministic/schema-input.mjs'
 import { sortComponentsByHazardDesc } from './why-this-score-component-sort.mjs'
 import { whyThisScoreLabelForComponent } from './why-this-score-labels.mjs'
-import { finalizeOptions, NONE, VOCABULARY } from './why-this-score-vocabulary.mjs'
+import {
+  CERT_VERIFICATION_ABSENT,
+  finalizeOptions,
+  NONE,
+  VOCABULARY,
+} from './why-this-score-vocabulary.mjs'
 import { factValue } from './deterministic/evidence-facts.mjs'
+import { getSubstrateCanonical } from './deterministic/schema-input.mjs'
+import { getMaterial } from './deterministic/material-taxonomy.mjs'
+import { getUseConditionTemplatesForScoringCategory } from '../../src/shared/product-type-registry/index.mjs'
 
 const PRIMARY_ROLES = new Set(['primary_food_contact', 'formulation'])
 const SECONDARY_ROLES = new Set(['handle', 'lid', 'rivet', 'gasket', 'packaging', 'structural'])
@@ -31,18 +44,45 @@ function mapPrimaryMaterial(_evidence, inputs) {
   return finalizeOptions(picked, 'primary_material_options')
 }
 
-function mapSecondaryMaterials(_evidence, inputs) {
+function substrateBodyLabel(evidence) {
+  const substrate = getSubstrateCanonical(evidence)
+  const substrateId = substrate?.agent2_material_id ?? substrate?.canonical_id
+  if (!substrateId || isExpansionRequired(substrateId) || !getMaterial(substrateId)) {
+    return null
+  }
+  return whyThisScoreLabelForComponent(substrateId, 'structural', 'secondary')
+}
+
+function mapSecondaryMaterials(evidence, inputs) {
   const components = (inputs?.components ?? []).filter((c) =>
     SECONDARY_ROLES.has(c.component_role ?? c.role),
   )
   const picked = labelsFromComponents(components, 'secondary')
+  const bodyLabel = substrateBodyLabel(evidence)
+  if (bodyLabel && !picked.includes(bodyLabel)) {
+    picked.push(bodyLabel)
+  }
   if (!picked.length) {
     return finalizeOptions([NONE], 'secondary_materials_options')
   }
   return finalizeOptions(picked, 'secondary_materials_options')
 }
 
-function mapCoatingsFinishes(_evidence, inputs) {
+function coatingModifierLabel(evidence) {
+  const mod = getCanonicalMappings(evidence)?.coating_modifier_id
+  const modId = mod?.canonical_id ?? ''
+  if (!modId || modId === 'no_coating_modifier' || modId === 'not_applicable') return null
+  const agent2Id = mod?.agent2_material_id ?? modId
+  const fromTaxonomy = whyThisScoreLabelForComponent(agent2Id, 'coating', 'coating')
+  if (fromTaxonomy) return fromTaxonomy
+  const raw = String(mod.raw_value ?? '').trim()
+  if (/ceramic.*sol.*gel|sol.*gel.*ceramic/i.test(raw)) {
+    return 'Ceramic sol-gel nonstick coating'
+  }
+  return mod.display_label ?? null
+}
+
+function mapCoatingsFinishes(evidence, inputs) {
   const coatingComponents = []
   for (const c of inputs?.components ?? []) {
     const role = c.component_role ?? c.role
@@ -50,13 +90,21 @@ function mapCoatingsFinishes(_evidence, inputs) {
       coatingComponents.push(c)
     } else if (
       role === 'primary_food_contact' &&
-      (isUnknownFoodContactCoatingMaterial(c.material_id) ||
+      (isFoodContactCoatingPrimaryMaterial(c.material_id) ||
+        isUnknownFoodContactCoatingMaterial(c.material_id) ||
         /^ptfe/i.test(String(c.material_id ?? '')))
     ) {
       coatingComponents.push(c)
     }
   }
   const picked = labelsFromComponents(coatingComponents, 'coating')
+  const modLabel = coatingModifierLabel(evidence)
+  if (modLabel && !picked.includes(modLabel)) {
+    const ceramicDup = picked.some(
+      (p) => /ceramic.*sol.*gel|sol.*gel.*ceramic/i.test(p) && /ceramic.*sol.*gel|sol.*gel.*ceramic/i.test(modLabel),
+    )
+    if (!ceramicDup) picked.push(modLabel)
+  }
   if (!picked.length) {
     return finalizeOptions([NONE], 'coatings_finishes_options')
   }
@@ -69,34 +117,34 @@ function mapUseConditions(_evidence, inputs) {
     .join(' ')
     .toLowerCase()
   const picked = []
+  const templates = getUseConditionTemplatesForScoringCategory(inputs?.product_category_default)
 
-  if (
-    inputs?.is_formulation_product ||
-    inputs?.product_category_default === 'rinse-off' ||
-    /rinse.off|dish soap|dishwashing|handwash|hand wash|hand dish|cleaning concentrate/.test(auth)
-  ) {
-    picked.push('Brief rinse-off contact')
-  } else if (/water bottle|travel mug|drinkware|beverage|sippy/.test(auth)) {
-    picked.push('Direct oral contact during drinking')
-  } else if (/utensil set|kitchen utensil|spatula|ladle|tongs/.test(auth)) {
-    picked.push('Direct food handling (utensils)')
-  } else if (/food storage|meal prep/.test(auth)) {
-    picked.push(/hot|heated|microwave/.test(auth) ? 'Hot food storage' : 'Cold food storage')
-  } else if (/cookware|frying pan|skillet|stovetop|sauté|saute|grill/.test(auth)) {
-    if (/oven|broil|bake|roast/.test(auth)) picked.push('Oven heat with fat exposure')
-    if (/acid|tomato|vinegar|citrus/.test(auth)) picked.push('Stovetop heat with acid exposure')
-    picked.push('Stovetop heat with fat exposure')
-  } else if (/leave.on|lotion|moisturizer|skincare/.test(auth)) {
-    picked.push('Skin contact leave-on')
-  } else if (/hand contact only|handle only/.test(auth)) {
-    picked.push('Hand contact only')
+  for (const tpl of templates) {
+    if (tpl.match) {
+      if (tpl.match.test(auth)) {
+        picked.push(tpl.label)
+      } else if (tpl.else_label) {
+        picked.push(tpl.else_label)
+      }
+    } else {
+      picked.push(tpl.label)
+    }
   }
 
   return finalizeOptions(picked, 'use_conditions_options')
 }
 
-function mapDisclosureQuality(inputs) {
-  const badge = String(inputs?.layer_4b?.transparency_badge ?? '').trim()
+function mapDisclosureQuality(inputs, evidence) {
+  let badge = String(inputs?.layer_4b?.transparency_badge ?? '').trim()
+  const gate1 = evidence?.agent_metadata?.structured_evidence?.transparency_assessment
+  if (gate1?.transparency_badge && !gate1.fully_disclosed_eligible) {
+    const gate1Badge = String(gate1.transparency_badge).trim()
+    const rank = { 'Fully Disclosed': 0, 'Documentation Incomplete': 1, 'Material Uncertain': 2, 'Opaque': 3 }
+    const cur = rank[badge] ?? 2
+    const g = rank[gate1Badge] ?? 1
+    if (g > cur) badge = gate1Badge
+  }
+  if (/^full\s+disclosed$/i.test(badge)) badge = 'Fully Disclosed'
   if (VOCABULARY.disclosure_quality.includes(badge)) {
     return finalizeOptions([badge], 'disclosure_quality_options')
   }
@@ -116,7 +164,7 @@ function mapCertifications(evidence) {
     if (!picked.includes(label)) picked.push(label)
   }
   if (!picked.length) {
-    return finalizeOptions(['Third-party verification absent'], 'certifications_options')
+    return finalizeOptions([CERT_VERIFICATION_ABSENT], 'certifications_options')
   }
   return finalizeOptions(picked, 'certifications_options')
 }
@@ -131,7 +179,7 @@ export function buildWhyThisScoreOptions(evidence, inputs) {
     secondary_materials_options: mapSecondaryMaterials(evidence, inputs),
     coatings_finishes_options: mapCoatingsFinishes(evidence, inputs),
     use_conditions_options: mapUseConditions(evidence, inputs),
-    disclosure_quality_options: mapDisclosureQuality(inputs),
+    disclosure_quality_options: mapDisclosureQuality(inputs, evidence),
     certifications_options: mapCertifications(evidence),
   }
 }

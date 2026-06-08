@@ -2,12 +2,6 @@
  * Shared Agent 1 dashboard join: products.agent_status + latest product_evidence versions.
  */
 
-const AGENT1_TFAL_PRODUCT_ID = '7a457a86-ab62-4cbf-90b9-ccaeafe06896'
-
-function isAgent1HeldFromAwaitingReviewTab(productId) {
-  return productId === AGENT1_TFAL_PRODUCT_ID
-}
-
 /**
  * @param {Array<{ product_id: string, agent_status: string, product_name?: string, brand?: string | null, category?: string | null, subcategory?: string | null }>} products
  * @param {Array<{ product_id: string, review_status: string, bundle_version: number, evidence_id?: string }>} evidenceRows
@@ -31,7 +25,6 @@ export function assembleAgent1Dashboard(products, evidenceRows) {
 
   for (const product of products ?? []) {
     if (product.agent_status === 'evidence_awaiting_review') {
-      if (isAgent1HeldFromAwaitingReviewTab(product.product_id)) continue
       const pending = latestSubmitted.get(product.product_id)
       if (pending) {
         pendingReview.push({ product, evidence: pending })

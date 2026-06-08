@@ -56,7 +56,9 @@ assert.equal(publicRetailerSectionTitle('High Risk'), 'Product listings')
 
 const productPage = readFileSync(join(root, 'src/pages/ProductPage.tsx'), 'utf8')
 assert.ok(/publicRetailerSectionTitle\(tier\)/.test(productPage))
-assert.ok(/lower expected PAC exposure/.test(productPage))
-console.log('✓ ProductPage CTA heading and PAC copy')
+assert.ok(/safer_alternatives_subhead/.test(productPage))
+assert.ok(/safer_alternatives_footer/.test(productPage))
+assert.ok(!/lower expected PAC exposure/i.test(productPage))
+console.log('✓ ProductPage reads safer-alternatives copy from display')
 
 console.log('\nAll public display copy tests passed')

@@ -5,8 +5,7 @@ const SIDECAR_PREFIX = 'PACSCORE_LINKS_JSON:'
 export const RETAILER_LINKS_BY_PRODUCT_NAME = {
   'Lodge 10.25 Inch Cast Iron Skillet': {
     target_url: 'https://www.target.com/p/lodge-10-25-cast-iron-skillet/-/A-10291925',
-    walmart_url:
-      'https://www.walmart.com/ip/Lodge-10-1-4-Cast-Iron-Skillet/596962815',
+    walmart_url: 'https://www.walmart.com/ip/Lodge-Cast-Iron-Seasoned-12-Skillet/5969628',
   },
 }
 

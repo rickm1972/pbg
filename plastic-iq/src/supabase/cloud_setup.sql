@@ -466,7 +466,7 @@ insert into public.products (
   'https://www.amazon.com/s?k=Lodge+10.25+Inch+Cast+Iron+Skillet',
   'https://www.amazon.com/s?k=Lodge+10.25+Inch+Cast+Iron+Skillet',
   'https://www.target.com/p/lodge-10-25-cast-iron-skillet/-/A-10291925',
-  'https://www.walmart.com/ip/Lodge-10-1-4-Cast-Iron-Skillet/596962815',
+  'https://www.walmart.com/ip/Lodge-Cast-Iron-Seasoned-12-Skillet/5969628',
   null,
   null,
   true

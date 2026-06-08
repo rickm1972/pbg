@@ -45,21 +45,19 @@ async function patchRow(sb, product, row) {
   const before = String(inputs.product_description ?? '').trim()
   const nextInputs = { ...inputs }
 
-  if (!descResult.ok) {
-    nextInputs.status = descResult.status
+  if (nextInputs.status === 'description_generation_failed') {
+    delete nextInputs.status
+  }
+  nextInputs.product_description = descResult.product_description ?? null
+  nextInputs.product_description_status = descResult.product_description_status
+  nextInputs.product_description_warnings = descResult.product_description_warnings ?? []
+  if (descResult.description_word_count != null) {
+    nextInputs.description_word_count = descResult.description_word_count
+  }
+  if (descResult.flagged_missing_fields?.length) {
     nextInputs.flagged_missing_fields = descResult.flagged_missing_fields
-    nextInputs.product_description = null
-    nextInputs.human_review_required = true
-    nextInputs.human_review_reason = descResult.human_review_reason
   } else {
-    if (nextInputs.status === 'description_generation_failed') {
-      delete nextInputs.status
-      delete nextInputs.flagged_missing_fields
-    }
-    nextInputs.product_description = descResult.product_description
-    if (descResult.description_word_count != null) {
-      nextInputs.description_word_count = descResult.description_word_count
-    }
+    delete nextInputs.flagged_missing_fields
   }
 
   const after = String(nextInputs.product_description ?? '').trim()
@@ -81,7 +79,8 @@ async function patchRow(sb, product, row) {
     console.log('  → saved')
   }
 
-  return { ok: descResult.ok, changed: before !== after }
+  const ok = descResult.product_description_status === 'generated'
+  return { ok, changed: before !== after }
 }
 
 async function main() {

@@ -37,12 +37,9 @@ export function stringifyRetailLinksSidecar(data: RetailLinksSidecar): string {
   return RETAIL_LINKS_SIDECAR_PREFIX + JSON.stringify(data)
 }
 
-function applyRetailClearFlags(product: Product, sidecar: RetailLinksSidecar | null): Product {
-  if (!sidecar?.retail_cleared?.length) return product
-  const p = { ...product }
-  if (sidecar.retail_cleared.includes('target')) p.target_url = null
-  if (sidecar.retail_cleared.includes('walmart')) p.walmart_url = null
-  return p
+/** retail_cleared is applied in applyRetailLinksSidecar; keep for backwards-compatible sidecars. */
+function applyRetailClearFlags(product: Product, _sidecar: RetailLinksSidecar | null): Product {
+  return product
 }
 
 /** Overlay sidecar URLs only where the product row has no value; respect retail_cleared. */
@@ -51,10 +48,16 @@ export function applyRetailLinksSidecar(product: Product, sidecar: RetailLinksSi
   const p = { ...product }
   const blockT = sidecar.retail_cleared?.includes('target')
   const blockW = sidecar.retail_cleared?.includes('walmart')
-  if (!blockT && !hasRetailUrl(p.target_url) && hasRetailUrl(sidecar.target_url))
+  if (blockT) {
+    p.target_url = null
+  } else if (!hasRetailUrl(p.target_url) && hasRetailUrl(sidecar.target_url)) {
     p.target_url = String(sidecar.target_url).trim()
-  if (!blockW && !hasRetailUrl(p.walmart_url) && hasRetailUrl(sidecar.walmart_url))
+  }
+  if (blockW) {
+    p.walmart_url = null
+  } else if (!hasRetailUrl(p.walmart_url) && hasRetailUrl(sidecar.walmart_url)) {
     p.walmart_url = String(sidecar.walmart_url).trim()
+  }
   if (!hasRetailUrl(p.other_retailer_label) && hasRetailUrl(sidecar.other_retailer_label))
     p.other_retailer_label = String(sidecar.other_retailer_label).trim()
   if (!hasRetailUrl(p.other_retailer_url) && hasRetailUrl(sidecar.other_retailer_url))

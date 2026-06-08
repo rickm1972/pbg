@@ -79,53 +79,74 @@ export async function fetchScoreToAudit(supabase, productId, scoreId) {
   throw new Error(`No product_scores row to audit for product ${productId}`)
 }
 
+/**
+ * Valid peer = active product, approved score on current chain:
+ * active_evidence_id → approved scoring_inputs → approved product_scores.
+ * Excludes legacy_do_not_use archive tables (main pipeline rows only).
+ */
 export async function fetchSubcategoryPeerScores(supabase, product, excludeScoreId) {
   if (!product.subcategory) return []
 
   const { data: peers, error: peersError } = await supabase
     .from('products')
-    .select('product_id')
+    .select(
+      'product_id, product_name, category, subcategory, active, publish_status, active_evidence_id, agent_status',
+    )
     .eq('subcategory', product.subcategory)
+    .eq('active', true)
     .neq('product_id', product.product_id)
 
   if (peersError) throw new Error(`Failed to load subcategory peers: ${peersError.message}`)
   if (!peers?.length) return []
 
-  const peerIds = peers.map((p) => p.product_id)
-  const { data: scores, error: scoresError } = await supabase
-    .from('product_scores')
-    .select('score_id, product_id, pac_safety_score, component_nprs, input_id')
-    .in('product_id', peerIds)
-    .eq('review_status', 'approved')
-    .order('run_timestamp', { ascending: false })
+  const results = []
 
-  if (scoresError) throw new Error(`Failed to load peer scores: ${scoresError.message}`)
+  for (const peer of peers) {
+    if (!peer.active_evidence_id) continue
 
-  const latestByProduct = new Map()
-  for (const row of scores ?? []) {
-    if (row.score_id === excludeScoreId) continue
-    if (!latestByProduct.has(row.product_id)) {
-      latestByProduct.set(row.product_id, row)
-    }
-  }
+    const { data: evidence, error: evErr } = await supabase
+      .from('product_evidence')
+      .select('evidence_id, review_status')
+      .eq('evidence_id', peer.active_evidence_id)
+      .eq('product_id', peer.product_id)
+      .maybeSingle()
+    if (evErr) throw new Error(`Failed to load peer evidence: ${evErr.message}`)
+    if (!evidence || evidence.review_status !== 'approved') continue
 
-  const inputIds = [...new Set([...latestByProduct.values()].map((s) => s.input_id).filter(Boolean))]
-  const inputsById = new Map()
-  if (inputIds.length) {
-    const { data: inputRows, error: inputError } = await supabase
+    const { data: scoringInput, error: inErr } = await supabase
       .from('scoring_inputs')
-      .select('input_id, inputs')
-      .in('input_id', inputIds)
-    if (inputError) throw new Error(`Failed to load peer inputs: ${inputError.message}`)
-    for (const row of inputRows ?? []) {
-      inputsById.set(row.input_id, row.inputs)
-    }
+      .select('input_id, evidence_id, review_status, inputs')
+      .eq('product_id', peer.product_id)
+      .eq('evidence_id', peer.active_evidence_id)
+      .eq('review_status', 'approved')
+      .order('review_timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (inErr) throw new Error(`Failed to load peer scoring_inputs: ${inErr.message}`)
+    if (!scoringInput) continue
+
+    const { data: score, error: scErr } = await supabase
+      .from('product_scores')
+      .select('score_id, product_id, pac_safety_score, tier, component_nprs, input_id, review_status, run_timestamp')
+      .eq('product_id', peer.product_id)
+      .eq('input_id', scoringInput.input_id)
+      .eq('review_status', 'approved')
+      .order('run_timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (scErr) throw new Error(`Failed to load peer product_scores: ${scErr.message}`)
+    if (!score || score.score_id === excludeScoreId) continue
+
+    results.push({
+      product: peer,
+      score,
+      inputs: scoringInput.inputs ?? null,
+      evidence_id: evidence.evidence_id,
+      input_id: scoringInput.input_id,
+    })
   }
 
-  return [...latestByProduct.values()].map((score) => ({
-    score,
-    inputs: inputsById.get(score.input_id) ?? null,
-  }))
+  return results
 }
 
 export async function insertProductQa(supabase, row) {

@@ -1,11 +1,14 @@
 import { supabase } from './supabaseClient'
 import { humanizeAgentStatus } from './agent1Review'
 import { canRunAgent3Sequential, onlyActivePipelineProducts } from './pipelineCatalog'
+import { whyFieldsFromScoringInput } from './whyThisScoreApi'
 import type {
   Agent3DashboardData,
+  NormalizationInputs,
   NormalizationLayer4a,
   ProductPipelineRow,
   ProductScoreRow,
+  ScoringInputRow,
 } from '../types/agent'
 
 export { humanizeAgentStatus }
@@ -85,18 +88,30 @@ export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
   ]
 
   const layer4aByInputId: Record<string, NormalizationLayer4a | undefined> = {}
+  const scoreMathContextByInputId: Agent3DashboardData['scoreMathContextByInputId'] = {}
   if (inputIds.length > 0) {
     const { data: inputRows, error: inputsError } = await supabase
       .from('scoring_inputs')
-      .select('input_id, inputs')
+      .select(
+        'input_id, inputs, primary_material_options, secondary_materials_options, coatings_finishes_options, use_conditions_options, disclosure_quality_options, certifications_options',
+      )
       .in('input_id', inputIds)
 
     if (inputsError) throw inputsError
 
     for (const row of inputRows ?? []) {
-      const inputs = row.inputs as { layer_4a?: NormalizationLayer4a } | null
-      if (row.input_id) {
-        layer4aByInputId[row.input_id] = inputs?.layer_4a
+      const scoringInput = row as ScoringInputRow
+      const inputs = scoringInput.inputs as NormalizationInputs | null
+      if (scoringInput.input_id) {
+        layer4aByInputId[scoringInput.input_id] = inputs?.layer_4a
+        scoreMathContextByInputId[scoringInput.input_id] = {
+          layer4b: inputs?.layer_4b,
+          normalizationComponents: inputs?.components,
+          whyThisScoreFields: whyFieldsFromScoringInput(scoringInput, inputs?.components),
+          layer4aVerified: (inputs as { layer_4a_verified?: unknown[] })?.layer_4a_verified as
+            | Agent3DashboardData['scoreMathContextByInputId'][string]['layer4aVerified']
+            | undefined,
+        }
       }
     }
   }
@@ -107,6 +122,7 @@ export async function fetchAgent3Dashboard(): Promise<Agent3DashboardData> {
     approvedByProductId,
     latestScoreByProductId,
     layer4aByInputId,
+    scoreMathContextByInputId,
     runnable,
     statusCounts,
   }

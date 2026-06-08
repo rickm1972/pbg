@@ -2,8 +2,7 @@
  * V2.3.4 materials-science catalog — agent pipeline UIs only surface active products.
  * Archived rows (e.g. formulation / dish soap) stay in DB for history but are hidden here.
  *
- * **Agent 1** is the pipeline entry: every active catalog product can run/re-run Agent 1 except
- * while evidence is in progress or awaiting review.
+ * **Agent 1 Run tab** lists only `unscored` products. Retries and review use other tabs or full reset.
  * **Agents 2–4** are sequential — a product only appears when the prior step is approved.
  */
 
@@ -39,6 +38,23 @@ const AGENT1_RUN_BLOCKED_STATUSES = new Set([
  */
 export function canRunAgent1FromPipelineStart(agentStatus: string): boolean {
   return !AGENT1_RUN_BLOCKED_STATUSES.has(agentStatus)
+}
+
+/** Agent 1-only run — no Agents 2–4 artifacts to clear first. */
+export const AGENT1_FRESH_RUN_STATUSES = new Set([
+  'unscored',
+  'evidence_pending',
+  'evidence_rejected',
+  'evidence_in_progress',
+  'evidence_awaiting_review',
+])
+
+/**
+ * Re-running Agent 1 from scratch requires wiping scoring/QA when the product has passed Gate 1.
+ * Applies to every catalog product (not product-specific).
+ */
+export function requiresFullPipelineResetBeforeAgent1Run(agentStatus: string): boolean {
+  return !AGENT1_FRESH_RUN_STATUSES.has(agentStatus)
 }
 
 /** @deprecated alias — only brand-new rows; use canRunAgent1FromPipelineStart for Admin Run tab. */

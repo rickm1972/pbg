@@ -1,6 +1,7 @@
 import { fetchPageText } from '../../../lib/fetch-page-text.mjs'
 import { fillQueryTemplate, runPerplexityQuery } from '../perplexity-query.mjs'
 import { getRetrievalTaskForCheck } from '../../../../src/shared/required-evidence-retrieval/retrieval-task-registry.mjs'
+import { shouldApplyMinnesotaPfasRegulatoryFlag } from '../../../../src/shared/canonical-taxonomy/inert-cookware-structural.mjs'
 
 const MN_PCA_URL = 'https://www.pca.state.mn.us/air-water-land-climate/2025-pfas-prohibitions'
 const MN_STATUTE_URL = 'https://www.revisor.mn.gov/statutes/cite/116.943'
@@ -27,6 +28,27 @@ export async function runCookwarePfasRegulatoryRetrieval(ctx) {
   const primaryId = mappings?.primary_contact_material_id?.canonical_id ?? ''
   const pfasId = mappings?.pfas_status_id?.canonical_id ?? ''
   const intentionallyAdded = /pfas_intentionally_added|pfas_present/.test(pfasId)
+
+  if (!shouldApplyMinnesotaPfasRegulatoryFlag(mappings, structured)) {
+    return {
+      check_id: 'external.regulatory_pfas_minnesota_review',
+      status: 'not_applicable',
+      source_url: null,
+      source_quote: null,
+      canonical_ids_added: [],
+      retrieval_attempts: [],
+      timestamp: new Date().toISOString(),
+      detail:
+        'Minnesota PFAS cookware prohibition not applicable — food-contact material is inert/uncoated without intentionally added PFAS.',
+      newSources: [],
+      applicability: {
+        primary_contact_material_id: primaryId,
+        pfas_status_id: pfasId,
+        intentionally_added_pfas: false,
+        mn_ban_applies_to_cookware_nonstick: false,
+      },
+    }
+  }
 
   // Existing manufacturer nonstick source
   const mfrNonstick =
@@ -138,13 +160,12 @@ export async function runCookwarePfasRegulatoryRetrieval(ctx) {
     detail =
       'Minnesota 2025 PFAS cookware prohibition is applicable/relevant: product is cookware and evidence shows intentionally added PFAS/PTFE nonstick. Category/material applicability from official PCA/statute — not confirmation that this exact SKU is banned in Minnesota.'
   } else if (mnOfficial) {
-    status = 'passed'
+    status = 'not_applicable'
     const reg = newSources[0]
     source_url = reg.url
     source_quote = reg.excerpt
-    canonical_ids_added.push('minnesota_pfas_ban_2025')
     detail =
-      'Minnesota regulatory applicability documented from official government source (cookware + intentionally added PFAS). Confirm PFAS intent on product; not SKU-specific ban confirmation.'
+      `Minnesota PFAS cookware prohibition regulatory source retrieved for context only — canonical pfas_status_id=${pfasId || 'n/a'} does not show intentionally added PFAS/PTFE nonstick; ban applicability not asserted for this SKU.`
   } else {
     status = 'failed'
     detail =

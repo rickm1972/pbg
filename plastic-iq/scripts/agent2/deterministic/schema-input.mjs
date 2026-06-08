@@ -78,6 +78,18 @@ export function getCanonicalMappings(evidence) {
   return getStructuredEvidence(evidence)?.canonical_mappings ?? null
 }
 
+/** True when Gate 1 canonical primary is resolved and maps to a valid Agent 2 material. */
+export function hasValidCanonicalPrimaryContact(evidence) {
+  if (!hasStructuredEvidence(evidence)) return false
+  const canonical = getStructuredEvidence(evidence)?.canonical_mappings?.primary_contact_material_id
+  if (!canonical?.canonical_id || isExpansionRequired(canonical.canonical_id)) return false
+  const matId =
+    canonical.agent2_material_id && getMaterial(canonical.agent2_material_id)
+      ? canonical.agent2_material_id
+      : canonical.canonical_id
+  return Boolean(matId && getMaterial(matId))
+}
+
 export function getPrimaryContact(evidence) {
   const s = getStructuredEvidence(evidence)
   if (!s) return null
@@ -94,14 +106,15 @@ export function getPrimaryContact(evidence) {
       `Invalid or missing canonical primary_contact_material_id for Agent 2 (got ${material_id ?? 'null'}).`,
     )
   }
+  const mappingConfidence = canonical?.confidence_label ?? pcm.confidence_label
   return {
     material_identity: pcm.material_identity,
     undisclosed_code: pcm.undisclosed_code ?? null,
     material_id,
     canonical_id: canonical?.canonical_id ?? null,
     mapping_rule_id: canonical?.mapping_rule_id ?? null,
-    source_url: pcm.source_url,
-    confidence: legacyConfidence(pcm.confidence_label),
+    source_url: canonical?.source_url ?? pcm.source_url,
+    confidence: legacyConfidence(mappingConfidence),
     specs_disclosed: pcm.material_specs_disclosed,
     excerpt: pcm.source_url ? `Primary contact per ${pcm.source_url}` : '',
   }

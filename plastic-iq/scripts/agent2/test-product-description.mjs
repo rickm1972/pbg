@@ -69,8 +69,8 @@ assert(
   'generator version stamped',
 )
 
-if (!hexDesc.ok) {
-  console.error('✗ HexClad description generation failed:', hexDesc.flagged_missing_fields)
+if (hexDesc.product_description_status !== 'generated') {
+  console.error('✗ HexClad description generation warning:', hexDesc.flagged_missing_fields)
   failed = true
 } else {
   const s1 = hexDesc.product_description.split('.')[0] + '.'
@@ -91,8 +91,8 @@ const tfalDesc = runProductDescriptionStep({
   whyThisScore: tfalWhy,
 })
 
-if (!tfalDesc.ok) {
-  console.error('✗ T-Fal description generation failed:', tfalDesc.flagged_missing_fields)
+if (tfalDesc.product_description_status !== 'generated') {
+  console.error('✗ T-Fal description generation warning:', tfalDesc.flagged_missing_fields)
   failed = true
 } else {
   console.log('\nT-Fal description:', tfalDesc.product_description.slice(0, 120) + '…')

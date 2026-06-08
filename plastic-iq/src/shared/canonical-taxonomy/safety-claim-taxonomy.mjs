@@ -11,9 +11,27 @@ export const SAFETY_CLAIM_TAXONOMY = [
     taxonomy_file: 'safety-claim-taxonomy.mjs',
   },
   {
+    canonical_id: 'ptfe_free_claim',
+    display_label: 'PTFE-free claim',
+    description: 'Explicit PTFE-free marketing — distinct from PFAS-free and PFOA-free.',
+    aliases: [/ptfe[-\s]?free/i, /\bno\s+ptfe\b/i],
+    mapping_rule_id: 'safety_ptfe_free_literal_v1',
+    taxonomy_file: 'safety-claim-taxonomy.mjs',
+  },
+  {
+    canonical_id: 'pfas_free_claim_structurally_verified',
+    display_label: 'PFAS-free claim structurally verified by material',
+    description:
+      'PFAS-free claim on an inherently PFAS-free inert food-contact material — not a vague coated/plastic marketing claim.',
+    aliases: [],
+    mapping_rule_id: 'safety_pfas_free_structural_v1',
+    taxonomy_file: 'safety-claim-taxonomy.mjs',
+  },
+  {
     canonical_id: 'pfas_free_marketing_claim',
     display_label: 'PFAS-free marketing claim',
-    description: 'Explicit PFAS-free claim in copy — separate from PFOA-free.',
+    description:
+      'Explicit PFAS-free claim on coated/plastic/proprietary materials — requires scrutiny; not structurally verified.',
     aliases: [/pfas[-\s]?free/i],
     mapping_rule_id: 'safety_pfas_free_literal_v1',
     taxonomy_file: 'safety-claim-taxonomy.mjs',

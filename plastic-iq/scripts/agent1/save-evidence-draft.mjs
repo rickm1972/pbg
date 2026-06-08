@@ -49,7 +49,10 @@ export async function saveEvidenceDraft(params) {
 
   const sources = row.sources ?? []
   const structured = structured_evidence
-  applyCanonicalMappings(structured, sources, { facts: row.facts ?? [] })
+  applyCanonicalMappings(structured, sources, {
+    facts: row.facts ?? [],
+    agent_metadata: row.agent_metadata ?? { warnings: [] },
+  })
   const field_provenance = buildFieldProvenance(structured, sources)
   const facts = bridgeLegacyFacts(structured, sources)
 

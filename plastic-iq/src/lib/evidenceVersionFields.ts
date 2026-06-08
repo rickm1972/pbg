@@ -12,7 +12,8 @@ import {
 } from './canonicalEvidenceMapping'
 import { getGate1ContradictionBlockers } from './gate1ContradictionBlockers'
 import { isFormulationSubcategory } from './requiredEvidenceValidation'
-import { getDisplayFacts, getStructuredEvidence, getWarnings } from './agent1Review'
+import { getDisplayFacts } from './agent1Review'
+import { getStructuredEvidence, getWarnings } from './evidenceMetadata'
 import { buildFieldProvenance } from './evidenceFieldProvenance'
 
 export type FieldEditAuditEntry = {
@@ -341,9 +342,4 @@ export function getApprovalBlockers(params: {
   return { canApprove: reasons.length === 0, reasons }
 }
 
-export function sourceLabelForUrl(url: string, sources: EvidenceSource[]): string {
-  const match = sources.find((s) => s.url === url)
-  if (!match) return url
-  const type = match.source_type?.replace(/_/g, ' ') ?? 'source'
-  return match.title?.trim() ? `${match.title.trim()} (${type})` : `${type} page`
-}
+export { sourceLabelForUrl } from './evidenceSourceLabels'

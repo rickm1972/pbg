@@ -5,6 +5,7 @@ import { getMatrixForSubcategory } from './matrices/index.mjs'
 import { detectPatternTriggers } from './pattern-triggers.mjs'
 import { evaluateFieldRequirement } from './field-evaluators.mjs'
 import { evaluateExternalCheck } from './external-checks.mjs'
+import { CATEGORY_CONFIG_REQUIRED } from '../product-type-registry/preflight.mjs'
 
 /**
  * @param {object} structured
@@ -14,10 +15,15 @@ import { evaluateExternalCheck } from './external-checks.mjs'
  */
 export function validateRequiredEvidence(structured, sources = [], options = {}) {
   const subcategory = structured?.product_identity?.subcategory ?? ''
-  const subcategoryKey = resolveSubcategoryKey(subcategory)
+  const category = structured?.product_identity?.category ?? ''
+  const subcategoryKey = resolveSubcategoryKey(subcategory, { category })
 
   if (isFormulationSubcategory(subcategory)) {
-    return formulationNotApplicablePayload(subcategoryKey)
+    return formulationNotApplicablePayload(subcategoryKey ?? 'formulation')
+  }
+
+  if (!subcategoryKey) {
+    return unconfiguredCategoryPayload(subcategory, category)
   }
 
   const matrix = getMatrixForSubcategory(subcategoryKey)
@@ -180,6 +186,29 @@ function formulationNotApplicablePayload(subcategoryKey) {
     },
     checklist_items: [],
     approval_blockers: [],
+  }
+}
+
+function unconfiguredCategoryPayload(subcategory, category) {
+  const detail = `${CATEGORY_CONFIG_REQUIRED}: no registry config for category="${category || '(unknown)'}", subcategory="${subcategory || '(unknown)'}".`
+  return {
+    schema_version: VALIDATION_SCHEMA_VERSION,
+    subcategory_key: null,
+    matrix_display_label: 'Unconfigured product type',
+    evaluated_at: new Date().toISOString(),
+    summary: {
+      required_fields_complete: false,
+      required_external_checks_complete: false,
+      missing_fields: [],
+      score_blocking_gaps: 1,
+      non_score_gaps: 0,
+      product_identity_verified: false,
+      approval_blocked: true,
+      category_config_required: true,
+      active_triggers: [],
+    },
+    checklist_items: [],
+    approval_blockers: [detail],
   }
 }
 

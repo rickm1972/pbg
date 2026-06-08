@@ -3,23 +3,23 @@ import {
   assembleAgent1Dashboard,
   mergeEvidenceRows,
 } from './agent1DashboardAssemble'
-import {
-  AGENT1_TFAL_PRODUCT_ID,
-  isAgent1HeldFromAwaitingReviewTab,
-} from './agent1RunTabOnly'
+import { AGENT1_LODGE_PRODUCT_ID, AGENT1_TFAL_PRODUCT_ID } from './agent1RunTabOnly'
 import {
   canRerunAgent1FromReviewSequential,
   canRunAgent1FromPipelineStart,
   onlyActivePipelineProducts,
   PIPELINE_CATALOG_EXPECTED_COUNT,
+  requiresFullPipelineResetBeforeAgent1Run,
 } from './pipelineCatalog'
 
 export {
+  AGENT1_LODGE_PRODUCT_ID,
   AGENT1_TFAL_PRODUCT_ID,
   canAgent1RetestReset,
-  isAgent1HeldFromAwaitingReviewTab,
   showAgent1RetestResetButton,
 } from './agent1RunTabOnly'
+
+export { requiresFullPipelineResetBeforeAgent1Run } from './pipelineCatalog'
 
 export { PIPELINE_CATALOG_EXPECTED_COUNT }
 import type {
@@ -372,6 +372,9 @@ export async function runAgent1Batch(
   onProgress?: (current: number, total: number, productName: string) => void,
 ): Promise<Agent1BatchRunResult[]> {
   const results: Agent1BatchRunResult[] = []
+  if (products.length === 0) return results
+
+  onProgress?.(0, products.length, products[0].product_name)
 
   for (let i = 0; i < products.length; i++) {
     const p = products[i]
@@ -485,18 +488,10 @@ export function getDisplayFacts(facts: EvidenceFact[]): EvidenceFact[] {
   )
 }
 
-export function getWarnings(metadata: AgentMetadata): string[] {
-  return metadata.warnings ?? []
-}
-
-export function getStructuredEvidence(
-  metadata: AgentMetadata,
-): import('../types/agent').StructuredEvidencePayload | null {
-  return metadata.structured_evidence ?? null
-}
+export { getStructuredEvidence, getWarnings } from './evidenceMetadata'
 
 /** Lodge — re-run Agent 1 from Run tab after pipeline moved on. */
-export const AGENT1_ADMIN_RERUN_PRODUCT_ID = '1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8'
+export const AGENT1_ADMIN_RERUN_PRODUCT_ID = AGENT1_LODGE_PRODUCT_ID
 
 /** Archived formulation product — excluded from pipeline UIs (migration 0019). */
 export const BRANCH_BASICS_PRODUCT_ID = 'a0c72167-f0f6-491e-90f7-bbb622fa5123'
@@ -512,8 +507,8 @@ export function isAgent1ValidationRerunProduct(productId: string): boolean {
   return (AGENT1_VALIDATION_RERUN_PRODUCT_IDS as readonly string[]).includes(productId)
 }
 
-/** Statuses where validation products may re-run from Run tab (never while awaiting review). */
-const AGENT1_VALIDATION_RERUN_STATUSES = new Set([
+/** Statuses where validation trio may re-run from Run tab when not on Awaiting review. */
+export const AGENT1_VALIDATION_RERUN_STATUSES = new Set([
   'evidence_approved',
   'normalization_rejected',
   'normalization_in_progress',
@@ -600,7 +595,7 @@ export function canAdminRerunAgent1(productId: string): boolean {
 
 /**
  * Agent 1 tab routing (do not special-case products):
- * - Successful Agent 1 run → Awaiting review. T-Fal: use Reset for re-test on Run tab to run again.
+ * - Successful Agent 1 run → Awaiting review (all products, including T-Fal).
  */
 export function isAgent1OnAwaitingReviewTab(status: string): boolean {
   return status === 'evidence_awaiting_review'
@@ -611,17 +606,32 @@ export function canRunAgent1(status: string, _productId?: string): boolean {
   return canRunAgent1FromPipelineStart(status)
 }
 
-/** Run Agent 1 tab — catalog default; validation trio also listed for re-run / recovery. */
+/** Statuses on Run Agent 1 — new runs and failed runs (not awaiting review; reset there first). */
+export const AGENT1_RUN_TAB_STATUSES = new Set([
+  'unscored',
+  'evidence_pending',
+  'evidence_in_progress',
+  'evidence_rejected',
+])
+
+/** Pill label on Run tab — failed queue rows read as unscored. */
+export function agent1RunTabDisplayStatus(agentStatus: string): string {
+  if (
+    agentStatus === 'evidence_pending' ||
+    agentStatus === 'evidence_in_progress' ||
+    agentStatus === 'evidence_rejected'
+  ) {
+    return 'unscored'
+  }
+  return agentStatus
+}
+
+/** Run Agent 1 tab — new runs, failed runs, and Gate 1 re-runs (clears prior evidence first). */
 export function canShowOnAgent1RunTab(product: {
   agent_status: string
   product_id: string
 }): boolean {
-  if (canRunAgent1FromPipelineStart(product.agent_status)) return true
-  if (!isAgent1ValidationRerunProduct(product.product_id)) return false
-  return (
-    product.agent_status === 'evidence_awaiting_review' ||
-    product.agent_status === 'evidence_in_progress'
-  )
+  return AGENT1_RUN_TAB_STATUSES.has(product.agent_status)
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   hasPackagingOnlyInference,
   hasPrimaryInferredComponent,
 } from '../agent3/confidence-interval.mjs'
+import { deriveLayer4bTransparencyFromContract } from '../../src/shared/agent2/layer4b-transparency-contract.mjs'
 import { safetyClaimContradictsMaterials } from './safety-claim-contradiction.mjs'
 
 const MARKETING_LANGUAGE_REASON = 'marketing language only, no verifiable claims'
@@ -101,42 +102,62 @@ export function stripMarketingLanguageNegative(inputs) {
   return { inputs, stripped: true }
 }
 
+const BADGE_RANK = {
+  [BADGES.FULL_DISCLOSED]: 0,
+  [BADGES.DOCUMENTATION_INCOMPLETE]: 1,
+  [BADGES.MATERIAL_UNCERTAIN]: 2,
+  [BADGES.OPAQUE]: 3,
+}
+
+function stricterBadge(a, b) {
+  const ra = BADGE_RANK[a] ?? 2
+  const rb = BADGE_RANK[b] ?? 2
+  return ra >= rb ? a : b
+}
+
 /** Agent 2 preview badge (Agent 3 recomputes CI from score). */
-export function enforceLayer4b(inputs) {
+export function enforceLayer4b(inputs, options = {}) {
+  const gate1 = options.gate1TransparencyAssessment
   const opaque = Boolean(inputs.layer_4a?.unknown_coating_cap_applies)
   const primaryInferred = hasPrimaryInferredComponent(inputs)
   const packagingOnlyInferred = hasPackagingOnlyInference(inputs)
   const negative = hasNegativeLayer4a(inputs)
 
-  let transparency_badge
-  let confidence_interval
-  let badge_justification
+  const derived = deriveLayer4bTransparencyFromContract({
+    opaque,
+    primaryInferred,
+    negativeLayer4a: negative,
+    components: inputs.components,
+  })
 
-  if (opaque) {
-    transparency_badge = BADGES.OPAQUE
-    confidence_interval = 22
-    badge_justification = 'Unknown food-contact coating cap applies.'
-  } else if (!primaryInferred && !negative) {
-    transparency_badge = BADGES.FULL_DISCLOSED
-    confidence_interval = 0
-    badge_justification = packagingOnlyInferred
-      ? 'Zero primary-contact inferred components; packaging-only inference does not affect badge (V2.3.4).'
-      : 'Zero inferred primary contact components and no negative Layer 4A adjustments (server-enforced V2.3.4).'
-  } else if (!primaryInferred) {
-    transparency_badge = BADGES.DOCUMENTATION_INCOMPLETE
-    confidence_interval = 3
+  let transparency_badge = derived.transparency_badge
+  let confidence_interval = derived.confidence_interval
+  let badge_justification = derived.badge_justification
+
+  if (
+    packagingOnlyInferred &&
+    transparency_badge === BADGES.FULL_DISCLOSED
+  ) {
     badge_justification =
-      'No primary-contact inferred components; minor Layer 4A or documentation gaps remain.'
-  } else {
-    transparency_badge = BADGES.MATERIAL_UNCERTAIN
-    confidence_interval = 12
-    badge_justification = 'Inferred or unverified primary-contact component confidence present.'
+      'Zero primary-contact inferred components; packaging-only inference does not affect badge (V2.3.4).'
+  }
+
+  if (gate1?.transparency_badge) {
+    const merged = stricterBadge(transparency_badge, gate1.transparency_badge)
+    if (merged !== transparency_badge) {
+      transparency_badge = merged
+      badge_justification = gate1.badge_justification ?? badge_justification
+      if (merged === BADGES.DOCUMENTATION_INCOMPLETE) confidence_interval = Math.max(confidence_interval, 3)
+      if (merged === BADGES.MATERIAL_UNCERTAIN) confidence_interval = Math.max(confidence_interval, 12)
+      if (merged === BADGES.OPAQUE) confidence_interval = Math.max(confidence_interval, 22)
+    }
   }
 
   inputs.layer_4b = {
     transparency_badge,
     confidence_interval,
     badge_justification,
+    gate1_transparency_assessment: gate1 ?? null,
   }
   return inputs
 }

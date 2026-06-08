@@ -13,12 +13,45 @@ import { partitionCertificationsAndSafetyClaims } from './certification-classify
 import { enforceStructuredCertificationVerification } from './certification-verify-structured.mjs'
 import { evaluateStructuredThreshold } from './threshold-structured.mjs'
 import { buildFieldProvenance } from './field-provenance.mjs'
-import { applyCanonicalMappings } from '../../src/shared/canonical-taxonomy/map-structured-evidence.mjs'
+import { filterOutOfScopeFromFacts } from '../../src/shared/safety-signals/out-of-scope-policy.mjs'
 import { detectPatternTriggers } from '../../src/shared/required-evidence-matrix/pattern-triggers.mjs'
 import {
   assertRequiredExternalRetrievalComplete,
   invokeRequiredCheckRetrieval,
 } from './required-check-retrieval/invoke.mjs'
+import { getProductTypeRegistryPreflightError } from '../../src/shared/product-type-registry/preflight.mjs'
+
+/** Dev API sets AGENT1_RELOAD_MODULES=1 so taxonomy edits load without restarting Vite. */
+async function loadCanonicalPipeline() {
+  const bust = process.env.AGENT1_RELOAD_MODULES === '1' ? `?t=${Date.now()}` : ''
+  const mapHref = new URL(
+    `../../src/shared/canonical-taxonomy/map-structured-evidence.mjs${bust}`,
+    import.meta.url,
+  ).href
+  const assertHref = new URL(`./assert-canonical-materials.mjs${bust}`, import.meta.url).href
+  const [mapMod, assertMod] = await Promise.all([import(mapHref), import(assertHref)])
+  return {
+    applyCanonicalMappings: mapMod.applyCanonicalMappings,
+    assertCookwareMaterialsResolved: assertMod.assertCookwareMaterialsResolved,
+  }
+}
+
+/**
+ * Failed or interrupted Agent 1 runs must not leave products stuck on evidence_in_progress.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} productId
+ * @param {string} nextStatus
+ */
+async function clearStuckEvidenceInProgress(supabase, productId, nextStatus) {
+  const { data } = await supabase
+    .from('products')
+    .select('agent_status')
+    .eq('product_id', productId)
+    .maybeSingle()
+  if (data?.agent_status === 'evidence_in_progress') {
+    await updateAgentStatus(supabase, productId, nextStatus)
+  }
+}
 
 export async function runAgent1({ productId, productName, dryRun = false }) {
   const supabase = createServiceClient()
@@ -34,6 +67,12 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   }
 
   console.log(`\n=== Agent 1: ${product.product_name} (${id}) ===\n`)
+
+  const registryPreflightError = getProductTypeRegistryPreflightError({ product })
+  if (registryPreflightError) {
+    console.log(`Stopped: ${registryPreflightError}`)
+    return { ok: false, product, reason: registryPreflightError }
+  }
 
   if (!dryRun) {
     await updateAgentStatus(supabase, id, 'evidence_in_progress')
@@ -80,7 +119,13 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
     )
 
     structured = packet.agent_metadata.structured_evidence
-    applyCanonicalMappings(structured, packet.sources, { facts: packet.facts })
+    const { applyCanonicalMappings, assertCookwareMaterialsResolved } = await loadCanonicalPipeline()
+    applyCanonicalMappings(structured, packet.sources, {
+      facts: packet.facts,
+      agent_metadata: packet.agent_metadata,
+    })
+    assertCookwareMaterialsResolved(structured, product)
+    packet.facts = filterOutOfScopeFromFacts(packet.facts)
     console.log('Step 4b: required-check retrieval (Phase 3.7)…')
     console.log(
       `  retrieval module reload=${process.env.AGENT1_RELOAD_MODULES === '1' ? 'yes' : 'no (set AGENT1_RELOAD_MODULES=1 in dev API)'}`,
@@ -112,7 +157,7 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
     }
   } catch (err) {
     if (!dryRun) {
-      await updateAgentStatus(supabase, id, 'evidence_pending')
+      await clearStuckEvidenceInProgress(supabase, id, 'unscored')
       const message = err instanceof Error ? err.message : String(err)
       if (/retrieval pipeline error|No retrieval runner registered/i.test(message)) {
         console.error(`Agent 1 retrieval failure — not submitting pending_review: ${message}`)

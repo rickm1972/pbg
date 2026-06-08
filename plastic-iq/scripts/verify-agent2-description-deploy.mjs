@@ -5,7 +5,7 @@
  */
 import { loadEnv } from './lib/env.mjs'
 
-const EXPECTED = '2026-06-01-hazard-sort-acronym'
+const EXPECTED = '2026-06-03-output-contract'
 const base = process.argv[2] || 'http://localhost:5173'
 
 async function main() {

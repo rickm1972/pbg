@@ -1,10 +1,8 @@
 import { supabase } from './supabaseClient'
 import { isPacRelevant } from './certificationTaxonomy'
 import { applyHazardSortToWhyThisScoreFields } from './whyThisScoreSort'
-import { publicCertificationOption, shapePublicWhyThisScoreFields } from './whyThisScorePublicDisplay'
 import {
   CERT_VERIFICATION_ABSENT,
-  isAllowedWhyOption,
   normalizeWhyThisScoreOption,
 } from './whyThisScoreVocabulary'
 import type { NormalizationComponent, ScoringInputRow } from '../types/agent'
@@ -98,4 +96,4 @@ export async function fetchWhyThisScore(productId: string): Promise<WhyThisScore
   return hasAny ? fields : null
 }
 
-export { shapePublicWhyThisScoreFields }
+export { shapePublicWhyThisScoreFields } from './whyThisScorePublicDisplay'

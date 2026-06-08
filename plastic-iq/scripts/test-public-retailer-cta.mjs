@@ -9,7 +9,7 @@ import {
   isAdminProductRetailerUrl,
   isExactUrlExplicitlyRejectedInGate1,
 } from '../src/lib/publicRetailerLinks.ts'
-import { retailerListingMatchesProductVariant } from '../src/lib/retailerVariantMatch.ts'
+import { retailerListingMatchesProductVariant, retailerListingHasConfirmedVariantMismatch } from '../src/lib/retailerVariantMatch.ts'
 import { publicRetailerSectionTitle } from '../src/lib/publicProductDisplay.ts'
 import { publicRetailerCtaLabel, usePublicRetailerMutedStyle } from '../src/lib/retailerLinks.ts'
 
@@ -106,6 +106,23 @@ assert.equal(
     { strictMissingSize: false },
   ),
   true,
+)
+
+assert.equal(
+  retailerListingHasConfirmedVariantMismatch(
+    LODGE_NAME,
+    'https://www.walmart.com/ip/Lodge-10-1-4-Cast-Iron-Skillet/596962815',
+  ),
+  false,
+  'Lodge 10-1-4 Walmart slug matches 10.25″ product',
+)
+assert.equal(
+  retailerListingHasConfirmedVariantMismatch(
+    LODGE_NAME,
+    'https://www.walmart.com/ip/Lodge-Cast-Iron-Seasoned-12-Skillet/5969628',
+  ),
+  true,
+  'Lodge 12″ Walmart slug is confirmed mismatch for 10.25″ product',
 )
 
 console.log('✓ admin-first public retailer CTA rules')

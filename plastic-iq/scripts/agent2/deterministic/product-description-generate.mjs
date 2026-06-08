@@ -1,6 +1,6 @@
 /**
- * Step 7 — deterministic product description (3 sentences, 50–100 words).
- * Reads pipeline outputs + Why This Score options only; no LLM.
+ * Step 7 — deterministic product description (3 sentences).
+ * Word limits and blocking policy: src/shared/agent2/output-contract.mjs
  */
 
 import { BADGES } from '../../agent3/confidence-interval.mjs'
@@ -8,13 +8,28 @@ import { NONE } from '../why-this-score-vocabulary.mjs'
 import { whyThisScoreLabelForComponent } from '../why-this-score-labels.mjs'
 import { factValue } from './evidence-facts.mjs'
 import { formatDescriptionPhrase } from './description-text.mjs'
-import { getSafetyClaims } from './schema-input.mjs'
+import { getSafetyClaims, getStructuredEvidence } from './schema-input.mjs'
+import { isFoodContactCoatingPrimaryMaterial } from './material-taxonomy.mjs'
 import { getMaterial, requireCategoryForDescription } from './material-taxonomy.mjs'
+import {
+  formatUseConditionsForPublicSentence,
+  isNonPacInertFoodContactMaterial,
+  nonPacInertMaterialClause,
+  nonPacInertScoreContextSentence,
+} from '../../lib/non-pac-inert-material.mjs'
+import {
+  AGENT2_OUTPUT_CONTRACT,
+  cosmeticProductDescriptionWarningMessage,
+  countProductDescriptionWords,
+  getProductDescriptionWordLimits,
+  validateProductDescriptionWordCount,
+} from '../../../src/shared/agent2/output-contract.mjs'
 
-export const PRODUCT_DESCRIPTION_GENERATOR_VERSION = '2026-06-01-hazard-sort-acronym'
+export const PRODUCT_DESCRIPTION_GENERATOR_VERSION = '2026-06-03-output-contract'
 
 const PRIMARY_ROLES = new Set(['primary_food_contact', 'formulation'])
 const MARKETING_LANGUAGE_REASON = 'marketing language only, no verifiable claims'
+const RETRY_STRATEGIES = AGENT2_OUTPUT_CONTRACT.product_description.retry_strategies
 
 /**
  * @param {object} params
@@ -24,17 +39,16 @@ const MARKETING_LANGUAGE_REASON = 'marketing language only, no verifiable claims
  * @param {object} params.whyThisScore
  */
 export function runProductDescriptionStep({ product, evidence, inputs, whyThisScore }) {
-  const missing = collectMissingFields({ product, evidence, inputs, whyThisScore })
+  const missing = collectMissingFields({ product, inputs, whyThisScore })
   if (missing.length) {
-    return {
-      ok: false,
-      status: 'description_generation_failed',
-      flagged_missing_fields: missing,
+    const flagged = missing.map((f) => `product_description:${f}`)
+    return cosmeticDescriptionResult({
       product_description: null,
-      human_review_required: true,
-      human_review_reason:
-        `Product description generation failed — missing: ${missing.join(', ')}.`,
-    }
+      product_description_status: AGENT2_OUTPUT_CONTRACT.product_description.statuses.validation_warning,
+      flagged_missing_fields: flagged,
+      product_description_warnings: [cosmeticProductDescriptionWarningMessage(flagged)],
+      description_word_count: null,
+    })
   }
 
   const primaryComponent = findPrimaryComponent(inputs.components)
@@ -45,44 +59,82 @@ export function runProductDescriptionStep({ product, evidence, inputs, whyThisSc
   const materialName = String(getMaterial(primaryComponent.material_id)?.name ?? '').trim()
   const category = requireCategoryForDescription(primaryComponent.material_id)
 
-  const sentence1 = buildSentence1(product, primaryLabels)
-  const sentence2 = buildSentence2({
+  const ctx = {
     product,
-    badge,
-    hazard,
-    materialName,
-    category,
-    inputs,
     evidence,
+    inputs,
     whyThisScore,
-  })
-  const sentence3 = buildSentence3({
+    primaryComponent,
+    primaryLabels,
+    useConditions,
     badge,
     hazard,
-    category,
-    useConditions,
     materialName,
-  })
+    category,
+  }
 
-  const description = [sentence1, sentence2, sentence3].join(' ')
-  const wordCount = countWords(description)
-  if (wordCount < 50 || wordCount > 100) {
-    return {
-      ok: false,
-      status: 'description_generation_failed',
-      flagged_missing_fields: [`word_count_out_of_range:${wordCount}`],
-      product_description: null,
-      human_review_required: true,
-      human_review_reason: `Product description word count ${wordCount} is outside 50–100.`,
+  let bestDescription = null
+  let bestWordCount = 0
+  let bestValidation = validateProductDescriptionWordCount(0)
+
+  for (const strategy of RETRY_STRATEGIES) {
+    const description = buildDescription(ctx, strategy)
+    const wordCount = countProductDescriptionWords(description)
+    const validation = validateProductDescriptionWordCount(wordCount)
+    if (validation.withinRange) {
+      return cosmeticDescriptionResult({
+        product_description: description,
+        product_description_status: AGENT2_OUTPUT_CONTRACT.product_description.statuses.ok,
+        flagged_missing_fields: [],
+        product_description_warnings: [],
+        description_word_count: wordCount,
+      })
+    }
+    if (!bestDescription || Math.abs(wordCount - getTargetWordCount()) < Math.abs(bestWordCount - getTargetWordCount())) {
+      bestDescription = description
+      bestWordCount = wordCount
+      bestValidation = validation
     }
   }
 
+  const flagged = [`word_count_out_of_range:${bestWordCount}`]
+  const warnings = [cosmeticProductDescriptionWarningMessage(flagged)]
+  const limits = getProductDescriptionWordLimits()
+
+  return cosmeticDescriptionResult({
+    product_description: bestDescription,
+    product_description_status: AGENT2_OUTPUT_CONTRACT.product_description.statuses.validation_warning,
+    flagged_missing_fields: flagged,
+    product_description_warnings: warnings,
+    description_word_count: bestWordCount,
+    human_review_reason: `Product description word count ${bestWordCount} is outside ${limits.min_words}–${limits.max_words}.`,
+  })
+}
+
+function getTargetWordCount() {
+  const { min_words, max_words } = getProductDescriptionWordLimits()
+  return Math.round((min_words + max_words) / 2)
+}
+
+/**
+ * @param {object} result
+ */
+function cosmeticDescriptionResult(result) {
   return {
-    ok: true,
-    product_description: description,
-    description_word_count: wordCount,
+    ...result,
     description_generator_version: PRODUCT_DESCRIPTION_GENERATOR_VERSION,
   }
+}
+
+/**
+ * @param {object} ctx
+ * @param {string} strategy
+ */
+function buildDescription(ctx, strategy) {
+  const sentence1 = buildSentence1(ctx.product, ctx.primaryLabels)
+  const sentence2 = buildSentence2({ ...ctx, copyStrategy: strategy })
+  const sentence3 = buildSentence3({ ...ctx, copyStrategy: strategy })
+  return [sentence1, sentence2, sentence3].join(' ')
 }
 
 /**
@@ -150,7 +202,6 @@ function primaryComponentHazard(component) {
 
 /**
  * Sentence 1 labels: primary food-contact components sorted by material_hazard descending.
- * Never uses why_this_score.primary_material_options array order (that follows extraction order).
  * @param {object} inputs
  * @param {object} whyThisScore
  */
@@ -227,10 +278,26 @@ function buildSentence1(product, primaryLabels) {
  * @param {object} ctx
  */
 function buildSentence2(ctx) {
-  const { product, badge, hazard, materialName, category, inputs, evidence, whyThisScore } =
-    ctx
+  const {
+    product,
+    badge,
+    hazard,
+    materialName,
+    category,
+    inputs,
+    evidence,
+    whyThisScore,
+    useConditions,
+    copyStrategy = 'default',
+  } = ctx
   const namePhrase = formatDescriptionPhrase(materialName)
   const brand = String(product?.brand ?? 'The brand').trim()
+  const useSentence = formatUseConditionsForPublicSentence(useConditions)
+  const nonPacInert = isNonPacInertFoodContactMaterial(
+    materialName,
+    ctx.primaryComponent?.material_id,
+    { categoryHint: category },
+  )
 
   if (
     badge === BADGES.DOCUMENTATION_INCOMPLETE &&
@@ -250,10 +317,22 @@ function buildSentence2(ctx) {
   }
 
   if (badge === BADGES.FULL_DISCLOSED && hazard < 0.1) {
-    return 'The disclosed food-contact material is inert under typical kitchen use and does not transfer plastic-associated chemicals into food.'
+    if (nonPacInert) {
+      if (copyStrategy === 'expand_inert_clause') {
+        return nonPacInertMaterialClause(namePhrase, useSentence)
+      }
+      if (copyStrategy === 'compact') {
+        return `${namePhrase} is inert for PAC exposure purposes.`
+      }
+      return `${namePhrase} is not a plastic- or PFAS-based food-contact material, so PAC exposure concern remains minimal.`
+    }
+    return `${namePhrase} is inert for PAC exposure purposes and has minimal expected plastic-associated chemical migration under typical kitchen use.`
   }
 
   if (badge === BADGES.FULL_DISCLOSED && hazard >= 0.5) {
+    if (copyStrategy === 'compact') {
+      return `${namePhrase} is a ${category} and can release plastic-associated chemicals into food under heat and wear.`
+    }
     return `${namePhrase} is a ${category} and can release plastic-associated chemicals into food, particularly under high heat, scratching, or as the coating wears with use.`
   }
 
@@ -265,20 +344,38 @@ function buildSentence2(ctx) {
  * @param {object} ctx
  */
 function buildSentence3(ctx) {
-  const { badge, hazard, category, useConditions, materialName } = ctx
+  const { badge, hazard, category, useConditions, materialName, copyStrategy = 'default' } = ctx
   const useText = formatUseConditionsList(useConditions)
   const namePhrase = formatDescriptionPhrase(materialName)
+  const nonPacInert = isNonPacInertFoodContactMaterial(
+    materialName,
+    ctx.primaryComponent?.material_id,
+    { categoryHint: category },
+  )
 
   if (hazard < 0.1) {
+    if (nonPacInert) {
+      if (copyStrategy === 'default' || copyStrategy === 'compact') {
+        return nonPacInertScoreContextSentence()
+      }
+      return `It's used for ${useText}; because ${namePhrase} is an inert material, routine heat and use conditions do not increase plastic-associated chemical migration.`
+    }
     return `It's used for ${useText}; because ${namePhrase} is an inert material, routine heat and use conditions do not increase plastic-associated chemical migration.`
   }
 
-  if (badge === BADGES.OPAQUE || badge === BADGES.MATERIAL_UNCERTAIN) {
-    return `It's used for ${useText}, conditions that would accelerate chemical migration from coatings — but we can't quantify the risk without disclosed chemistry.`
+  if (badge === BADGES.OPAQUE || badge === BADGES.MATERIAL_UNCERTAIN || badge === BADGES.DOCUMENTATION_INCOMPLETE) {
+    const useSentence = formatUseConditionsForPublicSentence(useConditions)
+    if (/ceramic|sol.gel|nonstick coating/i.test(String(category))) {
+      return `It is used with ${useSentence}. Because the exact coating formulation is not fully disclosed, that uncertainty is reflected in the score and transparency badge.`
+    }
+    return `It is used with ${useSentence}. Because key food-contact chemistry is not fully disclosed, that uncertainty is reflected in the score and transparency badge.`
   }
 
   if (hazard >= 0.5) {
-    return `It's used for ${useText}, conditions that accelerate chemical release from ${category}.`
+    if (/pfas|ptfe|nonstick/i.test(String(category))) {
+      return `It's used for ${useText}, conditions associated with greater release potential for PFAS-related nonstick coatings.`
+    }
+    return `It's used for ${useText}, conditions associated with greater release potential for ${category}.`
   }
 
   return `It's used for ${useText}, conditions that can increase chemical migration from ${category}.`
@@ -354,14 +451,4 @@ function hazardBandLabel(hazard) {
   if (hazard < 0.1) return 'low'
   if (hazard < 0.5) return 'moderate'
   return 'high'
-}
-
-/**
- * @param {string} text
- */
-function countWords(text) {
-  return String(text ?? '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length
 }

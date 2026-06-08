@@ -1,3 +1,13 @@
+function isFullDisclosedBadge(badge: string): boolean {
+  return /^full(y)?\s+disclosed$/i.test(String(badge ?? '').trim())
+}
+
+/** Public product-page label (normalizes legacy “Full Disclosed”). */
+export function displayTransparencyBadge(badge: string): string {
+  if (isFullDisclosedBadge(badge)) return 'Fully Disclosed'
+  return badge
+}
+
 /** Layer 4B transparency badges (V2.3.4 public labels). */
 export function transparencyBadgeStyle(badge: string): {
   bg: string
@@ -6,7 +16,7 @@ export function transparencyBadgeStyle(badge: string): {
   text: string
 } {
   const n = badge.toLowerCase()
-  if (n.includes('full disclosed')) {
+  if (isFullDisclosedBadge(badge)) {
     return {
       bg: 'bg-blue-50',
       ring: 'ring-blue-200',
@@ -65,14 +75,14 @@ export function transparencyBadgeStyle(badge: string): {
 /** Plain-English one-liner shown under the badge on product pages. */
 export function transparencyBadgeSummary(badge: string): string {
   const n = badge.toLowerCase()
-  if (n.includes('full disclosed')) {
-    return 'Full Disclosed — all materials disclosed by the manufacturer; nothing inferred.'
+  if (isFullDisclosedBadge(badge)) {
+    return 'Fully Disclosed — clear material information was found for the parts that affect this score.'
   }
   if (n.includes('documentation incomplete')) {
     return 'Documentation Incomplete — most materials are known; minor details (grade, finish) are unconfirmed.'
   }
   if (n.includes('material uncertain')) {
-    return 'Material Uncertain — some food-contact materials are inferred or span multiple plausible hazard levels.'
+    return 'Material Uncertain — the material family is identified, but key details that affect exposure risk are not fully disclosed.'
   }
   if (n.includes('opaque')) {
     return 'Opaque — a food-contact coating or material is unknown or not verifiable from available sources.'
