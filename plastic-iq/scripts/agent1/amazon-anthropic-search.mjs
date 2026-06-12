@@ -1,5 +1,6 @@
 import { buildAmazonWebSearchSystemPrompt, buildAmazonWebSearchUserPrompt } from './prompt.mjs'
 import { extractAmazonAsin } from './perplexity-search.mjs'
+import { resolvePrimaryRetailerEvidenceUrl } from '../../src/shared/agent1/provided-source-intake.mjs'
 import {
   beginAnthropicApiCallLog,
   estimateAnthropicCostUsd,
@@ -32,7 +33,7 @@ export async function retrieveAmazonViaAnthropicWebSearch(product, env) {
   const apiKey = env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
 
-  const url = product.amazon_url?.trim() || null
+  const url = resolvePrimaryRetailerEvidenceUrl(product)
   const asin = extractAmazonAsin(url)
   const fetchedAt = new Date().toISOString()
 

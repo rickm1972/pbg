@@ -4,6 +4,7 @@
  */
 
 import { STARTER_PRODUCT_TYPE_CONFIGS } from './configs/starter-configs.mjs'
+import { matchesCookwareGranularSubcategory } from './cookware-subcategory-routing.mjs'
 import {
   buildRegistryKey,
   normalizeLookupText,
@@ -121,6 +122,10 @@ export function resolveProductTypeConfig(ctx = {}) {
     if (sub && (sub === configSub || (config.subcategory_aliases ?? []).map(normalizeLookupText).includes(sub))) {
       return config
     }
+  }
+
+  if (matchesCookwareGranularSubcategory(ctx.subcategory, ctx.category)) {
+    return CONFIG_BY_MATRIX_KEY.get('cookware') ?? null
   }
 
   return null

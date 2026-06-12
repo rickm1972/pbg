@@ -63,9 +63,40 @@ async function bustAgent1SharedModules({ dev }) {
   const shared = [
     'src/shared/agent1/amazon-source-consistency.mjs',
     'src/shared/agent1/gate1-product-identity.mjs',
+    'src/shared/agent1/manufacturer-pdp-validation.mjs',
+    'src/shared/agent1/source-authority.mjs',
+    'src/shared/agent1/lab-result-retrieval.mjs',
+    'src/shared/agent1/gate1-source-validation.mjs',
+    'src/shared/agent1/manufacturer-pdp-modal-extraction.mjs',
+    'src/shared/canonical-taxonomy/canonical-taxonomy-fallbacks.mjs',
+    'src/shared/canonical-taxonomy/hybrid-cookware-structural.mjs',
     'src/shared/canonical-taxonomy/inert-cookware-structural.mjs',
-    'src/shared/canonical-taxonomy/map-structured-evidence.mjs',
+    'src/shared/canonical-taxonomy/primary-contact-material-taxonomy.mjs',
+    'src/shared/canonical-taxonomy/substrate-material-taxonomy.mjs',
+    'src/shared/canonical-taxonomy/coating-modifier-taxonomy.mjs',
     'src/shared/canonical-taxonomy/compound-cookware-material.mjs',
+    'src/shared/canonical-taxonomy/map-structured-evidence.mjs',
+    'scripts/agent1/assert-canonical-materials.mjs',
+  ]
+  for (const rel of shared) {
+    await importFreshProject(rel, { dev })
+  }
+}
+
+/** Bust Agent 2/3 subgraph — runner import alone leaves layer4b + lab-evidence cached. */
+async function bustAgent2And3SharedModules({ dev }) {
+  const shared = [
+    'src/shared/agent2/manufacturer-lab-testing-evidence.mjs',
+    'src/shared/agent2/layer4b-transparency-contract.mjs',
+    'src/shared/agent3/escalator-eligibility.mjs',
+    'src/shared/agent2/proprietary-ceramic-nonstick.mjs',
+    'scripts/agent3/prepare-scoring-inputs.mjs',
+    'scripts/agent2/layer4b-enforce.mjs',
+    'scripts/agent2/layer4a-enforce.mjs',
+    'scripts/agent2/normalize-enforce.mjs',
+    'scripts/agent2/deterministic/layer4a-step.mjs',
+    'scripts/agent2/deterministic/layer4a-applicability.mjs',
+    'scripts/agent2/deterministic/product-description-generate.mjs',
   ]
   for (const rel of shared) {
     await importFreshProject(rel, { dev })
@@ -112,13 +143,14 @@ export function agentsApiPlugin() {
         const isPersonaApi = pathname.startsWith('/api/persona')
         const isChannelApi = pathname.startsWith('/api/channel')
         const isDescriptionOverrideApi = pathname.startsWith('/api/description-override')
+        const isPublishSnapshotApi = pathname.startsWith('/api/publish-with-snapshot')
         const isAgentApi =
           pathname.startsWith('/api/agent1') ||
           pathname.startsWith('/api/agent2') ||
           pathname.startsWith('/api/agent3') ||
           pathname.startsWith('/api/agent4')
 
-        if (!isPersonaApi && !isChannelApi && !isAgentApi && !isDescriptionOverrideApi) {
+        if (!isPersonaApi && !isChannelApi && !isAgentApi && !isDescriptionOverrideApi && !isPublishSnapshotApi) {
           next()
           return
         }
@@ -131,6 +163,52 @@ export function agentsApiPlugin() {
           res.statusCode = 204
           res.end()
           return
+        }
+
+        if (isPublishSnapshotApi) {
+          if (!secret || provided !== secret) {
+            sendJson(res, 401, { error: 'Unauthorized' })
+            return
+          }
+          if (req.method !== 'POST') {
+            sendJson(res, 405, { error: 'Method not allowed' })
+            return
+          }
+          try {
+            const body = await readJsonBody(req)
+            const productId = String(body.product_id ?? '').trim()
+            if (!productId) {
+              sendJson(res, 400, { error: 'product_id is required' })
+              return
+            }
+            const { publishProductWithFrozenSnapshot } = await server.ssrLoadModule(
+              '/src/lib/apr/publishedSnapshotPublish.ts',
+            )
+            const { createServiceClient } = await import('./agent1/supabase.mjs')
+            const sb = createServiceClient()
+            const result = await publishProductWithFrozenSnapshot(sb, productId, {
+              approved_by: 'admin-gate4',
+            })
+            let bundledSynced = false
+            if (result.snapshot_created) {
+              try {
+                execSync('node scripts/sync-bundled-durable-snapshots.mjs', {
+                  cwd: join(scriptsDir, '..'),
+                  stdio: 'pipe',
+                })
+                bundledSynced = true
+              } catch (syncErr) {
+                console.error('[agents-api] bundled sync failed:', syncErr)
+              }
+            }
+            sendJson(res, 200, { ...result, bundled_synced: bundledSynced })
+            return
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            console.error(`[agents-api] ${pathname}:`, message)
+            sendJson(res, 500, { error: message })
+            return
+          }
         }
 
         if (isDescriptionOverrideApi) {
@@ -622,6 +700,7 @@ export function agentsApiPlugin() {
           }
 
           if (pathname === '/api/agent3/run') {
+            await bustAgent2And3SharedModules({ dev })
             const { runAgent3, formatScoringSummary } = await importFresh('agent3/runner.mjs', {
               dev,
             })

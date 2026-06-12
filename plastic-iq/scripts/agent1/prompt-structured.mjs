@@ -71,18 +71,26 @@ Product:
 - category: ${product.category ?? 'unknown'}
 - subcategory: ${product.subcategory ?? 'unknown'}
 
-Catalog URLs:
-- amazon_url: ${product.amazon_url || product.affiliate_link || 'none'}
+Product intake (saved before run — prioritize over search-discovered manufacturer URLs):
+- product_title: ${product.product_name ?? 'none'}
+- amazon_or_primary_retailer_url: ${product.amazon_url ?? 'none'}
+- manufacturer_product_url: ${product.manufacturer_product_url ?? 'none'}
+
+Catalog commerce URLs (buy CTAs — affiliate_link is separate):
+- affiliate_link: ${product.affiliate_link ?? 'none'}
 - target_url: ${product.target_url ?? 'none'}
 - walmart_url: ${product.walmart_url ?? 'none'}
 
 ${amazonSection}
 
+Provided manufacturer intake fetch (use before Perplexity manufacturer hits):
+${JSON.stringify(retrieval.provided_source_intake ?? null, null, 2)}
+
 Perplexity (${retrieval.search_requests} searches):
 ${JSON.stringify(retrieval.searches, null, 2)}
 
 Instructions:
-1. retailer_links.amazon_url and manufacturer_direct_url are required (from snippets).
+1. retailer_links.amazon_url and manufacturer_direct_url are required. When manufacturer_product_url is provided in intake, use it as manufacturer_direct_url — do not replace with search-discovered homepage/wrong-region manufacturer URLs.
 7. sku_or_model: when the catalog primary retailer is a non-Amazon PDP, use the SKU/item number from that retailer listing — not the manufacturer collection model number (e.g. GR112.55) unless the retailer page shows the same value.
 2. primary_contact_material must be populated (material or undisclosed_code).
 3. No secondary component for parts explicitly absent.

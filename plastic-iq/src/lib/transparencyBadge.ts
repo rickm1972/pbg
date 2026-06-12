@@ -73,12 +73,21 @@ export function transparencyBadgeStyle(badge: string): {
 }
 
 /** Plain-English one-liner shown under the badge on product pages. */
-export function transparencyBadgeSummary(badge: string): string {
+export function transparencyBadgeSummary(
+  badge: string,
+  context?: { coatingFormulaUndisclosed?: boolean; hasLabTesting?: boolean },
+): string {
   const n = badge.toLowerCase()
   if (isFullDisclosedBadge(badge)) {
     return 'Fully Disclosed — clear material information was found for the parts that affect this score.'
   }
   if (n.includes('documentation incomplete')) {
+    if (context?.coatingFormulaUndisclosed && context?.hasLabTesting) {
+      return 'Documentation Incomplete — the material family is identified and lab testing is available, but the exact proprietary coating formula is not fully disclosed.'
+    }
+    if (context?.coatingFormulaUndisclosed) {
+      return 'Documentation Incomplete — the material family is identified, but the exact proprietary coating formula is not fully disclosed.'
+    }
     return 'Documentation Incomplete — most materials are known; minor details (grade, finish) are unconfirmed.'
   }
   if (n.includes('material uncertain')) {

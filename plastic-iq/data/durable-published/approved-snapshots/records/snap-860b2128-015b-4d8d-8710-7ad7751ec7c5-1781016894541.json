@@ -1,0 +1,206 @@
+{
+  "meta": {
+    "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016894541",
+    "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+    "version_sequence": 2,
+    "source_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781015933980",
+    "reason": "description_override",
+    "override_id": "desc-override-b54916de-e6e7-46d5-84b2-8404a7dddbab",
+    "approved_at": "2026-06-09T14:54:54.540Z",
+    "approved_by": "admin-editor",
+    "low_score_publication_review": {
+      "reviewer_id": "fixture-reviewer",
+      "reviewed_at": "2026-06-05T12:00:00.000Z",
+      "low_score_gate_version": "4.5.0",
+      "score_at_review": 69,
+      "primary_score_driving_concern": "Admin-approved override",
+      "evidence_sufficiency": "passed",
+      "language_safety": "passed",
+      "approval_status": "approved",
+      "reviewer_notes": "Fixture-approved low-score publication review."
+    },
+    "immutable": true
+  },
+  "record": {
+    "contract_version": "0.25.0",
+    "published_at": "2026-06-09T14:54:54.540Z",
+    "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+    "evidence_content_hash": "",
+    "normalization_content_hash": "",
+    "display_content_hash": "",
+    "score_content_hash": "",
+    "assembled_content_hash": "",
+    "display": {
+      "input_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "evidence_id": "",
+      "evidence_content_hash": "",
+      "normalization_content_hash": "",
+      "product_title": "GreenPan Valencia Pro Ceramic Nonstick 10” Frying Pan Skillet with Lid",
+      "primary_material": "Ceramic nonstick sol-gel coating",
+      "disclosure_sentence": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+      "product_description": "GreenPan’s cooking surface is a ceramic nonstick sol-gel coating over hard-anodized aluminum. This coating category is treated differently from PTFE/PFAS nonstick under the PAC Safety Score methodology, and GreenPan markets the product as PFAS- and PTFE-free. However, those claims were not supported by retrieved third-party test reports for this specific reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "secondary_materials": [
+        {
+          "name": "Hard anodized aluminum",
+          "note": null
+        },
+        {
+          "name": "Magnetic stainless steel base",
+          "note": null
+        },
+        {
+          "name": "Tempered glass lid",
+          "note": null
+        },
+        {
+          "name": "Stainless steel handle",
+          "note": null
+        }
+      ],
+      "coatings": "Ceramic nonstick sol-gel coating",
+      "use_conditions": [
+        "Oven heat with fat exposure",
+        "Stovetop heat with fat exposure"
+      ],
+      "disclosure_quality": "Material Uncertain",
+      "cert_line": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+      "risk_bars": [
+        {
+          "id": "material",
+          "label": "Contact material: Ceramic nonstick sol-gel coating",
+          "fill_percent": 56,
+          "color_token": "amber",
+          "status_label": "Moderate concern · coating uncertainty"
+        },
+        {
+          "id": "migration",
+          "label": "Migration",
+          "fill_percent": 50,
+          "color_token": "amber",
+          "status_label": "Moderate migration"
+        },
+        {
+          "id": "use_conditions",
+          "label": "Use conditions",
+          "fill_percent": 4,
+          "color_token": "red",
+          "status_label": "Harsh"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://www.amazon.com/GreenPan-CC000670-001-Valencia-Toxin-Free-Dishwasher/dp/B074CVZ7MM",
+          "group": "Retailer",
+          "label": "Amazon — GreenPan Valencia Pro Ceramic Nonstick 10” Frying Pan Skillet with Lid",
+          "public_source_eligible": true,
+          "source_role": "retailer_primary",
+          "variant_mismatch": false,
+          "footnote": null
+        }
+      ],
+      "why_this_score": {
+        "primary_material": "Ceramic nonstick sol-gel coating",
+        "secondary_materials": [
+          "Hard anodized aluminum",
+          "Magnetic stainless steel base",
+          "Tempered glass lid",
+          "Stainless steel handle"
+        ],
+        "coatings": "Ceramic nonstick sol-gel coating",
+        "use_conditions": [
+          "Oven heat with fat exposure",
+          "Stovetop heat with fat exposure"
+        ],
+        "disclosure_quality": "Material Uncertain",
+        "cert_line": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+        "sections": [
+          {
+            "title": "Primary material",
+            "items": [
+              {
+                "text": "Ceramic nonstick sol-gel coating",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Secondary materials",
+            "items": [
+              {
+                "text": "Hard anodized aluminum",
+                "note": null
+              },
+              {
+                "text": "Magnetic stainless steel base",
+                "note": null
+              },
+              {
+                "text": "Tempered glass lid",
+                "note": null
+              },
+              {
+                "text": "Stainless steel handle",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Coatings & finishes",
+            "items": [
+              {
+                "text": "Ceramic nonstick sol-gel coating",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Use conditions",
+            "items": [
+              {
+                "text": "Oven heat with fat exposure",
+                "note": null
+              },
+              {
+                "text": "Stovetop heat with fat exposure",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Disclosure quality",
+            "items": [
+              {
+                "text": "Material Uncertain",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Certifications & testing",
+            "items": [
+              {
+                "text": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+                "note": null
+              }
+            ]
+          }
+        ]
+      },
+      "badge_summary": "Material Uncertain — the material family is identified, but key details that affect exposure risk are not fully disclosed.",
+      "buy_section_title": "Product listings",
+      "retailer_caution_note": null,
+      "sources_intro": "Sources used for this score, including retailer sources where applicable.",
+      "safer_alternatives_subhead": "Higher PAC Safety Scores in this category.",
+      "safer_alternatives_footer": "These alternatives have higher PAC Safety Scores.",
+      "methodology_disclaimer": "The PAC Safety Score reflects plastic-associated-chemical exposure risk under our methodology, based on disclosed materials as of the review date. It is not an overall product safety or quality judgment."
+    },
+    "score": {
+      "pac_safety_score": 69,
+      "tier": "Caution",
+      "displayed_confidence_range": "57–81",
+      "transparency_badge": "Material Uncertain"
+    },
+    "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016894541",
+    "content_hash": "3d770f35369c1b3eccd5ca790e6e6e52d51a8d633274a03d48aa794fdaee4d21"
+  }
+}

@@ -5,6 +5,7 @@ import {
   CERT_VERIFICATION_ABSENT,
   normalizeWhyThisScoreOption,
 } from './whyThisScoreVocabulary'
+import { isManufacturerLabTestingCertOption } from './publicDisclosureGapCopy'
 import type { NormalizationComponent, ScoringInputRow } from '../types/agent'
 
 export type WhyThisScoreFields = {
@@ -39,6 +40,7 @@ export function primaryContactMaterialDisplay(
 /** Same rule as CertificationBadges — only PAC-relevant certs in Why This Score display. */
 export function filterPacRelevantCertificationOptions(options: string[]): string[] {
   const filtered = options.filter((o) => {
+    if (isManufacturerLabTestingCertOption(o)) return true
     const canonical = normalizeWhyThisScoreOption('certifications_options', o)
     return canonical === CERT_VERIFICATION_ABSENT || isPacRelevant(o)
   })

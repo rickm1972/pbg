@@ -92,6 +92,28 @@ export const RETRIEVAL_TASK_REGISTRY = [
     canonical_mapping_target: 'safety_claim_ids.pfoa_free_claim',
     pass_criteria_summary: 'PFOA-free documented without treating PFOA-free as PFAS-free.',
   },
+  {
+    check_id: 'external.coated_product_lab_results',
+    task_key: 'coated_product_lab_results',
+    label: 'Coated product lab / third-party testing',
+    pattern_trigger: 'coated_nonstick_lab_results',
+    target_source_types: ['manufacturer', 'retailer', 'amazon', 'faq'],
+    query_templates: [
+      {
+        goal: 'lab_results',
+        queryTemplate: '{{brand}} {{product_name}} lab results PFAS PTFE test report',
+      },
+      {
+        goal: 'coating_test',
+        queryTemplate: '{{brand}} TerraBond ceramic PFAS PTFE third party testing results',
+      },
+    ],
+    official_urls: [],
+    expected_evidence_fields: ['sources[].page_excerpt', 'required_check_results'],
+    canonical_mapping_target: 'safety_claims.pfas_free_claim',
+    pass_criteria_summary:
+      'PFAS/PTFE-free coated product claims have retrieved lab-result or third-party testing evidence when linked.',
+  },
 ]
 
 /**

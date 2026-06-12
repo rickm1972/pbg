@@ -65,15 +65,12 @@ export const ESCALATOR_INFO: Record<
   },
   escalator_3: {
     multiplier: 1.3,
-    plainEnglishName: 'Degraded coating escalation',
+    plainEnglishName: 'Degraded coating escalation (legacy — removed v2.3.5)',
     plainEnglishReason:
-      'A degraded coating was detected with post-degradation migration ≥ 0.70. The algorithm applies a 1.3 multiplier.',
-    reason: 'Degraded coating with post-degradation migration ≥ 0.70.',
-    reviewerThresholds: [
-      'Degradation adjustment > 0',
-      'Migration after degradation must be ≥ 0.70',
-    ],
-    thresholds: ['degradation_adjustment > 0', 'migration + degradation ≥ 0.70'],
+      'Legacy V2.3.3 degradation escalator. Removed in v2.3.5; not reachable in active scoring.',
+    reason: 'Legacy — degradation escalator removed in v2.3.5.',
+    reviewerThresholds: ['Not applied in v2.3.5 active scoring'],
+    thresholds: ['escalator_3_triggers=false (v2.3.5)'],
   },
   escalator_1: {
     multiplier: 1.25,

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const AGENT_VERSION = '2.0.0'
-export const ALGORITHM_VERSION = 'v2.3.4'
+export const ALGORITHM_VERSION = '2.3.5'
 
 /** Lodge / May 15 batch cap — enforced after the model returns. */
 export const MAX_SOURCES = 14

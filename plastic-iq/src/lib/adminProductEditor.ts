@@ -55,6 +55,7 @@ export const ADMIN_EDITABLE_PRODUCT_FIELD_KEYS = [
   'phthalate_free_claim',
   'amazon_url',
   'affiliate_link',
+  'manufacturer_product_url',
   'image_url',
   'active',
 ] as const
@@ -90,6 +91,7 @@ export function buildAdminProductSavePayload(
     phthalate_free_claim: p.phthalate_free_claim,
     amazon_url: p.amazon_url,
     affiliate_link: p.affiliate_link,
+    manufacturer_product_url: p.manufacturer_product_url,
     image_url: p.image_url,
     active: p.active,
   }

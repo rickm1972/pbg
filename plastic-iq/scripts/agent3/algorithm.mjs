@@ -2,8 +2,9 @@ import {
   deriveTransparencyBadgeAndCI,
   transparencyFromAgent2Layer4b,
 } from './confidence-interval.mjs'
+import { escalator1Eligible } from '../../src/shared/agent3/escalator-eligibility.mjs'
 
-export const ALGORITHM_VERSION = '2.3.4'
+export const ALGORITHM_VERSION = '2.3.5'
 
 export function tierForScore(score) {
   if (score >= 90) return 'Excellent'
@@ -20,10 +21,10 @@ const LAYER_4A_CAP = 5
 const HARD_CAP_UNKNOWN_COATING = 72
 const SCORE_MAX = 99
 
+/** v2.3.5: escalator_3 (degraded coating) removed — not reachable in active scoring. */
 const ESCALATORS = [
   { id: 'escalator_4', multiplier: 1.5, field: 'escalator_4_triggers' },
   { id: 'escalator_2', multiplier: 1.4, field: 'escalator_2_triggers' },
-  { id: 'escalator_3', multiplier: 1.3, field: 'escalator_3_triggers' },
   { id: 'escalator_1', multiplier: 1.25, field: 'escalator_1_triggers' },
 ]
 
@@ -80,11 +81,19 @@ function computeBaseNpr(component, severity, duration, contactIntimacy) {
   return hazard * migration * ci * severity * duration * NPR_SCALE
 }
 
-function pickEscalator(component) {
+function pickEscalator(component, inputs, evidence, options = {}) {
+  if (options.lockedInputMode) {
+    const mult = num(component.locked_escalator_multiplier, 1)
+    if (mult <= 1) return null
+    const match = ESCALATORS.find((e) => Math.abs(e.multiplier - mult) < 0.001)
+    return match ?? { id: 'locked_escalator', multiplier: mult, field: 'locked_escalator_multiplier' }
+  }
   for (const esc of ESCALATORS) {
-    if (component[esc.field]) {
-      return esc
+    if (!component[esc.field]) continue
+    if (esc.id === 'escalator_1' && !escalator1Eligible(component, inputs, evidence)) {
+      continue
     }
+    return esc
   }
   return null
 }
@@ -181,7 +190,8 @@ function computeIngredientTransparencyScore(inputs) {
  * @param {object} inputs
  * @param {Record<string, number>} [hazardOverrides] — component_name → material_hazard
  */
-export function scorePacCore(inputs, hazardOverrides = null) {
+export function scorePacCore(inputs, hazardOverrides = null, options = {}) {
+  const evidence = options.evidence ?? null
   const components = inputs.components ?? []
   const isFormulation = Boolean(inputs.is_formulation_product)
   const layer4a = inputs.layer_4a ?? {}
@@ -219,7 +229,7 @@ export function scorePacCore(inputs, hazardOverrides = null) {
     duration = afterCategory.duration
     contactIntimacy = afterCategory.contactIntimacy
 
-    const escalator = pickEscalator(effectiveComponent)
+    const escalator = pickEscalator(effectiveComponent, inputs, evidence, options)
     let finalNpr = npr
     if (escalator) {
       finalNpr *= escalator.multiplier
@@ -283,7 +293,7 @@ export function scorePacCore(inputs, hazardOverrides = null) {
  */
 export function scoreNormalization(inputs, options = {}) {
   const steps = []
-  const core = scorePacCore(inputs)
+  const core = scorePacCore(inputs, null, options)
   const pacSafetyScore = core.pac_safety_score
   const tier = core.tier
   const componentResults = core.component_results

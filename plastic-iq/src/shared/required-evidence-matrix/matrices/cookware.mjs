@@ -137,5 +137,12 @@ export const COOKWARE_MATRIX = {
       pattern_trigger: 'proprietary_coating',
       score_driving: true,
     },
+    {
+      id: 'external.coated_product_lab_results',
+      label: 'Coated product lab / third-party PFAS·PTFE testing retrieved when claimed',
+      category: 'external_check',
+      pattern_trigger: 'coated_nonstick_lab_results',
+      score_driving: false,
+    },
   ],
 }

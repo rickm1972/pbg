@@ -4,6 +4,7 @@ import { Agent2ReviewDashboard } from '../components/admin/Agent2ReviewDashboard
 import { Agent3ReviewDashboard } from '../components/admin/Agent3ReviewDashboard'
 import { Agent4ReviewDashboard } from '../components/admin/Agent4ReviewDashboard'
 import { BatchPublishDashboard } from '../components/admin/BatchPublishDashboard'
+import { LockedSnapshotDraftDashboard } from '../components/admin/LockedSnapshotDraftDashboard'
 import { consumePipelineFocus } from '../lib/adminPipelineNav'
 import { QuizAdminDashboard } from '../components/admin/QuizAdminDashboard'
 import { ChannelDashboard } from '../components/admin/ChannelDashboard'
@@ -14,6 +15,7 @@ import {
   formatAdminReadOnlyFieldValue,
 } from '../lib/adminProductEditor'
 import { saveAdminProduct } from '../lib/adminProductSave'
+import { SIMPLE_PRODUCT_INTAKE_FIELDS } from '../lib/simpleProductIntake'
 import { formatSupabaseUnknownError, supabase } from '../lib/supabaseClient'
 import {
   normalizeProductRow,
@@ -86,6 +88,7 @@ export function AdminPage() {
     const { data, error } = await supabase
       .from('products')
       .select(PRODUCT_SELECT_WITH_SCORE)
+      .or('is_archived.is.null,is_archived.eq.false')
       .order('date_added', { ascending: false })
       .limit(500)
     if (error) throw error
@@ -429,7 +432,14 @@ export function AdminPage() {
       ) : null}
 
       {tab === 'publish' ? (
-        <BatchPublishDashboard onNotice={setMessage} onError={setError} />
+        <>
+          <BatchPublishDashboard onNotice={setMessage} onError={setError} />
+          <LockedSnapshotDraftDashboard
+            authUserEmail={authUserEmail}
+            onNotice={setMessage}
+            onError={setError}
+          />
+        </>
       ) : null}
 
       {tab === 'agent4' ? (
@@ -494,6 +504,7 @@ export function AdminPage() {
                     walmart_url: null,
                     other_retailer_label: null,
                     other_retailer_url: null,
+                    manufacturer_product_url: null,
                     image_url: null,
                     date_added: new Date().toISOString(),
                     date_last_updated: new Date().toISOString(),
@@ -558,7 +569,7 @@ export function AdminPage() {
                     let msg = formatSupabaseUnknownError(e, 'Save failed')
                     if (/schema cache/i.test(msg) && /products/i.test(msg)) {
                       msg +=
-                        ' If this persists, run npm run db:repair (needs SUPABASE_DB_PASSWORD in .env) or apply supabase/migrations/0006_ensure_product_retailer_columns.sql.'
+                        ' If this persists, run npm run db:repair (needs SUPABASE_DB_PASSWORD in .env) or apply supabase/migrations/0040_product_source_intake.sql.'
                     }
                     setError(msg)
                   } finally {
@@ -599,13 +610,32 @@ function ProductEditor({
         onSave(product).catch(() => {})
       }}
     >
-      <Field label="Product name" required>
-        <input
-          value={product.product_name}
-          onChange={(e) => set('product_name', e.target.value)}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-        />
-      </Field>
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-900">
+            Product intake (before Agent 1)
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-indigo-950">
+            Enter the product title and two URLs Agent 1 cannot reliably discover on its own. Save
+            before running Agent 1 on the Agent 1 tab.
+          </p>
+        </div>
+        {SIMPLE_PRODUCT_INTAKE_FIELDS.map((field) => (
+          <Field key={field.key} label={field.label} required={field.key === 'product_name'}>
+            <input
+              value={(product[field.key] as string | null) ?? ''}
+              onChange={(e) =>
+                set(field.key, (e.target.value || null) as Product[typeof field.key])
+              }
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+            {field.helper ? (
+              <p className="mt-1 text-xs leading-relaxed text-indigo-900">{field.helper}</p>
+            ) : null}
+          </Field>
+        ))}
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Brand">
           <input
@@ -684,13 +714,11 @@ function ProductEditor({
         </Field>
       </div>
 
-      <Field label="Amazon product URL">
-        <input
-          value={product.amazon_url ?? ''}
-          onChange={(e) => set('amazon_url', e.target.value || null)}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-        />
-      </Field>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Commerce / buy links</p>
+      <p className="text-xs leading-relaxed text-slate-600">
+        Affiliate and secondary retailer links for public buy buttons. The Amazon or primary retailer URL
+        above is used by Agent 1 for evidence — affiliate links are commerce-only.
+      </p>
       <Field label="Amazon affiliate URL (optional)">
         <input
           value={product.affiliate_link ?? ''}

@@ -94,11 +94,13 @@ export async function runPublishedDisplayDiffGate(
 
     const durableOverride = loadLatestApprovedSnapshotDurable(snapshot.product_id)
     const baseline = loadPublishedBaselineSnapshotImmutable(snapshot.product_id)
-    const isDurableOverrideVersion =
-      durableOverride != null && durableOverride.snapshot_id !== baseline?.snapshot_id
+    const isDescriptionOverrideVersion =
+      durableOverride != null &&
+      baseline != null &&
+      durableOverride.snapshot_id !== baseline.snapshot_id
 
     if (
-      isDurableOverrideVersion &&
+      isDescriptionOverrideVersion &&
       snapshot.score.pac_safety_score < NEGATIVE_SCORE_PUBLICATION_GATE.threshold
     ) {
       const stored = loadLatestApprovedSnapshotStored(snapshot.product_id)

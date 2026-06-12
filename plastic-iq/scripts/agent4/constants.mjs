@@ -1,5 +1,5 @@
 export const AGENT_VERSION = '4.0.0'
-export const ALGORITHM_VERSION = '2.3.4'
+export const ALGORITHM_VERSION = '2.3.5'
 
 export const LAYER_4A_NEGATIVE_LOOKUP = [
   {
@@ -11,6 +11,11 @@ export const LAYER_4A_NEGATIVE_LOOKUP = [
     reason: 'Unknown proprietary food-contact coating',
     value: -3,
     pattern: /unknown proprietary food-contact coating/i,
+  },
+  {
+    reason: 'Proprietary food-contact coating chemistry undisclosed',
+    value: -3,
+    pattern: /proprietary food-contact coating chemistry undisclosed/i,
   },
   {
     reason: 'Marketing language only, no verifiable claims',

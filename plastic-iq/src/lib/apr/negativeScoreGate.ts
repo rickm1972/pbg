@@ -9,6 +9,7 @@ import type {
   LowScorePublicationReview,
 } from '../../types/apr'
 import { walkDisplayStrings } from './rendererTextContract'
+import { resolvePublicMethodologyDisclaimer } from './publicReviewStamp'
 
 export const LOW_SCORE_GATE_VERSION = '4.5.0'
 
@@ -432,7 +433,8 @@ function scanMethodologyFields(display: AprDisplayPayload): NegativeScoreGateFai
   const failures: NegativeScoreGateFailure[] = []
   const warnings: NegativeScoreGateFailure[] = []
 
-  if (!display.methodology_disclaimer?.trim()) {
+  const effectiveDisclaimer = resolvePublicMethodologyDisclaimer(display)
+  if (!effectiveDisclaimer.trim()) {
     failures.push({
       check_id: 'negative_score.methodology_disclaimer_missing',
       rule: 'methodology_disclaimer_required',

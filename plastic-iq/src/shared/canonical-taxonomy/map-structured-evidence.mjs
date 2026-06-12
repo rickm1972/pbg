@@ -37,6 +37,21 @@ import {
   stripInferredPfasFreeMarketingClaim,
 } from './inert-cookware-structural.mjs'
 import {
+  detectHybridCookwareEvidenceSignals,
+  getCoatingInertContradictionBlockers,
+  hasFoodContactCoatingModifier,
+  inertMetalProtectionBlocked,
+  isHybridFoodContactPrimary,
+} from './hybrid-cookware-structural.mjs'
+import {
+  findTaxonomyEntryById,
+  HYBRID_FOOD_CONTACT_PRIMARY_ENTRY,
+  isHybridPrimaryContactRaw,
+  PROPRIETARY_NONSTICK_COATING_MODIFIER_ENTRY,
+  STAINLESS_STEEL_BODY_SUBSTRATE_ENTRY,
+} from './canonical-taxonomy-fallbacks.mjs'
+import { scoreDrivingBlobExcludesOutdatedThirdPartyPtfe } from '../agent1/gate1-source-validation.mjs'
+import {
   resolveStainlessPrimaryFromNormalizedRaw,
   resolveStainlessSubstrateFromNormalizedRaw,
 } from './stainless-normalized-ids.mjs'
@@ -73,6 +88,13 @@ export function resolvePrimaryContactEntry(raw, entries = PRIMARY_CONTACT_MATERI
   if (!blob) return null
   const ceramic = resolveCeramicNonstickPrimaryFromRaw(blob, entries)
   if (ceramic) return ceramic
+  if (isHybridPrimaryContactRaw(blob)) {
+    return findTaxonomyEntryById(
+      entries,
+      'hybrid_stainless_nonstick_food_contact',
+      HYBRID_FOOD_CONTACT_PRIMARY_ENTRY,
+    )
+  }
   const normalized = blob.toLowerCase().replace(/\s+/g, '_')
   const exact = entries.find((e) => e.canonical_id === normalized || e.canonical_id === blob)
   if (exact) return exact
@@ -280,6 +302,231 @@ function applyCompoundCookwareMappings(out, primaryRaw, pcm, compound, structure
 }
 
 /**
+ * Ceramic / Thermolon nonstick coating over hard-anodized or aluminum body — not HexClad hybrid lattice.
+ * @param {object} structured
+ * @param {object[]} sources
+ * @param {object} pcm
+ * @param {string} primaryRaw
+ * @param {object | null} interiorCoat
+ * @param {string} blob
+ * @returns {import('./types.mjs').CanonicalMappingsPayload | null}
+ */
+function tryMapCeramicNonstickOverSubstrate(structured, sources, pcm, primaryRaw, interiorCoat, blob) {
+  const coatText = `${interiorCoat?.coating_name ?? ''} ${interiorCoat?.coating_type ?? ''}`.trim()
+  const disclosedProductBlob = `${primaryRaw} ${coatText}`.replace(/_/g, ' ')
+  if (/terrabond|terra\s*bond/i.test(disclosedProductBlob)) return null
+  if (isHybridPrimaryContactRaw(primaryRaw)) return null
+  const ceramicFromCoating = isCeramicNonstickMaterialText(coatText)
+  const ceramicFromPrimary = isCeramicNonstickMaterialText(primaryRaw)
+  const substrateBody =
+    /hard[_\s-]*anodized|hard[_\s-]*anodised/i.test(primaryRaw.replace(/_/g, ' ')) ||
+    parseCeramicCoatingSubstrateHint(primaryRaw) != null ||
+    /hard[_\s-]*anodized|hard[_\s-]*anodised/i.test(blob) ||
+    textDisclosesAluminumSubstrate(primaryRaw) ||
+    textDisclosesAluminumSubstrate(blob)
+
+  if (!ceramicFromCoating && !(ceramicFromPrimary && substrateBody)) return null
+  if (/\bptfe\b/i.test(`${coatText} ${primaryRaw}`) && !ceramicFromCoating) return null
+
+  const ceramicRaw =
+    interiorCoat?.coating_name ??
+    (ceramicFromPrimary ? primaryRaw : coatText || 'ceramic nonstick coating')
+  const ceramicEntry =
+    resolveCeramicNonstickPrimaryFromRaw(ceramicRaw) ??
+    resolveCeramicNonstickPrimaryFromRaw(coatText) ??
+    PRIMARY_CONTACT_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'ceramic_nonstick_sol_gel_coating')
+
+  /** @type {import('./types.mjs').CanonicalMappingsPayload} */
+  const out = {
+    schema_version: SCHEMA_VERSION,
+    safety_claim_ids: {},
+    regulatory_flag_ids: [],
+    blockers: [],
+  }
+
+  out.primary_contact_material_id = mappingRow({
+    field_key: 'primary_contact_material_id',
+    raw_value: ceramicRaw,
+    entry: ceramicEntry,
+    forceExpansion: !ceramicEntry,
+    mapping_rule_id: 'cookware_ceramic_nonstick_over_substrate_v1',
+    taxonomy_file: 'primary-contact-material-taxonomy.mjs',
+    source_url: interiorCoat?.source_url ?? pcm.source_url,
+    source_quote: interiorCoat?.coating_name ?? ceramicRaw,
+    confidence_label: pcm.confidence_label ?? interiorCoat?.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  const substrateTexts = [
+    primaryRaw,
+    pcm?.material_identity ?? '',
+    blob,
+    ...(structured?.coatings_and_finishes ?? []).flatMap((c) => [c.coating_name ?? '', c.coating_type ?? '']),
+    ...(structured?.secondary_components ?? []).flatMap((c) => [
+      c.material_identity ?? '',
+      c.component_role ?? '',
+    ]),
+  ]
+  let substrateEntry = null
+  let substrateRaw = 'hard anodized aluminum body'
+  let substrateRule = 'cookware_ceramic_hard_anodized_substrate_v1'
+
+  for (const text of substrateTexts) {
+    const hint = parseCeramicCoatingSubstrateHint(text)
+    if (hint === 'hard_anodized_aluminum') {
+      substrateEntry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'hard_anodized_aluminum')
+      substrateRaw = 'hard anodized aluminum body'
+      substrateRule = 'cookware_ceramic_hard_anodized_substrate_v1'
+      break
+    }
+    if (hint === 'aluminum_core') {
+      substrateEntry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'aluminum_core')
+      substrateRaw = 'aluminum core / body'
+      substrateRule = 'cookware_ceramic_aluminum_substrate_v1'
+      break
+    }
+  }
+  if (!substrateEntry && /hard[_\s-]*anodized|hard[_\s-]*anodised/i.test(primaryRaw.replace(/_/g, ' '))) {
+    substrateEntry = SUBSTRATE_MATERIAL_TAXONOMY.find((e) => e.canonical_id === 'hard_anodized_aluminum')
+  }
+
+  out.substrate_material_id = mappingRow({
+    field_key: 'substrate_material_id',
+    raw_value: substrateRaw,
+    entry: substrateEntry,
+    forceExpansion: !substrateEntry,
+    mapping_rule_id: substrateRule,
+    taxonomy_file: 'substrate-material-taxonomy.mjs',
+    source_url: pcm.source_url,
+    source_quote: primaryRaw,
+    confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  const proprietaryCeramic =
+    /thermolon|proprietary|undisclosed|minerals\s*pro/i.test(`${coatText} ${ceramicRaw}`) ||
+    interiorCoat?.coating_type === 'ceramic_nonstick_unverified' ||
+    pcm?.undisclosed_code === 'PROPRIETARY_NAMED'
+  const modEntry = proprietaryCeramic
+    ? findTaxonomyEntryById(
+        COATING_MODIFIER_TAXONOMY,
+        'proprietary_nonstick_coating_undisclosed',
+        PROPRIETARY_NONSTICK_COATING_MODIFIER_ENTRY,
+      )
+    : COATING_MODIFIER_TAXONOMY.find((e) => e.canonical_id === 'ceramic_sol_gel_nonstick_coating')
+
+  out.coating_modifier_id = mappingRow({
+    field_key: 'coating_modifier_id',
+    raw_value: interiorCoat?.coating_name ?? interiorCoat?.coating_type ?? ceramicRaw,
+    entry: modEntry,
+    forceExpansion: !modEntry,
+    mapping_rule_id: proprietaryCeramic
+      ? 'cookware_proprietary_nonstick_undisclosed_v1'
+      : 'cookware_ceramic_sol_gel_modifier_v1',
+    taxonomy_file: 'coating-modifier-taxonomy.mjs',
+    source_url: interiorCoat?.source_url ?? pcm.source_url,
+    confidence_label: interiorCoat?.confidence_label ?? pcm.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  return out
+}
+
+/**
+ * Map hybrid stainless + nonstick food-contact when evidence signals are present.
+ * @param {object} structured
+ * @param {object[]} sources
+ * @param {object} pcm
+ * @param {string} primaryRaw
+ * @param {object | null} interiorCoat
+ * @param {string} blob
+ * @returns {import('./types.mjs').CanonicalMappingsPayload | null}
+ */
+function tryMapHybridCookware(structured, sources, pcm, primaryRaw, interiorCoat, blob) {
+  if (!detectHybridCookwareEvidenceSignals(structured, sources)) return null
+
+  const hybridEntry = findTaxonomyEntryById(
+    PRIMARY_CONTACT_MATERIAL_TAXONOMY,
+    'hybrid_stainless_nonstick_food_contact',
+    HYBRID_FOOD_CONTACT_PRIMARY_ENTRY,
+  )
+  const proprietaryCoat =
+    /terrabond|terra\s*bond|proprietary|undisclosed/i.test(
+      `${interiorCoat?.coating_name ?? ''} ${interiorCoat?.coating_type ?? ''} ${primaryRaw} ${blob}`,
+    ) || pcm?.undisclosed_code === 'PROPRIETARY_NAMED'
+  const ceramicDisclosed =
+    !proprietaryCoat &&
+    (isCeramicNonstickMaterialText(`${interiorCoat?.coating_name ?? ''} ${interiorCoat?.coating_type ?? ''}`) ||
+      isCeramicNonstickMaterialText(blob))
+
+  /** @type {import('./types.mjs').CanonicalMappingsPayload} */
+  const out = {
+    schema_version: SCHEMA_VERSION,
+    safety_claim_ids: {},
+    regulatory_flag_ids: [],
+    blockers: [],
+  }
+
+  out.primary_contact_material_id = mappingRow({
+    field_key: 'primary_contact_material_id',
+    raw_value:
+      interiorCoat?.coating_name ??
+      (proprietaryCoat ? 'hybrid stainless + proprietary nonstick coating' : primaryRaw) ??
+      'hybrid stainless nonstick food-contact surface',
+    entry: hybridEntry,
+    forceExpansion: !hybridEntry,
+    mapping_rule_id: 'cookware_hybrid_stainless_nonstick_v1',
+    taxonomy_file: 'primary-contact-material-taxonomy.mjs',
+    source_url: interiorCoat?.source_url ?? pcm.source_url,
+    source_quote: interiorCoat?.coating_name ?? primaryRaw,
+    confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  const substrateEntry = findTaxonomyEntryById(
+    SUBSTRATE_MATERIAL_TAXONOMY,
+    'stainless_steel_body',
+    STAINLESS_STEEL_BODY_SUBSTRATE_ENTRY,
+  )
+  out.substrate_material_id = mappingRow({
+    field_key: 'substrate_material_id',
+    raw_value: 'Stainless steel bonded body / hybrid construction',
+    entry: substrateEntry,
+    mapping_rule_id: 'cookware_stainless_body_v1',
+    source_url: pcm.source_url,
+    confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  const modEntry = proprietaryCoat
+    ? findTaxonomyEntryById(
+        COATING_MODIFIER_TAXONOMY,
+        'proprietary_nonstick_coating_undisclosed',
+        PROPRIETARY_NONSTICK_COATING_MODIFIER_ENTRY,
+      )
+    : ceramicDisclosed
+      ? COATING_MODIFIER_TAXONOMY.find((e) => e.canonical_id === 'ceramic_sol_gel_nonstick_coating')
+      : findTaxonomyEntryById(
+          COATING_MODIFIER_TAXONOMY,
+          'proprietary_nonstick_coating_undisclosed',
+          PROPRIETARY_NONSTICK_COATING_MODIFIER_ENTRY,
+        )
+
+  out.coating_modifier_id = mappingRow({
+    field_key: 'coating_modifier_id',
+    raw_value:
+      interiorCoat?.coating_name ??
+      interiorCoat?.coating_type ??
+      (proprietaryCoat ? 'proprietary nonstick coating (undisclosed)' : 'ceramic nonstick coating'),
+    entry: modEntry,
+    forceExpansion: !modEntry,
+    mapping_rule_id: proprietaryCoat
+      ? 'cookware_proprietary_nonstick_undisclosed_v1'
+      : 'cookware_ceramic_sol_gel_modifier_v1',
+    taxonomy_file: 'coating-modifier-taxonomy.mjs',
+    source_url: interiorCoat?.source_url ?? pcm.source_url,
+    confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+  })
+
+  return out
+}
+
+/**
  * @param {object} structured
  * @param {object[]} sources
  */
@@ -356,6 +603,19 @@ function mapCookwareTfalStyle(structured, sources) {
       })
     }
   } else {
+    const ceramicOut = tryMapCeramicNonstickOverSubstrate(
+      structured,
+      sources,
+      pcm,
+      primaryRaw,
+      interiorCoat,
+      blob,
+    )
+    if (ceramicOut) return ceramicOut
+
+    const hybridOut = tryMapHybridCookware(structured, sources, pcm, primaryRaw, interiorCoat, blob)
+    if (hybridOut) return hybridOut
+
     const compound = parseCompoundCookwareMaterial(primaryRaw)
     if (compound.isCompound && compound.primaryContactCanonicalId) {
       applyCompoundCookwareMappings(out, primaryRaw, pcm, compound, structured)
@@ -419,6 +679,38 @@ function mapCookwareTfalStyle(structured, sources) {
  */
 function mapCoatingModifierForPrimary(cookware, ctx) {
   const primaryId = cookware?.primary_contact_material_id?.canonical_id ?? ''
+
+  if (isHybridFoodContactPrimary(primaryId)) {
+    const proprietaryContext =
+      /terrabond|terra\s*bond|proprietary|undisclosed/i.test(
+        `${ctx.interiorCoat?.coating_name ?? ''} ${ctx.interiorCoat?.coating_type ?? ''} ${ctx.primaryRaw ?? ''}`,
+      ) ||
+      ctx.pcm?.undisclosed_code === 'PROPRIETARY_NAMED'
+    const modEntry = proprietaryContext
+      ? findTaxonomyEntryById(
+          COATING_MODIFIER_TAXONOMY,
+          'proprietary_nonstick_coating_undisclosed',
+          PROPRIETARY_NONSTICK_COATING_MODIFIER_ENTRY,
+        )
+      : COATING_MODIFIER_TAXONOMY.find((e) => e.canonical_id === 'ceramic_sol_gel_nonstick_coating')
+    return mappingRow({
+      field_key: 'coating_modifier_id',
+      raw_value:
+        ctx.interiorCoat?.coating_name ??
+        ctx.interiorCoat?.coating_type ??
+        ctx.primaryRaw ??
+        'hybrid nonstick food-contact coating',
+      entry: modEntry,
+      forceExpansion: !modEntry,
+      mapping_rule_id: proprietaryContext
+        ? 'cookware_proprietary_nonstick_undisclosed_v1'
+        : 'cookware_ceramic_sol_gel_modifier_v1',
+      taxonomy_file: 'coating-modifier-taxonomy.mjs',
+      source_url: ctx.interiorCoat?.source_url ?? ctx.pcm?.source_url,
+      confidence_label: ctx.pcm?.confidence_label ?? 'manufacturer_confirmed',
+    })
+  }
+
   const ceramicCoatingContext =
     isCeramicNonstickPrimary(primaryId) ||
     isCeramicNonstickMaterialText(ctx.primaryRaw) ||
@@ -493,6 +785,22 @@ function mapSubstrateForPrimary(cookware, primaryRaw, pcm, structured, sources) 
   const primaryId =
     resolvedPrimaryId ??
     (mappedPrimaryId && mappedPrimaryId !== TAXONOMY_EXPANSION_REQUIRED ? mappedPrimaryId : '')
+  if (isHybridFoodContactPrimary(primaryId)) {
+    const entry = findTaxonomyEntryById(
+      SUBSTRATE_MATERIAL_TAXONOMY,
+      'stainless_steel_body',
+      STAINLESS_STEEL_BODY_SUBSTRATE_ENTRY,
+    )
+    return mappingRow({
+      field_key: 'substrate_material_id',
+      raw_value: 'Stainless steel bonded body / hybrid construction',
+      entry,
+      mapping_rule_id: 'cookware_stainless_body_v1',
+      source_url: pcm.source_url,
+      confidence_label: pcm.confidence_label ?? 'manufacturer_confirmed',
+    })
+  }
+
   const ceramicProduct =
     isCeramicNonstickPrimary(primaryId) || isCeramicNonstickMaterialText(primaryRaw)
   if (ceramicProduct) {
@@ -707,6 +1015,35 @@ function mapPfasStatus(structured, sources, cookware) {
     })
   }
 
+  if (
+    isHybridFoodContactPrimary(primaryId) ||
+    hasFoodContactCoatingModifier(cookware?.coating_modifier_id?.canonical_id ?? '') ||
+    inertMetalProtectionBlocked(cookware)
+  ) {
+    if (sc.pfas_free_claim?.claimed && /\bpfas[-\s]?free\b/i.test(`${sc.pfas_free_claim.source_quote ?? ''} ${blob}`)) {
+      const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_free_claimed')
+      return mappingRow({
+        field_key: 'pfas_status_id',
+        raw_value: sc.pfas_free_claim.source_quote ?? 'pfas_free_claim',
+        entry,
+        mapping_rule_id: 'pfas_free_claimed_v1',
+        source_url: sc.pfas_free_claim.source_url,
+        source_quote: sc.pfas_free_claim.source_quote ?? null,
+        confidence_label: 'manufacturer_confirmed',
+      })
+    }
+    const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_not_disclosed')
+    return mappingRow({
+      field_key: 'pfas_status_id',
+      raw_value: 'Hybrid/coated food-contact surface — PFAS chemistry not fully disclosed',
+      entry,
+      mapping_rule_id: 'pfas_not_disclosed_v1',
+      source_url: cookware?.primary_contact_material_id?.source_url ?? pcmSource(structured),
+      source_quote: cookware?.primary_contact_material_id?.raw_value ?? primaryId,
+      confidence_label: 'unknown',
+    })
+  }
+
   if (isStructurallyPfasFreePrimary(primaryId)) {
     const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_not_present_inert_material')
     return mappingRow({
@@ -757,7 +1094,8 @@ function mapPfasStatus(structured, sources, cookware) {
     })
   }
 
-  if (blobDisclosesPfasFamilyPresent(blob)) {
+  const blobForPfasPresence = scoreDrivingBlobExcludesOutdatedThirdPartyPtfe(blob, sources)
+  if (blobDisclosesPfasFamilyPresent(blobForPfasPresence)) {
     const entry = PFAS_STATUS_TAXONOMY.find((e) => e.canonical_id === 'pfas_present_disclosed')
     return mappingRow({
       field_key: 'pfas_status_id',
@@ -1040,7 +1378,12 @@ export function applyCanonicalMappings(structured, sources = [], options = {}) {
 
   reconcileCanonicalMappingsConfidence(cookware, sources, structured)
   syncStructuredConfidenceFromMappings(structured, cookware)
-  cookware.blockers = getCanonicalApprovalBlockers(cookware, { subcategory: sub })
+  const baseBlockers = getCanonicalApprovalBlockers(cookware, { subcategory: sub })
+  const contradictionBlockers = getCoatingInertContradictionBlockers(cookware, structured)
+  cookware.blockers = [
+    ...baseBlockers,
+    ...contradictionBlockers.filter((b) => !baseBlockers.includes(b)),
+  ]
   structured.canonical_mappings = cookware
   structured.transparency_assessment = assessTransparency(structured, cookware, sources)
   applyRequiredEvidenceValidation(structured, sources, options)

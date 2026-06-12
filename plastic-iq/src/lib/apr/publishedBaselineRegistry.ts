@@ -13,6 +13,7 @@
 import type { PublishedDisplaySnapshotRecord } from './publishedDisplaySnapshot'
 import { assertPublishedSnapshotIntegrity } from './publishedDisplaySnapshot'
 import { PUBLISHED_BASELINE_PRODUCT_IDS } from './publishedBaselineIds'
+import { listAllFrozenPublishedProductIds } from './publishedFrozenProductRegistry'
 import {
   listApprovedSnapshotVersionsDurable,
   loadLatestApprovedSnapshotDurable,
@@ -76,17 +77,17 @@ export function listPublishedBaselineSnapshots(): PublishedDisplaySnapshotRecord
 
 /** Latest-approved snapshots for diff gate — same resolution path as public render. */
 export function listLatestApprovedSnapshotsForDiffGate(): PublishedDisplaySnapshotRecord[] {
-  return listPublishedBaselineSnapshots().map((baseline) => {
-    return loadPublishedDisplaySnapshot(baseline.product_id) ?? baseline
+  return listAllFrozenPublishedProductIds().map((productId) => {
+    const snap = loadPublishedDisplaySnapshot(productId)
+    if (!snap) {
+      throw new Error(`Diff gate: missing frozen snapshot for product ${productId}`)
+    }
+    return snap
   })
 }
 
 export function hasPublishedDisplaySnapshot(productId: string): boolean {
-  return (
-    productId in REGISTRY ||
-    productId in TEST_SNAPSHOT_REGISTRY ||
-    loadLatestApprovedSnapshotDurable(productId) != null
-  )
+  return loadPublishedDisplaySnapshot(productId) != null
 }
 
 export function listApprovedSnapshotVersions(productId: string): PublishedDisplaySnapshotRecord[] {

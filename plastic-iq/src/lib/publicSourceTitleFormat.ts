@@ -23,6 +23,15 @@ export function isFilenameLikeSourceTitle(title: string): boolean {
   return false
 }
 
+const GENERIC_MANUFACTURER_TITLE_RE =
+  /^(?:hybrid|home|shop|product|products|collections|collection|learn\s*more)$/i
+
+export function isGenericManufacturerSourceTitle(title: string): boolean {
+  const t = stripPublicSourceRolePrefix(title).trim()
+  if (!t || t.length < 3) return true
+  return GENERIC_MANUFACTURER_TITLE_RE.test(t)
+}
+
 /** Detect scrape/size artifacts like "12 5 Inch page" in public labels. */
 export function containsPublicSizeArtifact(title: string): boolean {
   const t = String(title ?? '').trim()

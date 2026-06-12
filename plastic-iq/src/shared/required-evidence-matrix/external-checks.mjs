@@ -145,9 +145,34 @@ export function evaluateExternalCheck(structured, sources, mappings, triggers, c
       if (!triggers.has('proprietary_coating')) return notApplicable()
       const pcm = structured?.primary_contact_material
       if (pcm?.undisclosed_code === 'PROPRIETARY_NAMED' || pcm?.undisclosed_code === 'UNKNOWN') {
-        return review('Proprietary / undisclosed primary contact — human review required', pcm.source_url)
+        return review(
+          'Proprietary / undisclosed coating — Documentation Incomplete / Material Uncertain until composition or lab testing supports stronger status. Human acknowledgment required.',
+          pcm.source_url,
+        )
       }
       return pass('Proprietary coating pattern flagged for review', pcm?.source_url)
+    }
+
+    case 'external.coated_product_lab_results': {
+      if (!triggers.has('coated_nonstick_lab_results')) return notApplicable()
+      const rc = (structured?.required_check_results ?? []).find(
+        (r) => r.check_id === 'external.coated_product_lab_results',
+      )
+      if (rc?.status === 'passed') {
+        return pass(rc.detail ?? 'Lab/testing evidence retrieved for coated product claims', rc.source_url)
+      }
+      if (rc?.status === 'failed' && /LAB_RESULTS_LINK_NOT_RETRIEVED/i.test(rc.detail ?? '')) {
+        return review(
+          rc.detail ?? 'LAB_RESULTS_LINK_NOT_RETRIEVED — lab-result link cited but report not retrieved',
+          rc.source_url,
+        )
+      }
+      if (rc?.status === 'failed') {
+        return warning(
+          rc.detail ?? 'NO_THIRD_PARTY_TESTING_FOUND — targeted lab-result search did not retrieve testing evidence',
+        )
+      }
+      return warning('Coated product lab-result retrieval not yet evaluated')
     }
 
     case 'external.plastic_food_contact_disclosure': {

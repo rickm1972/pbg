@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": [
+    "src/types/lockedInput.ts",
+    "src/lib/lockedInput/**/*.ts",
+    "src/components/admin/Gate1SystemValidationPanel.tsx",
+    "src/components/admin/Gate1HumanReviewGatePanel.tsx",
+    "src/components/admin/Gate1LockedInputPackagePanel.tsx"
+  ]
+}

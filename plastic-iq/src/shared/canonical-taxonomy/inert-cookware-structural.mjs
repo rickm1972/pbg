@@ -2,6 +2,16 @@
  * Structural rules for uncoated / inert cookware food-contact surfaces (global, not product-specific).
  */
 
+import {
+  HYBRID_FOOD_CONTACT_PRIMARY_IDS,
+  inertMetalProtectionBlocked as hybridInertMetalProtectionBlocked,
+} from './hybrid-cookware-structural.mjs'
+
+/** Re-export via wrapper — Vite dev `export { … } from` re-exports fail on Agent 1 /run. */
+export function inertMetalProtectionBlocked(mappings) {
+  return hybridInertMetalProtectionBlocked(mappings)
+}
+
 export const PTFE_FAMILY_PRIMARY_IDS = new Set([
   'ptfe_nonstick_coating',
   'ptfe_nonstick_titanium_reinforced',
@@ -36,6 +46,7 @@ export const STRUCTURALLY_PFAS_FREE_PRIMARY_IDS = new Set([
 /** Coated patterns where a coating modifier can change risk profile. */
 export const COATED_RISK_PRIMARY_IDS = new Set([
   ...PTFE_FAMILY_PRIMARY_IDS,
+  ...HYBRID_FOOD_CONTACT_PRIMARY_IDS,
   'ceramic_nonstick_sol_gel_coating',
   'ceramic_nonstick_verified',
 ])
@@ -97,6 +108,8 @@ export function shouldApplyMinnesotaPfasRegulatoryFlag(mappings, structured = {}
   ) {
     return true
   }
+
+  if (inertMetalProtectionBlocked(mappings)) return false
 
   if (isInertFoodContactPrimary(primaryId) && pfasId === 'pfas_not_present_inert_material') {
     return false

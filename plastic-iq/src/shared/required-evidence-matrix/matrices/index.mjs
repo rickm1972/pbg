@@ -8,9 +8,23 @@ import { INFANT_ORAL_MATRIX } from './infant-oral.mjs'
 import { RINSE_OFF_MATRIX } from './rinse-off.mjs'
 
 /** @type {Record<string, import('../types.mjs').SubcategoryMatrix>} */
+const WATER_BOTTLES_MATRIX = {
+  ...WATER_BOTTLES_DRINKWARE_MATRIX,
+  subcategory_key: 'water_bottles',
+  display_label: 'Water bottles',
+}
+
+const DRINKWARE_MATRIX = {
+  ...WATER_BOTTLES_DRINKWARE_MATRIX,
+  subcategory_key: 'drinkware',
+  display_label: 'Drinkware',
+}
+
 export const SUBCATEGORY_MATRICES = {
   cookware: COOKWARE_MATRIX,
   food_storage: FOOD_STORAGE_MATRIX,
+  water_bottles: WATER_BOTTLES_MATRIX,
+  drinkware: DRINKWARE_MATRIX,
   water_bottles_drinkware: WATER_BOTTLES_DRINKWARE_MATRIX,
   cooking_utensils: COOKING_UTENSILS_MATRIX,
   cutting_boards: CUTTING_BOARDS_MATRIX,

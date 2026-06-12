@@ -5,6 +5,7 @@
 
 import { enforceLayer4a } from '../layer4a-enforce.mjs'
 import { stripMarketingLanguageNegative } from '../layer4b-enforce.mjs'
+import { marketingLanguageStripNormalizationNote } from '../../../src/shared/agent2/manufacturer-lab-testing-evidence.mjs'
 import { buildLayer4a, requiresHumanReview } from './layer4a-applicability.mjs'
 
 /**
@@ -53,7 +54,7 @@ export function runLayer4aStep(evidence, inferredComponents, category) {
   if (didStrip) {
     layer4aPacket.layer4a_notes = [
       layer4aPacket.layer4a_notes,
-      'Server stripped Marketing language only Layer 4A — not applicable when manufacturer fully discloses materials.',
+      marketingLanguageStripNormalizationNote(evidence),
     ]
       .filter(Boolean)
       .join(' ')

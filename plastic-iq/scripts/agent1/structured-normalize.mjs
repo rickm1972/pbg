@@ -231,10 +231,12 @@ function normalizeConflicts(car) {
   return out
 }
 
-function enrichRetailerLinks(links, product) {
+export function enrichRetailerLinks(links, product) {
   const l = links && typeof links === 'object' ? { ...links } : {}
   const amazon = coerceUrlOrNull(l.amazon_url) ?? coerceUrlOrNull(product.amazon_url)
+  const providedMfr = coerceUrlOrNull(product.manufacturer_product_url)
   const mfr =
+    providedMfr ??
     coerceUrlOrNull(l.manufacturer_direct_url) ??
     coerceUrlOrNull(product.manufacturer_url) ??
     coerceUrlOrNull(product.other_retailer_url) ??

@@ -10,13 +10,21 @@ export function listDescriptionOverrides(productId: string): DescriptionOverride
   return durableWriter.listDescriptionOverridesDurable(productId)
 }
 
+function sortOverridesNewestFirst(
+  rows: DescriptionOverrideRecord[],
+): DescriptionOverrideRecord[] {
+  return [...rows].sort((a, b) =>
+    (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at),
+  )
+}
+
 export function getActiveDescriptionOverride(productId: string): DescriptionOverrideRecord | null {
   const rows = listDescriptionOverrides(productId)
-  const draftish = rows.find((r) => r.status === 'draft' || r.status === 'pending_review')
+  const draftish = sortOverridesNewestFirst(
+    rows.filter((r) => r.status === 'draft' || r.status === 'pending_review'),
+  )[0]
   if (draftish) return draftish
-  const approved = rows
-    .filter((r) => r.status === 'approved')
-    .sort((a, b) => (b.reviewed_at ?? b.created_at).localeCompare(a.reviewed_at ?? a.created_at))[0]
+  const approved = sortOverridesNewestFirst(rows.filter((r) => r.status === 'approved'))[0]
   return approved ?? null
 }
 

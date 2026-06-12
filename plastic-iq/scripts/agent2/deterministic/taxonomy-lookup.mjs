@@ -6,6 +6,8 @@
 import { requireMaterial } from './material-taxonomy.mjs'
 import {
   getExposureDefaultsForScoringCategory,
+  resolveExposureDefaultsForRole,
+  resolveUtensilsPrimaryDefaults,
   UNIVERSAL_ROLE_DEFAULTS,
 } from '../../../src/shared/product-type-registry/scoring-assumptions.mjs'
 
@@ -16,16 +18,22 @@ function roleDefaults(role, category) {
   return UNIVERSAL_ROLE_DEFAULTS[role] ?? UNIVERSAL_ROLE_DEFAULTS.default
 }
 
-function contactIntimacyForRole(role, category) {
-  return roleDefaults(role, category).contact_intimacy
+function contactIntimacyForRole(role, category, materialId = null) {
+  return resolveExposureDefaultsForRole(role, category, materialId).contactIntimacy ?? 0.5
 }
 
-function severityForRole(role, category) {
+function severityForRole(role, category, materialId = null) {
+  const resolved = resolveExposureDefaultsForRole(role, category, materialId)
+  if (resolved.severity != null) return resolved.severity
   const spec = roleDefaults(role, category).severity
   return spec ?? 0.5
 }
 
-function durationForRole(role, category) {
+function durationForRole(role, category, materialId = null) {
+  const resolved = resolveExposureDefaultsForRole(role, category, materialId)
+  if (resolved.duration != null) {
+    return { duration: resolved.duration, modifier: 1 }
+  }
   const spec = roleDefaults(role, category).duration
   return spec ?? { duration: 0.3, modifier: 1 }
 }
@@ -112,8 +120,17 @@ export function enrichComponentsFromTaxonomy(extracted, ctx) {
   return extracted.map((draft) => {
     const tax = requireMaterial(draft.material_id)
     const role = draft.role
-    const ci = contactIntimacyForRole(role, category)
-    const sevSpec = severityForRole(role, category)
+    if (
+      category === 'utensils' &&
+      role === 'primary_food_contact' &&
+      !resolveUtensilsPrimaryDefaults(draft.material_id)
+    ) {
+      throw new Error(
+        `Utensils primary food-contact material "${draft.material_id}" does not match v2.3.5 plastic/nylon or stainless/wood role-split paths`,
+      )
+    }
+    const ci = contactIntimacyForRole(role, category, draft.material_id)
+    const sevSpec = severityForRole(role, category, draft.material_id)
     let severity_base
     let severity_additions = []
     let exposure_severity

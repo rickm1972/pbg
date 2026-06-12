@@ -35,6 +35,22 @@ export const COATING_MODIFIER_TAXONOMY = [
     taxonomy_file: 'coating-modifier-taxonomy.mjs',
   },
   {
+    canonical_id: 'proprietary_nonstick_coating_undisclosed',
+    display_label: 'Proprietary nonstick coating (composition undisclosed)',
+    description:
+      'Manufacturer-named proprietary ceramic/nonstick coating; PTFE-free or PFAS-free may be claimed but full chemistry is not publicly disclosed.',
+    aliases: [
+      /terrabond/i,
+      /terra\s*bond/i,
+      /proprietary.*nonstick/i,
+      /proprietary.*ceramic/i,
+      /undisclosed.*coating/i,
+      /proprietary_undisclosed/i,
+    ],
+    mapping_rule_id: 'cookware_proprietary_nonstick_undisclosed_v1',
+    taxonomy_file: 'coating-modifier-taxonomy.mjs',
+  },
+  {
     canonical_id: 'ceramic_sol_gel_nonstick_coating',
     display_label: 'Ceramic sol-gel nonstick coating (modifier)',
     description: 'Sol-gel / mineral ceramic nonstick food-contact coating chemistry.',

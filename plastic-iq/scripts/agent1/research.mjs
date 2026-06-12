@@ -30,6 +30,12 @@ import {
   MAX_PAGE_EXCERPT_CHARS,
 } from './confidence-enforce.mjs'
 import { reconcileAmazonRetrievalWarnings } from '../../src/shared/agent1/amazon-source-consistency.mjs'
+import {
+  applyProvidedSourceIntakePriority,
+  assembleProvidedSourceIntakeReport,
+  buildPrimaryRetailerIntakeEntry,
+  retrieveProvidedSourceIntake,
+} from '../../src/shared/agent1/provided-source-intake.mjs'
 
 const DEFAULT_MAX_WEB_SEARCH_USES = 12
 /** Cap synthesis generation — smaller JSON target (~3k output tokens). */
@@ -208,9 +214,16 @@ async function buildStructuredEvidencePacketFromRawText(
   const runTimestamp = new Date().toISOString()
 
   const normalized = await normalizeStructuredPacketLive(parsed, product)
-  const structured = normalized.structured_evidence
+  let structured = normalized.structured_evidence
 
   let sources = (normalized.sources ?? []).map((source) => ({ ...source }))
+  const intakeReport = amazonRetrieval?.provided_source_intake_report ?? null
+  if (intakeReport) {
+    const applied = applyProvidedSourceIntakePriority(structured, sources, product, intakeReport)
+    structured = applied.structured
+    sources = applied.sources
+    amazonRetrieval.provided_source_intake_report = applied.intakeReport
+  }
   let facts = bridgeLegacyFacts(structured, sources)
 
   const { facts: upgradedFacts, upgrades } = applyConfidenceUpgrades(sources, facts)
@@ -240,6 +253,7 @@ async function buildStructuredEvidencePacketFromRawText(
     confidence_upgrades: upgrades,
     api_usage: apiUsage,
     structured_evidence: structured,
+    provided_source_intake: intakeReport ?? undefined,
   }
 
   AgentMetadataSchema.parse(agent_metadata)
@@ -328,9 +342,16 @@ async function synthesizeWithClaude(product, retrieval, env, options = {}) {
 
 /** Default: Anthropic web_search (Amazon) + Perplexity Search + Claude synthesis. */
 async function researchWithPerplexitySearchAndClaude(product, env) {
+  const fetchedIntake = await retrieveProvidedSourceIntake(product)
   const amazonAnthropic = await retrieveAmazonViaAnthropicWebSearch(product, env)
+  const primaryEntry = buildPrimaryRetailerIntakeEntry(amazonAnthropic, product)
+  const intakeReport = assembleProvidedSourceIntakeReport(primaryEntry, fetchedIntake)
+  amazonAnthropic.provided_source_intake_report = intakeReport
+
   const retrieval = await runPerplexityRetrieval(product, env)
   retrieval.amazon_anthropic_web_search = amazonAnthropic
+  retrieval.provided_source_intake = intakeReport
+  retrieval.provided_source_intake_sources = fetchedIntake.sources ?? []
 
   const synthUsageRecords = []
   let lastErr

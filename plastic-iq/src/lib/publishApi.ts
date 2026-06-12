@@ -123,11 +123,32 @@ export async function checkPublishChain(productId: string): Promise<PublishChain
   return { canPublish: missing.length === 0, missingGates: missing }
 }
 
+function publishSnapshotApiBase(): string {
+  return import.meta.env.VITE_PUBLISH_SNAPSHOT_API_URL || '/api/publish-with-snapshot'
+}
+
+function publishSnapshotAdminSecret(): string {
+  const secret = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
+  if (!secret) {
+    throw new Error('VITE_ADMIN_PASSWORD is not set — restart npm run dev after updating .env')
+  }
+  return secret
+}
+
+/** Gate 4 publish — freezes display snapshot first; fails if snapshot creation fails. */
 export async function publishProduct(productId: string): Promise<void> {
-  const { error } = await supabase.rpc('set_product_published', {
-    p_product_id: productId,
+  const res = await fetch(publishSnapshotApiBase(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Agent-Secret': publishSnapshotAdminSecret(),
+    },
+    body: JSON.stringify({ product_id: productId }),
   })
-  if (error) throw error
+  const body = (await res.json().catch(() => ({}))) as { error?: string }
+  if (!res.ok) {
+    throw new Error(body.error ?? `Publish failed (${res.status})`)
+  }
 }
 
 export async function unpublishProduct(productId: string): Promise<void> {

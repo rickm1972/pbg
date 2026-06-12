@@ -1,10 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectRoot } from '../lib/env.mjs'
-import { enforceLayer4a } from '../agent2/layer4a-enforce.mjs'
-import { finalizeNormalization } from '../agent2/layer4b-enforce.mjs'
-import { enforceNormalizationDeterminism } from '../agent2/normalize-enforce.mjs'
 import { ALGORITHM_VERSION, formatCalculationTrace, scoreNormalization } from './algorithm.mjs'
+import { prepareAgent3ScoringInputs } from './prepare-scoring-inputs.mjs'
 import { fetchApprovedEvidence } from '../agent2/supabase.mjs'
 import { AGENT3_SEQUENTIAL_RUN_STATUSES } from '../lib/pipeline-catalog.mjs'
 import {
@@ -54,19 +52,18 @@ export async function runAgent3({ productId, productName, dryRun = false }) {
     ? structuredClone(scoringInput.inputs.layer_4b)
     : null
 
-  const inputs = finalizeNormalization(
-    enforceLayer4a(
-      enforceNormalizationDeterminism(structuredClone(scoringInput.inputs)),
-    ),
-  )
-  console.log(`Step 3–14: running V2.3.4 algorithm on ${inputs.components?.length ?? 0} components…`)
-
   let evidence = null
   try {
     evidence = await fetchApprovedEvidence(supabase, id)
   } catch {
     console.log('Step 2b: (no approved evidence bundle — pathway from normalization fields only)')
   }
+
+  const inputs = prepareAgent3ScoringInputs(scoringInput.inputs, evidence)
+  console.log(
+    `Step 3: using approved Gate 2 Layer 4A net ${inputs.layer_4a?.net_adjustment ?? 0} (no re-enforcement)`,
+  )
+  console.log(`Step 3–14: running V2.3.4 algorithm on ${inputs.components?.length ?? 0} components…`)
 
   const registryPreflightError = getProductTypeRegistryPreflightError({ product, evidence })
   if (registryPreflightError) {

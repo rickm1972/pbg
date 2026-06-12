@@ -5,6 +5,11 @@
  */
 
 import { isUnknownFoodContactCoatingMaterial } from './deterministic/material-taxonomy.mjs'
+import {
+  applyKnownCeramicNonstickScoringBands,
+  isKnownProprietaryCeramicNonstickMaterial,
+  isTrulyUnknownProprietaryCoatingMaterial,
+} from '../../src/shared/agent2/proprietary-ceramic-nonstick.mjs'
 
 const PRIMARY_CONTACT_CI = 0.7
 const ESCALATOR_1_MIGRATION_MIN = 0.6
@@ -116,11 +121,16 @@ function componentBlob(component) {
     .toLowerCase()
 }
 
-export function isUnknownProprietaryFoodContactCoating(component) {
-  if (isUnknownFoodContactCoatingMaterial(component.material_id)) {
-    return component.role === 'primary_food_contact' || component.role === 'coating'
+export function isUnknownProprietaryFoodContactCoating(component, evidence = null) {
+  const role = component.role ?? component.component_role
+  if (role !== 'primary_food_contact' && role !== 'coating') return false
+  if (isKnownProprietaryCeramicNonstickMaterial(component.material_id, component, evidence)) {
+    return false
   }
-  return false
+  if (isTrulyUnknownProprietaryCoatingMaterial(component.material_id, component, evidence)) {
+    return true
+  }
+  return isUnknownFoodContactCoatingMaterial(component.material_id)
 }
 
 function isStayCoolCookwareHandleInference(component, ctx) {
@@ -163,7 +173,7 @@ function isChildrensProduct(ctx) {
   return /children|infant|toy|kids/.test(cat) || /children|infant|toy/.test(sub)
 }
 
-function computeEscalatorFlags(component, ctx) {
+export function computeEscalatorFlags(component, ctx) {
   const migration = num(
     component.adjusted_migration_potential ?? component.base_migration_potential,
   )
@@ -182,7 +192,8 @@ function computeEscalatorFlags(component, ctx) {
     childrens &&
     migration >= ESCALATOR_1_MIGRATION_MIN &&
     severity >= ESCALATOR_1_SEVERITY_MIN
-  const escalator_3_triggers = migrationAfterDegradation >= 0.7 && degraded
+  /** v2.3.5: degradation escalator removed — never fires in active scoring. */
+  const escalator_3_triggers = false
   const escalator_4_triggers =
     ci >= 1.0 - 1e-6 && hazard >= 0.8 && /oral|teether|pacifier/i.test(componentBlob(component))
   const escalator_5_note =
@@ -198,9 +209,6 @@ function computeEscalatorFlags(component, ctx) {
   } else if (escalator_2_triggers) {
     escalator_applied = 'escalator_2'
     escalator_multiplier = 1.4
-  } else if (escalator_3_triggers) {
-    escalator_applied = 'escalator_3'
-    escalator_multiplier = 1.3
   } else if (escalator_1_triggers) {
     escalator_applied = 'escalator_1'
     escalator_multiplier = 1.25
@@ -222,12 +230,27 @@ function computeEscalatorFlags(component, ctx) {
  * @param {object[]} taxonomyComponents
  * @param {object} pipelineCtx — category, product_category_default, subcategory
  */
-export function applyServerInferenceRules(taxonomyComponents, pipelineCtx) {
+export function applyServerInferenceRules(taxonomyComponents, pipelineCtx, options = {}) {
   const enforcement_log = []
+  const evidence = options.evidence ?? null
+  const testingEvidence = options.testingEvidence ?? null
   const components = structuredClone(taxonomyComponents)
 
   for (const component of components) {
-    if (isUnknownProprietaryFoodContactCoating(component)) {
+    const ceramicPatched = applyKnownCeramicNonstickScoringBands(
+      component,
+      evidence,
+      testingEvidence,
+    )
+    Object.assign(component, ceramicPatched)
+    if (ceramicPatched.ceramic_lab_migration_mitigated) {
+      enforcement_log.push({
+        component_name: component.component_name,
+        rule: 'ceramic_lab_non_detect_migration_mitigation',
+      })
+    }
+
+    if (isUnknownProprietaryFoodContactCoating(component, evidence)) {
       applyScoringPatch(component, UNKNOWN_PROPRIETARY_FOOD_CONTACT_COATING)
       enforcement_log.push({
         component_name: component.component_name,
@@ -263,14 +286,14 @@ export function applyServerInferenceRules(taxonomyComponents, pipelineCtx) {
   return {
     components,
     normalization_enforcement: {
-      version: '2.3.4-deterministic-step3',
+      version: '2.3.5-deterministic-step3',
       enforcement_log,
     },
   }
 }
 
 /** @deprecated Use applyServerInferenceRules in the pipeline. */
-export function enforceNormalizationDeterminism(inputs) {
+export function enforceNormalizationDeterminism(inputs, options = {}) {
   const ctx = {
     product_category_default: inputs.product_category_default,
     subcategory: inputs.subcategory,
@@ -278,6 +301,7 @@ export function enforceNormalizationDeterminism(inputs) {
   const { components, normalization_enforcement } = applyServerInferenceRules(
     inputs.components ?? [],
     ctx,
+    options,
   )
   return {
     ...inputs,

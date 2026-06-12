@@ -32,6 +32,7 @@ import {
   loadPublishedBaselineSnapshotImmutable,
   loadPublishedDisplaySnapshot,
 } from './publishedBaselineRegistry'
+import { resolvePublicMethodologyDisclaimer } from './publicReviewStamp'
 
 export type DescriptionOverrideStatus =
   | 'none'
@@ -95,7 +96,9 @@ function buildSnapshotForGateValidation(
       ...snapshot.display,
       product_description: overrideText.trim(),
       methodology_disclaimer:
-        displayRemediation?.methodology_disclaimer ?? snapshot.display.methodology_disclaimer,
+        displayRemediation?.methodology_disclaimer ??
+        snapshot.display.methodology_disclaimer ??
+        resolvePublicMethodologyDisclaimer(snapshot.display),
       low_score_last_reviewed_at:
         displayRemediation?.low_score_last_reviewed_at ?? snapshot.display.low_score_last_reviewed_at,
     },
@@ -135,6 +138,21 @@ export function getDescriptionOverrideState(productId: string): DescriptionOverr
   }
 }
 
+/** Draft save — language/claims gate on override text only (no page-level display fields). */
+export function validateDescriptionOverrideDraft(proposedText: string): DescriptionOverrideValidation {
+  const trimmed = proposedText.trim()
+  if (!trimmed) {
+    return { language_ok: true, negative_score_gate: null, failures: [] }
+  }
+  const language = validateDescriptionOverrideLanguage(trimmed)
+  return {
+    language_ok: language.ok,
+    negative_score_gate: null,
+    failures: language.failures,
+  }
+}
+
+/** Approval — Phase 4.5 on merged snapshot + override; low-score review required when score < 75. */
 export function validateDescriptionOverride(
   snapshot: PublishedDisplaySnapshotRecord,
   proposedText: string,
@@ -175,7 +193,24 @@ export function saveDescriptionOverrideDraft(input: {
     throw new Error('Override text is required. Empty override means use the current snapshot description.')
   }
 
-  const validation = validateDescriptionOverride(snapshot, trimmed)
+  const validation = validateDescriptionOverrideDraft(trimmed)
+
+  const existingDraft = listDescriptionOverrides(input.product_id)
+    .filter((r) => r.status === 'draft' || r.status === 'pending_review')
+    .sort((a, b) => (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at))[0]
+
+  if (existingDraft) {
+    const updated: DescriptionOverrideRecord = {
+      ...existingDraft,
+      previous_snapshot_id: snapshot.snapshot_id,
+      proposed_override_text: trimmed,
+      status: 'draft',
+      validation,
+      updated_at: new Date().toISOString(),
+    }
+    saveDescriptionOverrideRecord(updated)
+    return updated
+  }
 
   const record: DescriptionOverrideRecord = {
     override_id: newOverrideId(),
@@ -252,7 +287,9 @@ export function approveDescriptionOverride(
       ...previous.display,
       product_description: record.proposed_override_text,
       methodology_disclaimer:
-        options.display_remediation?.methodology_disclaimer ?? previous.display.methodology_disclaimer,
+        options.display_remediation?.methodology_disclaimer ??
+        previous.display.methodology_disclaimer ??
+        resolvePublicMethodologyDisclaimer(previous.display),
       low_score_last_reviewed_at:
         options.display_remediation?.low_score_last_reviewed_at ??
         previous.display.low_score_last_reviewed_at,

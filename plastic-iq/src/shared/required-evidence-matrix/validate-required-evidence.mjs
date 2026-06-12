@@ -111,7 +111,11 @@ export function validateRequiredEvidence(structured, sources = [], options = {})
     if (item.status === 'missing' && item.severity === 'blocker') {
       approval_blockers.push(`Required evidence: ${item.label} — ${item.detail ?? 'incomplete'}`)
     }
-    if (item.status === 'review_required' && item.score_driving) {
+    if (
+      item.status === 'review_required' &&
+      item.score_driving &&
+      item.severity === 'blocker'
+    ) {
       approval_blockers.push(`Required evidence review: ${item.label} — ${item.detail ?? 'needs reviewer'}`)
     }
   }
@@ -144,7 +148,13 @@ export function validateRequiredEvidence(structured, sources = [], options = {})
     required_fields_complete: requiredFieldItems.every((i) => i.status === 'passed'),
     required_external_checks_complete: externalItems
       .filter((i) => i.score_driving)
-      .every((i) => i.status === 'passed' || i.status === 'not_applicable'),
+      .every(
+        (i) =>
+          i.status === 'passed' ||
+          i.status === 'not_applicable' ||
+          (i.status === 'review_required' &&
+            (i.severity === 'warning' || i.severity === 'info')),
+      ),
     missing_fields: checklist_items.filter((i) => i.status === 'missing').map((i) => i.id),
     score_blocking_gaps,
     non_score_gaps,

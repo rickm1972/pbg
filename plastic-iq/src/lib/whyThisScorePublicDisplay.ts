@@ -1,7 +1,7 @@
 import type { WhyThisScoreFields } from './whyThisScoreApi'
 import { displayOptions } from './whyThisScoreApi'
 import {
-  publicCertificationOption,
+  publicCertificationsForDisplay,
   CERT_ABSENT_PUBLIC_DISCLOSED,
   CERT_ABSENT_PUBLIC_COATING_FORMULATION,
   CERT_ABSENT_PUBLIC_STAINLESS_GRADE,
@@ -53,8 +53,11 @@ export function shapePublicWhyThisScoreFields(
     disclosure_quality_options: fields.disclosure_quality_options.map((o) =>
       normalizeDisclosureBadge(o),
     ),
-    certifications_options: fields.certifications_options.map((o) =>
-      publicCertificationOption(o, disclosureBadge, primary, fields.coatings_finishes_options),
+    certifications_options: publicCertificationsForDisplay(
+      fields.certifications_options,
+      disclosureBadge,
+      primary,
+      fields.coatings_finishes_options,
     ),
   }
 }

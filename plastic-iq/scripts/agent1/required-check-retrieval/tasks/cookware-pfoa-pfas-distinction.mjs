@@ -1,8 +1,14 @@
 import { fetchPageText } from '../../../lib/fetch-page-text.mjs'
 import { isCeramicNonstickPrimary } from '../../../../src/shared/canonical-taxonomy/ceramic-nonstick-structural.mjs'
+import { isHybridFoodContactPrimary } from '../../../../src/shared/canonical-taxonomy/hybrid-cookware-structural.mjs'
 import { PTFE_PRIMARY_IDS } from '../../../../src/shared/required-evidence-matrix/pattern-triggers.mjs'
 import { getRetrievalTaskForCheck } from '../../../../src/shared/required-evidence-retrieval/retrieval-task-registry.mjs'
 import { fillQueryTemplate, runPerplexityQuery } from '../perplexity-query.mjs'
+import {
+  isOutdatedThirdPartyPtfeContext,
+  isThirdPartySource,
+} from '../../../../src/shared/agent1/source-authority.mjs'
+import { manufacturerHostMatchesBrand } from '../../../../src/shared/agent1/manufacturer-pdp-validation.mjs'
 
 const CHECK_ID = 'external.pfoa_vs_pfas_free_distinction'
 
@@ -75,8 +81,13 @@ export async function runCookwarePfoaPfasDistinctionRetrieval(ctx) {
   const mappings = structured?.canonical_mappings ?? {}
   const pfasStatusId = mappings.pfas_status_id?.canonical_id ?? ''
   const primaryId = mappings.primary_contact_material_id?.canonical_id ?? ''
+  const hybridOrProprietary =
+    isHybridFoodContactPrimary(primaryId) ||
+    mappings.coating_modifier_id?.canonical_id === 'proprietary_nonstick_coating_undisclosed' ||
+    isCeramicNonstickPrimary(primaryId)
   const ptfeOrPfasPresent =
-    PTFE_PRIMARY_IDS.has(primaryId) || PFAS_PRESENT_STATUS_IDS.has(pfasStatusId)
+    !hybridOrProprietary &&
+    (PTFE_PRIMARY_IDS.has(primaryId) || PFAS_PRESENT_STATUS_IDS.has(pfasStatusId))
 
   let status = 'failed'
   let detail = null
@@ -206,8 +217,11 @@ function analyzePfoaPfasClaims(structured, sources, product) {
     pfas_free_marketing.source_quote = pfas_free_marketing.source_quote ?? pfasMap.source_quote
   }
 
+  const officialSources = (sources ?? []).filter((s) => !isThirdPartySource(s, s.url))
+
   for (const s of sources ?? []) {
     if (isRegulatorySource(s)) continue
+    if (isOutdatedThirdPartyPtfeContext(s, product, officialSources)) continue
     const text = `${s.page_excerpt ?? ''} ${s.title ?? ''}`.trim()
     if (!text) continue
     const productScoped = isProductScopedSource(s, product)
@@ -365,8 +379,9 @@ function isProductScopedSource(s, product) {
 function isProductScopedUrl(url, product) {
   if (!url) return false
   const u = url.toLowerCase()
-  const brand = (product.brand ?? 't-fal').toLowerCase().replace(/[^a-z0-9]/g, '')
-  if (brand && (u.includes('t-fal') || u.includes('tfal') || u.includes('t-fal.'))) return true
+  const brand = (product.brand ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (brand && u.includes(brand)) return true
+  if (brand && manufacturerHostMatchesBrand(url, product.brand)) return true
   if (/amazon\.com\/.*\/(dp|gp\/product)\//i.test(u)) return true
   return false
 }

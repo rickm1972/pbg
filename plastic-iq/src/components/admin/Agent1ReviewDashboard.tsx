@@ -8,6 +8,7 @@ import {
   canShowOnAgent1RunTab,
   requiresFullPipelineResetBeforeAgent1Run,
   showAgent1RetestResetButton,
+  mustResetAgent1BeforeRerun,
   resetAgent1ForRetestRemote,
   isAgent1ValidationRerunProduct,
   fetchAgent1Dashboard,
@@ -83,6 +84,17 @@ export function Agent1ReviewDashboard({
   useEffect(() => {
     load()
   }, [load])
+
+  /** Drop stale client cache when DB reset/supersede moved product off Awaiting review. */
+  useEffect(() => {
+    if (!data) return
+    setPostRunReviewEntries((prev) =>
+      prev.filter((entry) => {
+        const live = data.products.find((p) => p.product_id === entry.product.product_id)
+        return live?.agent_status === 'evidence_awaiting_review'
+      }),
+    )
+  }, [data])
 
   const mergedPendingReview = useMemo(() => {
     if (!data) return postRunReviewEntries
@@ -305,6 +317,22 @@ export function Agent1ReviewDashboard({
     }
   }
 
+  function clearProductFromAwaitingReviewUi(productId: string) {
+    setListFilter('run')
+    setSelectedId(null)
+    setPostRunReviewEntries((prev) => prev.filter((x) => x.product.product_id !== productId))
+    setData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        products: prev.products.map((p) =>
+          p.product_id === productId ? { ...p, agent_status: 'unscored' } : p,
+        ),
+        pendingReview: prev.pendingReview.filter((x) => x.product.product_id !== productId),
+      }
+    })
+  }
+
   async function handleRunAgent1(productId: string, productName?: string) {
     const product =
       data?.products.find((p) => p.product_id === productId) ??
@@ -322,13 +350,20 @@ export function Agent1ReviewDashboard({
     setBusyId(productId)
     setBatchProgress({ current: 0, total: 1, name: product.product_name })
     onError(null)
-    onNotice(`Starting Agent 1 for ${product.product_name}…`)
+    if (needsFreshReset && mustResetAgent1BeforeRerun(product.agent_status)) {
+      clearProductFromAwaitingReviewUi(productId)
+      onNotice(
+        `Clearing Awaiting review for ${product.product_name} → unscored on Run tab, then starting Agent 1…`,
+      )
+    } else if (needsFreshReset) {
+      onNotice(`Clearing prior Agent 1 bundle for ${product.product_name}…`)
+    } else {
+      onNotice(`Starting Agent 1 for ${product.product_name}…`)
+    }
     try {
       if (needsFreshReset) {
         const outcome = await resetAgent1ForRetestRemote(productId)
         onNotice(outcome.message ?? 'Reset complete. Starting Agent 1…')
-        setPostRunReviewEntries((prev) => prev.filter((x) => x.product.product_id !== productId))
-        setSelectedId(null)
         await load()
       }
       onNotice('Agent 1 running… this may take 1–2 minutes. Watch your Anthropic usage dashboard.')
@@ -425,15 +460,20 @@ export function Agent1ReviewDashboard({
 
     const firstName = selectedRunnable[0]?.product_name ?? ''
     onError(null)
+    setListFilter('run')
+    for (const p of freshResets) {
+      clearProductFromAwaitingReviewUi(p.product_id)
+    }
     setBatchProgress({ current: 0, total: selectedRunnable.length, name: firstName })
     onNotice(
-      `Starting Agent 1 for ${selectedRunnable.map((p) => p.product_name).join(', ')}…`,
+      freshResets.length
+        ? `Clearing ${freshResets.length} prior bundle(s) → Run tab, then starting Agent 1…`
+        : `Starting Agent 1 for ${selectedRunnable.map((p) => p.product_name).join(', ')}…`,
     )
 
     try {
       for (const p of freshResets) {
         await resetAgent1ForRetestRemote(p.product_id)
-        setPostRunReviewEntries((prev) => prev.filter((x) => x.product.product_id !== p.product_id))
       }
       if (freshResets.length) await load()
 
@@ -594,9 +634,10 @@ export function Agent1ReviewDashboard({
               {listFilter === 'run' ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-relaxed text-slate-600">
-                    Check one or more products, then click <strong>Run Agent 1</strong>. To re-run
-                    after a finished pass, use <strong>Re-run Agent 1</strong> on the Awaiting
-                    review card (clears the bundle and returns here as unscored).
+                    Check one or more products, then click <strong>Run Agent 1</strong>. Re-runs
+                    always clear <strong>Awaiting review</strong> first and return here as{' '}
+                    <strong>unscored</strong> before Agent 1 starts — you never rerun from Awaiting
+                    review.
                   </p>
                   {selectedRunIds.size > 0 ? (
                     <p className="text-[11px] font-semibold text-violet-800">

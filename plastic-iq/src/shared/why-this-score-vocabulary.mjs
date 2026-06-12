@@ -181,12 +181,18 @@ export function normalizeDisclosureBadge(badge) {
  * @param {string[]} selected
  * @param {string} fieldKey
  */
+const MANUFACTURER_LAB_TESTING_OPTION_RE =
+  /^Manufacturer-published third-party lab testing/i
+
 export function sanitizeOptions(selected, fieldKey) {
   const allowed = new Set(allowedOptionsForField(fieldKey))
   const out = []
   for (const item of selected ?? []) {
     const s = normalizeWhyThisScoreOption(fieldKey, String(item ?? '').trim())
-    if (!s || s === NONE || !allowed.has(s)) continue
+    if (!s || s === NONE) continue
+    const labTestingOption =
+      fieldKey === 'certifications_options' && MANUFACTURER_LAB_TESTING_OPTION_RE.test(s)
+    if (!allowed.has(s) && !labTestingOption) continue
     if (!out.includes(s)) out.push(s)
   }
   out.sort((a, b) => {

@@ -6,11 +6,12 @@ import type {
   ProductEvidence,
   StructuredEvidencePayload,
 } from '../types/agent'
-import {
-  getCanonicalApprovalBlockers,
-  getRequiredEvidenceApprovalBlockers,
-} from './canonicalEvidenceMapping'
+import { getCanonicalApprovalBlockers } from './canonicalEvidenceMapping'
 import { getGate1ContradictionBlockers } from './gate1ContradictionBlockers'
+import {
+  listScoreDrivingReviewAcknowledgments,
+  resolveLiveRequiredEvidenceValidation,
+} from './gate1ApprovalEligibility'
 import { isFormulationSubcategory } from './requiredEvidenceValidation'
 import { getDisplayFacts } from './agent1Review'
 import { getStructuredEvidence, getWarnings } from './evidenceMetadata'
@@ -275,11 +276,19 @@ export type ApprovalBlockers = {
 export function getApprovalBlockers(params: {
   evidence: ProductEvidence
   warningsAcknowledged: boolean
+  /** Score-driving review_required rows (e.g. proprietary coating) acknowledged by reviewer */
+  requiredEvidenceReviewsAcknowledged?: boolean
   allFieldsConfirmed: boolean
   /** All score-driving canonical rows confirmed in Gate 1 taxonomy table */
   canonicalReviewConfirmed?: boolean
 }): ApprovalBlockers {
-  const { evidence, warningsAcknowledged, allFieldsConfirmed, canonicalReviewConfirmed } = params
+  const {
+    evidence,
+    warningsAcknowledged,
+    requiredEvidenceReviewsAcknowledged = false,
+    allFieldsConfirmed,
+    canonicalReviewConfirmed,
+  } = params
   const reasons: string[] = []
   const warnings = getWarnings(evidence.agent_metadata ?? {})
   const threshold = evidence.agent_metadata?.minimum_threshold
@@ -314,9 +323,21 @@ export function getApprovalBlockers(params: {
     reasons.push('Minimum threshold checks have not all passed.')
   }
 
-  if (usesRequiredEvidenceMatrix) {
-    for (const b of getRequiredEvidenceApprovalBlockers(structured)) {
-      reasons.push(b)
+  if (usesRequiredEvidenceMatrix && structured) {
+    const liveValidation = resolveLiveRequiredEvidenceValidation(
+      structured,
+      evidence.sources ?? [],
+      evidence.facts ?? [],
+    )
+    for (const b of liveValidation?.approval_blockers ?? []) {
+      if (!reasons.includes(b)) reasons.push(b)
+    }
+    const reviewAckItems = listScoreDrivingReviewAcknowledgments(liveValidation)
+    if (reviewAckItems.length > 0 && !requiredEvidenceReviewsAcknowledged) {
+      const first = reviewAckItems[0]
+      reasons.push(
+        `Acknowledge required evidence review: ${first.label} — ${first.detail ?? 'human acknowledgment required'}`,
+      )
     }
     if (canonicalReviewConfirmed === false) {
       reasons.push('Confirm each canonical score-driving field in the taxonomy table before approving.')

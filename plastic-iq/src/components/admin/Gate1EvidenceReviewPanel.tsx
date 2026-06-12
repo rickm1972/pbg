@@ -36,11 +36,20 @@ import { Gate1OutOfScopeSafetySignals } from './Gate1OutOfScopeSafetySignals'
 import { Gate1RequiredCheckResultsPanel } from './Gate1RequiredCheckResultsPanel'
 import { applyRequiredEvidenceValidation } from '../../lib/requiredEvidenceValidation'
 import {
+  listScoreDrivingReviewAcknowledgments,
+  resolveLiveRequiredEvidenceValidation,
+} from '../../lib/gate1ApprovalEligibility'
+import {
   canonicalReviewKey,
   listCanonicalReviewFieldKeys,
 } from '../../lib/gate1CanonicalReviewKeys'
 import { TAXONOMY_EXPANSION_REQUIRED } from '../../lib/canonicalEvidenceMapping'
 import { Gate1DecisionSummary } from './Gate1DecisionSummary'
+import { Gate1HumanReviewGatePanel } from './Gate1HumanReviewGatePanel'
+import { Gate1SystemValidationPanel } from './Gate1SystemValidationPanel'
+import { Gate1LockedInputPackagePanel } from './Gate1LockedInputPackagePanel'
+import { getAgent1ProposedInputByEvidenceId } from '../../lib/lockedInput'
+import type { Agent1ProposedInput } from '../../types/lockedInput'
 import type {
   AgentMetadata,
   CanonicalMappingsPayload,
@@ -92,6 +101,7 @@ export function Gate1EvidenceReviewPanel({
   const [editValue, setEditValue] = useState('')
   const [confirmedPaths, setConfirmedPaths] = useState<Set<string>>(() => new Set())
   const [warningsAcked, setWarningsAcked] = useState(false)
+  const [requiredReviewsAcked, setRequiredReviewsAcked] = useState(false)
   const [canonicalConfirmedKeys, setCanonicalConfirmedKeys] = useState<Set<string>>(
     () => new Set(),
   )
@@ -99,6 +109,7 @@ export function Gate1EvidenceReviewPanel({
   const [canonicalRejectedKeys, setCanonicalRejectedKeys] = useState<Set<string>>(() => new Set())
   const [saveBusy, setSaveBusy] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [proposedInput, setProposedInput] = useState<Agent1ProposedInput | null>(null)
 
   useEffect(() => {
     setViewingId(null)
@@ -159,6 +170,20 @@ export function Gate1EvidenceReviewPanel({
     return versions.find((v) => v.evidence_id === viewingId) ?? evidence
   }, [evidence, viewingId, versions])
 
+  useEffect(() => {
+    let cancelled = false
+    void getAgent1ProposedInputByEvidenceId(displayEvidence.evidence_id)
+      .then((row) => {
+        if (!cancelled) setProposedInput(row)
+      })
+      .catch(() => {
+        if (!cancelled) setProposedInput(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [displayEvidence.evidence_id])
+
   const structuredForReview = useMemo(
     () => getStructuredEvidence(displayEvidence.agent_metadata ?? {}),
     [displayEvidence],
@@ -166,7 +191,19 @@ export function Gate1EvidenceReviewPanel({
 
   const canonicalMappings = structuredForReview?.canonical_mappings ?? null
 
-  const requiredEvidenceValidation = structuredForReview?.required_evidence_validation ?? null
+  const requiredEvidenceValidation = useMemo(
+    () =>
+      resolveLiveRequiredEvidenceValidation(
+        structuredForReview,
+        displayEvidence.sources ?? [],
+        displayEvidence.facts ?? [],
+      ),
+    [structuredForReview, displayEvidence.sources, displayEvidence.facts],
+  )
+  const requiredReviewAckItems = useMemo(
+    () => listScoreDrivingReviewAcknowledgments(requiredEvidenceValidation),
+    [requiredEvidenceValidation],
+  )
   const requiredCheckResults = structuredForReview?.required_check_results ?? null
 
   const handleCanonicalUpdate = useCallback(
@@ -279,6 +316,8 @@ export function Gate1EvidenceReviewPanel({
   const approvalBlockers = getApprovalBlockers({
     evidence: displayEvidence,
     warningsAcknowledged: warnings.length === 0 || warningsAcked,
+    requiredEvidenceReviewsAcknowledged:
+      requiredReviewAckItems.length === 0 || requiredReviewsAcked,
     allFieldsConfirmed: allConfirmed,
     canonicalReviewConfirmed,
   })
@@ -520,7 +559,37 @@ export function Gate1EvidenceReviewPanel({
             validation={requiredEvidenceValidation}
             approvalBlockers={approvalBlockers}
             legacy={legacy}
+            proposedInput={proposedInput}
           />
+
+          {!legacy && proposedInput ? (
+            <Gate1HumanReviewGatePanel
+              key={`${proposedInput.proposed_input_id}-${proposedInput.updated_at ?? proposedInput.created_at}`}
+              proposedInput={proposedInput}
+              editable={editable}
+              reviewerEmail={authUserEmail}
+              onSaved={(row) => setProposedInput(row)}
+              onError={(message) => setSaveError(message)}
+            />
+          ) : null}
+
+          {!legacy && proposedInput ? (
+            <>
+              <Gate1SystemValidationPanel
+                key={`validation-${proposedInput.proposed_input_id}`}
+                proposedInput={proposedInput}
+                onValidated={() => {}}
+                onError={(message) => setSaveError(message)}
+              />
+              <Gate1LockedInputPackagePanel
+                key={`locked-${proposedInput.proposed_input_id}`}
+                proposedInput={proposedInput}
+                authUserEmail={authUserEmail}
+                onLocked={() => {}}
+                onError={(message) => setSaveError(message)}
+              />
+            </>
+          ) : null}
 
           {!editable && viewingId && viewingId !== initialEvidence.evidence_id ? (
             <p className="mt-4 text-sm text-slate-600">
@@ -538,7 +607,9 @@ export function Gate1EvidenceReviewPanel({
             </div>
           ) : null}
 
-          {warnings.length > 0 || (requiredEvidenceValidation?.summary?.non_score_gaps ?? 0) > 0 ? (
+          {warnings.length > 0 ||
+          requiredReviewAckItems.length > 0 ||
+          (requiredEvidenceValidation?.summary?.non_score_gaps ?? 0) > 0 ? (
             <section className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
               <h4 className="text-sm font-semibold text-amber-950">
                 PAC validation warnings / acknowledgment
@@ -553,6 +624,37 @@ export function Gate1EvidenceReviewPanel({
                     <li key={i}>{w}</li>
                   ))}
                 </ul>
+              ) : null}
+              {requiredReviewAckItems.length > 0 ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-white/80 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-950">
+                    Required evidence review (acknowledgment)
+                  </p>
+                  <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-amber-950">
+                    {requiredReviewAckItems.map((item) => (
+                      <li key={item.id}>
+                        <span className="font-medium">{item.label}</span>
+                        {item.detail ? (
+                          <p className="mt-0.5 text-xs text-amber-900">{item.detail}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {editable ? (
+                    <label className="mt-3 flex items-start gap-2 text-sm text-amber-950">
+                      <input
+                        type="checkbox"
+                        checked={requiredReviewsAcked}
+                        onChange={(e) => setRequiredReviewsAcked(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-amber-400"
+                      />
+                      <span>
+                        I acknowledge the proprietary / undisclosed coating review and accept
+                        Documentation Incomplete / Material Uncertain for downstream Gates.
+                      </span>
+                    </label>
+                  ) : null}
+                </div>
               ) : null}
               {(requiredEvidenceValidation?.summary?.non_score_gaps ?? 0) > 0 ? (
                 <p className="mt-2 text-xs text-amber-900">

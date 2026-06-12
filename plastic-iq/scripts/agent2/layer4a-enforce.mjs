@@ -66,7 +66,11 @@ function shouldApplyUnknownCoatingCap(negatives) {
     const reason = adjustmentReason(adj)
     const value = adjustmentValue(adj)
     if (isNegativeMarkedNotApplied(reason, value)) return false
-    return /unknown proprietary food-contact coating/i.test(reason) && value === -3
+    return (
+      /unknown proprietary food-contact coating/i.test(reason) &&
+      !/proprietary food-contact coating chemistry undisclosed/i.test(reason) &&
+      value === -3
+    )
   })
 }
 

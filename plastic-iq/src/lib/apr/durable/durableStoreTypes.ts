@@ -17,7 +17,7 @@ export type ApprovedSnapshotVersionMeta = {
   product_id: string
   version_sequence: number
   source_snapshot_id: string
-  reason: 'description_override'
+  reason: 'description_override' | 'source_correction' | 'gate4_publish' | 'snapshot_backfill'
   override_id: string | null
   approved_at: string
   approved_by: string | null

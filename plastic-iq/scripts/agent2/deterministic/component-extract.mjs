@@ -21,9 +21,13 @@ import {
   hasStructuredEvidence,
   hasValidCanonicalPrimaryContact,
 } from './schema-input.mjs'
+import {
+  dedupeRedundantFoodContactSecondaries,
+  isRedundantFoodContactSecondary,
+} from './coating-substrate-handoff.mjs'
 
 /** Bump when extraction rules change — visible in component_extraction_log for Gate 2 review. */
-export const COMPONENT_EXTRACT_VERSION = '2026-06-03-ptfe-canonical-dedup-v2'
+export const COMPONENT_EXTRACT_VERSION = '2026-06-09-coating-substrate-handoff-v1'
 
 const COMPOUND_MATERIAL_RE = /^([a-z0-9_]+)_on_([a-z0-9_]+)$/i
 
@@ -203,7 +207,28 @@ function addPrimaryFromStructuredContact(evidence, components) {
     (primary.undisclosed_code === 'PROPRIETARY_NAMED' || identity === 'PROPRIETARY_NAMED')
   const proprietaryId = isTerrabond ? 'terrabond_proprietary' : 'proprietary_named_food_contact'
 
-  if (isTerrabond || isGenericProprietaryNamed || matId === 'proprietary_named_food_contact') {
+  if (
+    (isTerrabond || matId === 'terrabond_proprietary') &&
+    !hasValidCanonicalPrimaryContact(evidence)
+  ) {
+    if (!hasPrimaryCookingMaterial(components, proprietaryId)) {
+      components.push(
+        draftTerrabondValleysComponent({
+          fact_key: 'primary_contact_material',
+          excerpt: primary.excerpt,
+          source_url: primary.source_url,
+          confidence: primary.confidence,
+        }),
+      )
+    }
+    return
+  }
+
+  if (
+    isGenericProprietaryNamed &&
+    matId === 'proprietary_named_food_contact' &&
+    !hasValidCanonicalPrimaryContact(evidence)
+  ) {
     if (!hasPrimaryCookingMaterial(components, proprietaryId)) {
       components.push(
         draftTerrabondValleysComponent({
@@ -866,6 +891,17 @@ function extractFromStructuredSchema(evidence, product) {
     if (!getMaterial(materialId)) continue
 
     if (
+      isRedundantFoodContactSecondary(
+        components,
+        materialId,
+        sec.material_identity,
+        sec.component_role,
+      )
+    ) {
+      continue
+    }
+
+    if (
       components.some(
         (c) =>
           c.material_id === materialId &&
@@ -912,7 +948,15 @@ function extractFromStructuredSchema(evidence, product) {
     })
   }
 
-  return { isFormulation: false, components, extraction_log: log }
+  const deduped = dedupeRedundantFoodContactSecondaries(components)
+  if (deduped.length !== components.length) {
+    log.push({
+      step: 'dedupe_redundant_food_contact_secondaries',
+      removed: components.length - deduped.length,
+    })
+  }
+
+  return { isFormulation: false, components: deduped, extraction_log: log }
 }
 
 /**

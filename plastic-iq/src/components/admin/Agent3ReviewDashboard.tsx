@@ -9,8 +9,15 @@ import {
   runAgent3Batch,
   runAgent3Remote,
 } from '../../lib/agent3Review'
+import {
+  approveAgent3LockedOutput,
+  fetchAgent3LockedOutputDashboard,
+  rejectAgent3LockedOutput,
+  type Agent3LockedOutputDashboardItem,
+} from '../../lib/agent3LockedOutputReview'
 import type { Agent3DashboardData, ProductPipelineRow } from '../../types/agent'
 import { Gate3ScoreReviewPanel } from './Gate3ScoreReviewPanel'
+import { Gate3LockedInputScoreReviewPanel } from './Gate3LockedInputScoreReviewPanel'
 
 type Props = {
   authUserEmail: string | null
@@ -28,9 +35,11 @@ export function Agent3ReviewDashboard({
   onError,
 }: Props) {
   const [data, setData] = useState<Agent3DashboardData | null>(null)
+  const [lockedData, setLockedData] = useState<Agent3LockedOutputDashboardItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [listFilter, setListFilter] = useState<'review' | 'run' | 'all'>('review')
+  const [listFilter, setListFilter] = useState<'review' | 'run' | 'all' | 'locked'>('review')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedLockedOutputId, setSelectedLockedOutputId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -45,10 +54,15 @@ export function Agent3ReviewDashboard({
     setLoading(true)
     onError(null)
     try {
-      const dashboard = await fetchAgent3Dashboard()
+      const [dashboard, locked] = await Promise.all([
+        fetchAgent3Dashboard(),
+        fetchAgent3LockedOutputDashboard(),
+      ])
       setData(dashboard)
+      setLockedData(locked.pending)
     } catch (e: unknown) {
       setData(null)
+      setLockedData([])
       onError(formatSupabaseUnknownError(e, 'Failed to load Agent 3 dashboard'))
     } finally {
       setLoading(false)
@@ -77,8 +91,14 @@ export function Agent3ReviewDashboard({
     if (!data) return []
     if (listFilter === 'review') return reviewQueue
     if (listFilter === 'run') return runnableProducts
+    if (listFilter === 'locked') return []
     return data.products
   }, [data, listFilter, reviewQueue, runnableProducts])
+
+  const selectedLockedItem = useMemo(() => {
+    if (!selectedLockedOutputId) return null
+    return lockedData.find((x) => x.output.locked_output_id === selectedLockedOutputId) ?? null
+  }, [lockedData, selectedLockedOutputId])
 
   const selectedItem = useMemo(() => {
     if (!data || !selectedId) return null
@@ -143,16 +163,62 @@ export function Agent3ReviewDashboard({
     setSelectedRunIds(new Set())
   }
 
-  function switchListFilter(filter: 'review' | 'run' | 'all') {
+  function switchListFilter(filter: 'review' | 'run' | 'all' | 'locked') {
     setListFilter(filter)
     setRejecting(false)
     setRejectNotes('')
     if (filter === 'run') {
       setSelectedId(null)
+      setSelectedLockedOutputId(null)
     } else if (filter === 'review' && reviewQueue.length > 0) {
       setSelectedId(reviewQueue[0].product_id)
+      setSelectedLockedOutputId(null)
+    } else if (filter === 'locked' && lockedData.length > 0) {
+      setSelectedId(null)
+      setSelectedLockedOutputId(lockedData[0].output.locked_output_id)
     } else if (filter === 'all') {
       setSelectedId(null)
+      setSelectedLockedOutputId(null)
+    }
+  }
+
+  async function handleApproveLockedOutput() {
+    if (!selectedLockedItem || !authUserEmail) return
+    onError(null)
+    onNotice(null)
+    setBusyId(selectedLockedItem.output.product_id)
+    try {
+      await approveAgent3LockedOutput({
+        locked_output_id: selectedLockedItem.output.locked_output_id,
+        reviewed_by: authUserEmail,
+      })
+      onNotice('Locked-input Agent 3 output approved (not published).')
+      await load()
+    } catch (e: unknown) {
+      onError(formatSupabaseUnknownError(e, 'Locked output approve failed'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleRejectLockedOutput(notes: string) {
+    if (!selectedLockedItem || !authUserEmail) return
+    onError(null)
+    onNotice(null)
+    setBusyId(selectedLockedItem.output.product_id)
+    try {
+      await rejectAgent3LockedOutput({
+        locked_output_id: selectedLockedItem.output.locked_output_id,
+        reviewed_by: authUserEmail,
+        review_notes: notes || null,
+      })
+      onNotice('Locked-input Agent 3 output rejected.')
+      await load()
+      setSelectedLockedOutputId(null)
+    } catch (e: unknown) {
+      onError(formatSupabaseUnknownError(e, 'Locked output reject failed'))
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -276,8 +342,8 @@ export function Agent3ReviewDashboard({
           <div>
             <h2 className="text-lg font-semibold text-ink-900">Agent 3 — Scoring</h2>
             <p className="mt-1 text-sm text-slate-600">
-              {reviewQueue.length} awaiting review · {runnableProducts.length} ready to run · Algorithm
-              V2.3.3
+              {reviewQueue.length} awaiting review · {runnableProducts.length} ready to run ·{' '}
+              {lockedData.length} locked-input outputs · Algorithm V2.3.3
             </p>
           </div>
           <button
@@ -296,7 +362,7 @@ export function Agent3ReviewDashboard({
           <div className="rounded-2xl border border-slate-200 bg-white shadow-card">
             <div className="space-y-3 border-b border-slate-100 p-3">
               <div className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-                {(['review', 'run', 'all'] as const).map((filter) => (
+                {(['review', 'run', 'locked', 'all'] as const).map((filter) => (
                   <button
                     key={filter}
                     type="button"
@@ -309,7 +375,9 @@ export function Agent3ReviewDashboard({
                       ? `Awaiting review (${reviewQueue.length})`
                       : filter === 'run'
                         ? `Run Agent 3 (${runnableProducts.length})`
-                        : 'All products'}
+                        : filter === 'locked'
+                          ? `Locked input (${lockedData.length})`
+                          : 'All products'}
                   </button>
                 ))}
               </div>
@@ -352,7 +420,34 @@ export function Agent3ReviewDashboard({
               ) : null}
             </div>
             <ul className="max-h-[60dvh] divide-y divide-slate-100 overflow-auto">
-              {listProducts.length === 0 ? (
+              {listFilter === 'locked' ? (
+                lockedData.length === 0 ? (
+                  <li className="p-4 text-sm text-slate-600">No locked-input Agent 3 outputs awaiting review.</li>
+                ) : (
+                  lockedData.map((item) => {
+                    const isSelected = item.output.locked_output_id === selectedLockedOutputId
+                    return (
+                      <li key={item.output.locked_output_id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLockedOutputId(item.output.locked_output_id)}
+                          className={`w-full px-4 py-3 text-left transition hover:bg-violet-50/60 ${
+                            isSelected ? 'bg-violet-50' : ''
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-ink-900">
+                            {item.product_name ?? item.output.display_payload?.product_name ?? 'Product'}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {item.output.score_payload.pac_safety_score} · {item.output.score_payload.tier} ·{' '}
+                            {item.output.review_status}
+                          </p>
+                        </button>
+                      </li>
+                    )
+                  })
+                )
+              ) : listProducts.length === 0 ? (
                 <li className="p-4 text-sm text-slate-600">
                   {listFilter === 'review'
                     ? 'Nothing awaiting score review.'
@@ -412,7 +507,23 @@ export function Agent3ReviewDashboard({
         </div>
 
         <div className="lg:col-span-8">
-          {listFilter === 'run' ? (
+          {listFilter === 'locked' && selectedLockedItem ? (
+            <Gate3LockedInputScoreReviewPanel
+              product={{
+                product_id: selectedLockedItem.output.product_id,
+                product_name: selectedLockedItem.product_name ?? 'Product',
+                brand: selectedLockedItem.brand ?? null,
+                category: null,
+                subcategory: null,
+                agent_status: 'scoring_review_pending',
+              }}
+              output={selectedLockedItem.output}
+              busy={busyId === selectedLockedItem.output.product_id}
+              authUserEmail={authUserEmail}
+              onApprove={handleApproveLockedOutput}
+              onReject={handleRejectLockedOutput}
+            />
+          ) : listFilter === 'run' ? (
             <Agent3RunTabPanel
               selectedProduct={selectedProduct}
               selectedRunnable={selectedRunnable}

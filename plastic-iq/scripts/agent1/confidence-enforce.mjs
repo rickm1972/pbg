@@ -2,6 +2,11 @@
  * Server-side confidence + excerpt policy (post-synthesis, pre-save).
  */
 
+import {
+  enforceFactSourceAuthority,
+  isThirdPartySource,
+} from '../../src/shared/agent1/source-authority.mjs'
+
 export const MAX_PAGE_EXCERPT_CHARS = 400
 export const MAX_FACT_EXCERPT_CHARS = 200
 
@@ -96,6 +101,20 @@ export function applyConfidenceUpgrades(sources, facts) {
       if (before !== 'certification verified') {
         upgrades.push({ fact_key: fact.fact_key, from: before, to: 'certification verified' })
         return { ...fact, confidence: 'certification verified' }
+      }
+      return fact
+    }
+
+    if (isThirdPartySource(source, source?.url)) {
+      const downgraded = enforceFactSourceAuthority(sources, [fact])[0]
+      if (downgraded.confidence !== before) {
+        upgrades.push({
+          fact_key: fact.fact_key,
+          from: before,
+          to: downgraded.confidence,
+          source_type: source.source_type,
+        })
+        return downgraded
       }
       return fact
     }

@@ -1,5 +1,5 @@
 /**
- * Adds target_url, walmart_url, other_retailer_* to public.products if missing.
+ * Adds retailer URL + source-intake columns to public.products if missing.
  * Requires DB credentials (not the anon key).
  *
  * Option A — full URI (Settings → Database → Connection string → URI):
@@ -57,7 +57,12 @@ alter table public.products
   add column if not exists target_url text,
   add column if not exists walmart_url text,
   add column if not exists other_retailer_label text,
-  add column if not exists other_retailer_url text;
+  add column if not exists other_retailer_url text,
+  add column if not exists manufacturer_product_url text,
+  add column if not exists primary_retailer_evidence_url text,
+  add column if not exists manufacturer_lab_results_url text,
+  add column if not exists manufacturer_materials_faq_url text,
+  add column if not exists agent1_source_notes text;
 `
 
 async function main() {
@@ -65,7 +70,12 @@ async function main() {
   try {
     client = await connectPgClient(env)
     await client.query(sql)
-    console.log('OK: retailer URL columns are present on public.products.')
+    console.log(
+      'OK: retailer URL + source-intake columns (incl. manufacturer_product_url) are present on public.products.',
+    )
+    console.log(
+      'If admin save still fails with schema cache, wait ~1 min or reload API schema in Supabase Dashboard → Settings → API.',
+    )
   } catch (e) {
     console.error('Failed:', e instanceof Error ? e.message : e)
     if (String(e).includes('password authentication failed')) {

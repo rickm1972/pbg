@@ -3,7 +3,7 @@
  * Used for public CTAs — fail closed when mismatch is detectable.
  */
 
-const SIZE_IN_TEXT_RE = /(\d+(?:\.\d+)?)\s*(?:inch|in\.?|")\b/gi
+const SIZE_IN_TEXT_RE = /(\d+(?:\.\d+)?)\s*(?:inch|in\.?|"|″|\u201d|\u2033)/gi
 /** Slug form: `12-inch`, `10-25-inch` — not bare `5-graphite` from product lines like G5. */
 const SIZE_HYPHEN_INCH_SLUG_RE = /(\d+(?:\.\d+)?)-inch\b/gi
 /** Fractional inch slugs: `10-1-4` → 10.25 (10¼″). Must run before two-part slug decimal. */
@@ -13,6 +13,8 @@ const FRACTIONAL_THREE_QUARTER_INCH_SLUG_RE = /\b(\d{1,2})-3-4\b/gi
 /** Size before cookware noun: `Seasoned-12-Skillet`, `10-25-cast-iron-skillet`. */
 const SLUG_SIZE_BEFORE_COOKWARE_RE =
   /(?:^|[-/])(\d+(?:\.\d+)?)-(?:cast[-/])?(?:iron[-/])?(?:skillet|pan|frypan|frying|wok|griddle|pot|dutch-oven|cookware)\b/gi
+/** Walmart-style slugs: `Nonstick-8-Fry-Pan`. */
+const SLUG_SIZE_BEFORE_FRY_PAN_RE = /(?:^|[-/])(\d{1,2})-(?:fry-)?pan\b/gi
 const PIECE_COUNT_RE = /(\d+)\s*[-\s]?(?:piece|pc|pk)\b/gi
 
 const STOP_TOKENS = new Set([
@@ -53,7 +55,7 @@ const PRODUCT_LINE_MARKERS = [
 ]
 
 const SIZE_LIST_BEFORE_INCH_RE =
-  /(\d+(?:\.\d+)?(?:\s*,\s*\d+(?:\.\d+)?)+)\s*(?:inch|in\.?|")\b/gi
+  /(\d+(?:\.\d+)?(?:\s*,\s*\d+(?:\.\d+)?)+)\s*(?:inch|in\.?|"|″|\u201d|\u2033)/gi
 
 /** Retailer slug sizes: `10-5` → 10.5, `10-25` → 10.25 (not multi-pan `8-10`). */
 const SLUG_DECIMAL_SIZE_RE = /\b(\d{1,2})-(\d{1,2})\b/gi
@@ -92,6 +94,10 @@ export function extractInchSizes(text: string): number[] {
     if (Number.isFinite(n)) sizes.push(n + 0.75)
   }
   for (const match of t.matchAll(SLUG_SIZE_BEFORE_COOKWARE_RE)) {
+    const n = Number(match[1])
+    if (Number.isFinite(n) && n >= 4 && n <= 20) sizes.push(n)
+  }
+  for (const match of t.matchAll(SLUG_SIZE_BEFORE_FRY_PAN_RE)) {
     const n = Number(match[1])
     if (Number.isFinite(n) && n >= 4 && n <= 20) sizes.push(n)
   }

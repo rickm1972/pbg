@@ -344,72 +344,6 @@
       }
     },
     {
-      "override_id": "desc-override-511f3c3e-7246-4237-b0a7-865642734b77",
-      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
-      "field": "product_description",
-      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780926804437",
-      "proposed_override_text": "Caraway's cooking surface is a ceramic nonstick sol-gel coating. Unlike traditional Teflon-style nonstick, ceramic sol-gel coatings do not rely on fluoropolymer chemistry, which is a point in their favor. However, Caraway's exact coating formulation is proprietary and not publicly disclosed, so the specific food-contact chemistry can't be independently verified. Under the PAC Safety Score methodology, this pan sits in the Caution range because of that disclosure gap — the score reflects incomplete material transparency, not a finding about the coating itself. It's used under high-heat cooking conditions, which the score also reflects.",
-      "status": "pending_review",
-      "created_by": "admin-editor",
-      "created_at": "2026-06-08T14:16:55.434Z",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "resulting_snapshot_id": null,
-      "validation": {
-        "language_ok": true,
-        "negative_score_gate": {
-          "ok": false,
-          "applies": true,
-          "score": 66,
-          "threshold": 75,
-          "failures": [
-            {
-              "check_id": "negative_score.review_missing",
-              "rule": "human_approval_required",
-              "path": "qa.low_score_publication_review",
-              "message": "Score 66 < 75 requires explicit low-score publication review approval."
-            }
-          ],
-          "warnings": [],
-          "required_review": true,
-          "review_status": "missing",
-          "evidence_status": "passed",
-          "language_status": "passed",
-          "gate_version": "4.5.0"
-        },
-        "failures": [
-          {
-            "check_id": "negative_score.review_missing",
-            "rule": "human_approval_required",
-            "path": "qa.low_score_publication_review",
-            "message": "Score 66 < 75 requires explicit low-score publication review approval."
-          }
-        ]
-      },
-      "notes": null,
-      "updated_at": "2026-06-08T14:19:30.314Z",
-      "negative_score_gate_result": {
-        "ok": false,
-        "applies": true,
-        "score": 66,
-        "threshold": 75,
-        "failures": [
-          {
-            "check_id": "negative_score.review_missing",
-            "rule": "human_approval_required",
-            "path": "qa.low_score_publication_review",
-            "message": "Score 66 < 75 requires explicit low-score publication review approval."
-          }
-        ],
-        "warnings": [],
-        "required_review": true,
-        "review_status": "missing",
-        "evidence_status": "passed",
-        "language_status": "passed",
-        "gate_version": "4.5.0"
-      }
-    },
-    {
       "override_id": "desc-override-5fe4feb7-5654-427f-9739-4dbfb821a4a7",
       "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
       "field": "product_description",
@@ -476,72 +410,6 @@
       }
     },
     {
-      "override_id": "desc-override-5139fd79-889a-4a74-bdff-bc2f9c89f276",
-      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
-      "field": "product_description",
-      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780926804437",
-      "proposed_override_text": "Caraway's cooking surface is a ceramic nonstick sol-gel coating. Unlike traditional Teflon-style nonstick, ceramic sol-gel coatings do not rely on fluoropolymer chemistry, which is a point in their favor. However, Caraway's exact coating formulation is proprietary and not publicly disclosed, so its composition can't be independently verified. Under the PAC Safety Score methodology, this pan sits in the Caution range because of that disclosure gap — the score reflects incomplete material transparency, not a problem found with the product itself.",
-      "status": "draft",
-      "created_by": "admin-editor",
-      "created_at": "2026-06-08T14:19:52.131Z",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "resulting_snapshot_id": null,
-      "validation": {
-        "language_ok": true,
-        "negative_score_gate": {
-          "ok": false,
-          "applies": true,
-          "score": 66,
-          "threshold": 75,
-          "failures": [
-            {
-              "check_id": "negative_score.review_missing",
-              "rule": "human_approval_required",
-              "path": "qa.low_score_publication_review",
-              "message": "Score 66 < 75 requires explicit low-score publication review approval."
-            }
-          ],
-          "warnings": [],
-          "required_review": true,
-          "review_status": "missing",
-          "evidence_status": "passed",
-          "language_status": "passed",
-          "gate_version": "4.5.0"
-        },
-        "failures": [
-          {
-            "check_id": "negative_score.review_missing",
-            "rule": "human_approval_required",
-            "path": "qa.low_score_publication_review",
-            "message": "Score 66 < 75 requires explicit low-score publication review approval."
-          }
-        ]
-      },
-      "notes": null,
-      "updated_at": "2026-06-08T14:19:52.131Z",
-      "negative_score_gate_result": {
-        "ok": false,
-        "applies": true,
-        "score": 66,
-        "threshold": 75,
-        "failures": [
-          {
-            "check_id": "negative_score.review_missing",
-            "rule": "human_approval_required",
-            "path": "qa.low_score_publication_review",
-            "message": "Score 66 < 75 requires explicit low-score publication review approval."
-          }
-        ],
-        "warnings": [],
-        "required_review": true,
-        "review_status": "missing",
-        "evidence_status": "passed",
-        "language_status": "passed",
-        "gate_version": "4.5.0"
-      }
-    },
-    {
       "override_id": "desc-override-cd7fca4c-4547-4fe1-9503-8b7fd65fdb8c",
       "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
       "field": "product_description",
@@ -579,6 +447,909 @@
       },
       "notes": null,
       "updated_at": "2026-06-08T14:19:55.384Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 66,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-c248def7-54ac-41ea-8500-9f24ae7d2852",
+      "product_id": "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1780927989584",
+      "proposed_override_text": "Lodge’s cooking surface is bare cast iron — no nonstick coating, no PFAS, and no plastic-based layer between food and pan. Under the PAC Safety Score methodology, cast iron is treated as an inert metal with very low plastic-associated chemical exposure concern, even under high-heat cooking. That is why it earns one of the highest scores in cookware. Seasoned cast iron also develops a natural, durable cooking surface over time.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:22:10.307Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:22:12.031Z",
+      "resulting_snapshot_id": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1781014932025",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": false,
+          "score": 99,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [],
+          "required_review": false,
+          "review_status": "not_required",
+          "evidence_status": "skipped",
+          "language_status": "skipped",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:22:12.031Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": false,
+        "score": 99,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [],
+        "required_review": false,
+        "review_status": "not_required",
+        "evidence_status": "skipped",
+        "language_status": "skipped",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-dcf4839f-6335-48be-8e3e-cac603f56e9c",
+      "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780928046586",
+      "proposed_override_text": "All-Clad’s G5 cooking surface is stainless steel — an inert metal with no nonstick coating and no PFAS. Under the PAC Safety Score methodology, stainless steel carries very low plastic-associated chemical exposure concern, even under high-heat cooking. That is why this pan earns one of the highest scores in cookware. The exact steel grade is not fully published, which is reflected in the Documentation Incomplete badge, but it does not materially change the low PAC exposure concern.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:22:52.451Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:22:53.620Z",
+      "resulting_snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1781014973615",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": false,
+          "score": 99,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [],
+          "required_review": false,
+          "review_status": "not_required",
+          "evidence_status": "skipped",
+          "language_status": "skipped",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:22:53.620Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": false,
+        "score": 99,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [],
+        "required_review": false,
+        "review_status": "not_required",
+        "evidence_status": "skipped",
+        "language_status": "skipped",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-4d762a4a-5121-4cab-aa27-d2408677368e",
+      "product_id": "fd05c5fb-19c2-4bc0-9882-ce73a7644ef5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781015933588",
+      "proposed_override_text": "HexClad uses a proprietary ceramic nonstick coating in the cooking-surface valleys, with laser-etched stainless steel peaks. The manufacturer publishes Light Labs third-party testing showing Non-Detect results for PFAS, PTFE, PFOA, and PFOS — stronger evidence than an unverified marketing claim — but the full coating formula remains proprietary. That combination of real testing plus remaining formula uncertainty is why it scores Good rather than Excellent.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:40:47.310Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:40:48.497Z",
+      "resulting_snapshot_id": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781016048493",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": false,
+          "score": 78,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [],
+          "required_review": false,
+          "review_status": "not_required",
+          "evidence_status": "skipped",
+          "language_status": "skipped",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:40:48.497Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": false,
+        "score": 78,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [],
+        "required_review": false,
+        "review_status": "not_required",
+        "evidence_status": "skipped",
+        "language_status": "skipped",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-b54916de-e6e7-46d5-84b2-8404a7dddbab",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781015933980",
+      "proposed_override_text": "GreenPan’s cooking surface is a ceramic nonstick sol-gel coating over hard-anodized aluminum. This coating category is treated differently from PTFE/PFAS nonstick under the PAC Safety Score methodology, and GreenPan markets the product as PFAS- and PTFE-free. However, those claims were not supported by retrieved third-party test reports for this specific reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:42:20.963Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:54:54.551Z",
+      "resulting_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016894541",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 69,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.methodology_disclaimer_missing",
+              "rule": "review_date_recommended",
+              "path": "display.low_score_last_reviewed_at",
+              "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+            },
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:54:54.551Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 69,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.methodology_disclaimer_missing",
+            "rule": "review_date_recommended",
+            "path": "display.low_score_last_reviewed_at",
+            "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+          },
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-3c5df286-f223-44c0-8fae-c276a7af1a9a",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781015933980",
+      "proposed_override_text": "aaa",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:44:29.816Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:54:58.548Z",
+      "resulting_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016898547",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 69,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.methodology_disclaimer_missing",
+              "rule": "review_date_recommended",
+              "path": "display.low_score_last_reviewed_at",
+              "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+            },
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:54:58.548Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 69,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.methodology_disclaimer_missing",
+            "rule": "review_date_recommended",
+            "path": "display.low_score_last_reviewed_at",
+            "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+          },
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-cbe21dc8-0a5e-4f18-acb8-664b6c7e0842",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781015933980",
+      "proposed_override_text": "GreenPan’s cooking surface is a ceramic nonstick sol-gel coating over hard-anodized aluminum. This coating category is treated differently from PTFE/PFAS nonstick under the PAC Safety Score methodology, and GreenPan markets the product as PFAS- and PTFE-free. However, those claims were not supported by retrieved third-party test reports for this specific reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:54:52.159Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:55:26.109Z",
+      "resulting_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016926108",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 69,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.methodology_disclaimer_missing",
+              "rule": "review_date_recommended",
+              "path": "display.low_score_last_reviewed_at",
+              "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+            },
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:55:26.109Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 69,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.methodology_disclaimer_missing",
+            "rule": "review_date_recommended",
+            "path": "display.low_score_last_reviewed_at",
+            "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+          },
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-99f094d8-8555-4940-8a8f-b20513427ee6",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016926108",
+      "proposed_override_text": "GreenPan’s cooking surface is a ceramic nonstick sol-gel coating over hard-anodized aluminum. This coating category is treated differently from PTFE/PFAS nonstick under the PAC Safety Score methodology, and GreenPan markets the product as PFAS- and PTFE-free. However, those claims were not supported by retrieved third-party test reports for this specific reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:55:30.744Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:55:31.842Z",
+      "resulting_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016931839",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 69,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.methodology_disclaimer_missing",
+              "rule": "review_date_recommended",
+              "path": "display.low_score_last_reviewed_at",
+              "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+            },
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:55:31.842Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 69,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.methodology_disclaimer_missing",
+            "rule": "review_date_recommended",
+            "path": "display.low_score_last_reviewed_at",
+            "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+          },
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-511f3c3e-7246-4237-b0a7-865642734b77",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780926804437",
+      "proposed_override_text": "Caraway's cooking surface is a ceramic nonstick sol-gel coating. Unlike traditional Teflon-style nonstick, ceramic sol-gel coatings do not rely on fluoropolymer chemistry, which is a point in their favor. However, Caraway's exact coating formulation is proprietary and not publicly disclosed, so the specific food-contact chemistry can't be independently verified. Under the PAC Safety Score methodology, this pan sits in the Caution range because of that disclosure gap — the score reflects incomplete material transparency, not a finding about the coating itself. It's used under high-heat cooking conditions, which the score also reflects.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-08T14:16:55.434Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:56:42.246Z",
+      "resulting_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017002241",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 66,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:56:42.246Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 66,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-5139fd79-889a-4a74-bdff-bc2f9c89f276",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780926804437",
+      "proposed_override_text": "Caraway's cooking surface is a ceramic nonstick sol-gel coating. Unlike traditional Teflon-style nonstick, ceramic sol-gel coatings do not rely on fluoropolymer chemistry, which is a point in their favor. However, Caraway's exact coating formulation is proprietary and not publicly disclosed, so its composition can't be independently verified. Under the PAC Safety Score methodology, this pan sits in the Caution range because of that disclosure gap — the score reflects incomplete material transparency, not a problem found with the product itself.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-08T14:19:52.131Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T14:57:25.679Z",
+      "resulting_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017045674",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 66,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T14:57:25.679Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 66,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-2c3a9e5d-c8bc-493a-9afd-395a35c06d62",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017045674",
+      "proposed_override_text": "Caraway's cooking surface is a ceramic nonstick sol-gel coating. Unlike traditional Teflon-style nonstick, ceramic sol-gel coatings do not rely on fluoropolymer chemistry, which is a point in their favor. However, Caraway's exact coating formulation is proprietary and not publicly disclosed, so its composition can't be independently verified. Under the PAC Safety Score methodology, this pan sits in the Caution range because of that disclosure gap — the score reflects incomplete material transparency, not a problem found with the product itself.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:57:23.053Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T15:00:49.201Z",
+      "resulting_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017249196",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 66,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T15:00:49.201Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 66,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-93a3cf64-3a97-4a86-80a2-fc086154e83c",
+      "product_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1780927667891",
+      "proposed_override_text": "This pan’s cooking surface is PTFE nonstick — a fluoropolymer in the PFAS family. Under the PAC Safety Score methodology, PTFE-coated cookware scores at the bottom of our range because high-heat cooking creates greater concern for this type of coating. For lower-PAC cookware options, see the cast iron and stainless steel alternatives.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T15:01:35.140Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T15:01:37.712Z",
+      "resulting_snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017297707",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 2,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T15:01:37.712Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 2,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-69858e6b-e871-4cd9-a89d-7000e6e745d6",
+      "product_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017297707",
+      "proposed_override_text": "This pan's cooking surface is PTFE nonstick — a fluoropolymer in the PFAS family. Unlike bare cast iron or stainless steel, PTFE is a plastic-associated coating applied directly to the food-contact surface. Under the PAC Safety Score methodology, PTFE-coated cookware scores at the bottom of our range because high-heat cooking creates greater concern for this type of coating. It sits in High Risk because the score is driven by the coating material and cooking conditions, not by a defect found in this specific pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T15:05:04.363Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T15:05:05.126Z",
+      "resulting_snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017505122",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 2,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T15:05:05.126Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 2,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-7342c65d-4362-491b-a27b-0715dbb4195f",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017249196",
+      "proposed_override_text": "Caraway’s cooking surface is a ceramic nonstick sol-gel coating. This coating category is treated differently from PTFE/PFAS nonstick under the PAC Safety Score methodology, and Caraway markets the product as PFAS- and PTFE-free. However, those claims were not supported by retrieved third-party test reports for the reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T14:56:41.440Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T15:06:07.260Z",
+      "resulting_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017567254",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 66,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T15:06:07.260Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 66,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-9fd61fff-4d8b-4295-b6c4-ad656b7aa04f",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016931839",
+      "proposed_override_text": "GreenPan’s cooking surface is a ceramic nonstick sol-gel coating over hard-anodized aluminum. That is a different coating category from PTFE nonstick, which is a fluoropolymer in the PFAS family. GreenPan markets the product as PFAS- and PTFE-free, but those claims were not supported by retrieved third-party test reports for this specific reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T15:19:27.877Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T15:19:28.768Z",
+      "resulting_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781018368761",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 69,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.methodology_disclaimer_missing",
+              "rule": "review_date_recommended",
+              "path": "display.low_score_last_reviewed_at",
+              "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+            },
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T15:19:28.769Z",
+      "negative_score_gate_result": {
+        "ok": true,
+        "applies": true,
+        "score": 69,
+        "threshold": 75,
+        "failures": [],
+        "warnings": [
+          {
+            "check_id": "negative_score.methodology_disclaimer_missing",
+            "rule": "review_date_recommended",
+            "path": "display.low_score_last_reviewed_at",
+            "message": "display.low_score_last_reviewed_at is missing — required for on-page review date stamp in a future task."
+          },
+          {
+            "check_id": "negative_score.review_stale",
+            "rule": "review_concern_drift",
+            "path": "qa.low_score_publication_review.primary_score_driving_concern",
+            "message": "Review primary concern may not match current assembly primary concern."
+          }
+        ],
+        "required_review": true,
+        "review_status": "approved",
+        "evidence_status": "passed",
+        "language_status": "passed",
+        "gate_version": "4.5.0"
+      }
+    },
+    {
+      "override_id": "desc-override-efda4532-9dce-43d3-8ce8-dce901c0fa4d",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "field": "product_description",
+      "previous_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017567254",
+      "proposed_override_text": "Caraway’s cooking surface is a ceramic nonstick sol-gel coating. That is a different coating category from PTFE nonstick, which is a fluoropolymer in the PFAS family. Caraway markets the product as PFAS- and PTFE-free, but those claims were not supported by retrieved third-party test reports for this specific reviewed product, and the exact formulation remains proprietary. It sits in Caution because of that verification and disclosure gap, not because a specific problem was found with the pan.",
+      "status": "approved",
+      "created_by": "admin-editor",
+      "created_at": "2026-06-09T15:19:43.559Z",
+      "reviewed_by": "admin-editor",
+      "reviewed_at": "2026-06-09T15:19:44.482Z",
+      "resulting_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781018384477",
+      "validation": {
+        "language_ok": true,
+        "negative_score_gate": {
+          "ok": true,
+          "applies": true,
+          "score": 66,
+          "threshold": 75,
+          "failures": [],
+          "warnings": [
+            {
+              "check_id": "negative_score.review_stale",
+              "rule": "review_concern_drift",
+              "path": "qa.low_score_publication_review.primary_score_driving_concern",
+              "message": "Review primary concern may not match current assembly primary concern."
+            }
+          ],
+          "required_review": true,
+          "review_status": "approved",
+          "evidence_status": "passed",
+          "language_status": "passed",
+          "gate_version": "4.5.0"
+        },
+        "failures": []
+      },
+      "notes": null,
+      "updated_at": "2026-06-09T15:19:44.482Z",
       "negative_score_gate_result": {
         "ok": true,
         "applies": true,

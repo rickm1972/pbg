@@ -8,6 +8,8 @@ import {
   isPtfeFamilyPrimary,
   PTFE_FAMILY_PRIMARY_IDS,
 } from '../canonical-taxonomy/inert-cookware-structural.mjs'
+import { isHybridFoodContactPrimary } from '../canonical-taxonomy/hybrid-cookware-structural.mjs'
+import { requiresLabResultRetrieval } from '../agent1/lab-result-retrieval.mjs'
 
 /**
  * @param {object} structured
@@ -84,6 +86,18 @@ export function detectPatternTriggers(structured, mappings, sources = []) {
   // PTFE cookware always requires PFOA-vs-PFAS distinction retrieval (Phase 3.7).
   if (triggers.has('ptfe_primary_contact')) {
     triggers.add('pfoa_pfas_distinction')
+  }
+
+  if (
+    isHybridFoodContactPrimary(primaryId) ||
+    triggers.has('proprietary_coating') ||
+    triggers.has('ceramic_nonstick_coating')
+  ) {
+    triggers.add('pfoa_pfas_distinction')
+  }
+
+  if (requiresLabResultRetrieval(mappings, structured)) {
+    triggers.add('coated_nonstick_lab_results')
   }
 
   return triggers

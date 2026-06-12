@@ -1,6 +1,13 @@
 import { normalizeDisclosureBadge, normalizeWhyThisScoreOption } from './whyThisScoreVocabulary'
 import { CERT_VERIFICATION_ABSENT } from './whyThisScoreVocabulary'
 
+export const MANUFACTURER_LAB_TESTING_OPTION_RE =
+  /^Manufacturer-published third-party lab testing/i
+
+export function isManufacturerLabTestingCertOption(option: string): boolean {
+  return MANUFACTURER_LAB_TESTING_OPTION_RE.test(String(option ?? '').trim())
+}
+
 /** Public prose when disclosure is strong (Fully Disclosed). */
 export const CERT_ABSENT_PUBLIC_DISCLOSED =
   'No third-party certification found; material identity is clearly disclosed.'
@@ -140,9 +147,15 @@ export function publicCertificationOption(
   disclosureBadge?: string | null,
   primaryMaterialOptions?: string[] | null,
   coatingsFinishesOptions?: string[] | null,
+  options?: { hasLabTesting?: boolean },
 ): string {
+  if (isManufacturerLabTestingCertOption(option)) return option
+
   const canonical = normalizeWhyThisScoreOption('certifications_options', option)
   if (canonical === CERT_VERIFICATION_ABSENT) {
+    if (options?.hasLabTesting) {
+      return CERT_VERIFICATION_ABSENT
+    }
     return publicCertificationAbsenceCopy(
       disclosureBadge,
       primaryMaterialOptions,
@@ -150,4 +163,33 @@ export function publicCertificationOption(
     )
   }
   return option
+}
+
+/**
+ * Public Certifications & testing rows — lab testing and certification absence stay separate.
+ */
+export function publicCertificationsForDisplay(
+  options: string[],
+  disclosureBadge?: string | null,
+  primaryMaterialOptions?: string[] | null,
+  coatingsFinishesOptions?: string[] | null,
+): string[] {
+  const visible = (options ?? []).filter((o) => o && o !== 'None')
+  const labRows = visible.filter(isManufacturerLabTestingCertOption)
+  const hasLabTesting = labRows.length > 0
+  const out: string[] = [...labRows]
+
+  for (const option of visible) {
+    if (isManufacturerLabTestingCertOption(option)) continue
+    const shaped = publicCertificationOption(
+      option,
+      disclosureBadge,
+      primaryMaterialOptions,
+      coatingsFinishesOptions,
+      { hasLabTesting },
+    )
+    if (!out.includes(shaped)) out.push(shaped)
+  }
+
+  return out
 }

@@ -29,6 +29,7 @@ import {
   cosmeticProductDescriptionWarningMessage,
   isProductDescriptionScoreBlocking,
 } from '../../../src/shared/agent2/output-contract.mjs'
+import { extractManufacturerPublishedLabTesting } from '../../../src/shared/agent2/manufacturer-lab-testing-evidence.mjs'
 
 /**
  * @param {object} product
@@ -50,7 +51,11 @@ export function runAgent2NormalizationPipeline(product, evidence) {
     product_category_default: category,
     subcategory: product.subcategory,
   }
-  const step3 = applyServerInferenceRules(step2, pipelineCtx)
+  const testing_evidence = extractManufacturerPublishedLabTesting(evidence)
+  const step3 = applyServerInferenceRules(step2, pipelineCtx, {
+    evidence,
+    testingEvidence: testing_evidence,
+  })
 
   const step4 = runLayer4aStep(evidence, step3.components, category)
 
@@ -86,6 +91,7 @@ export function runAgent2NormalizationPipeline(product, evidence) {
     layer_4a_positive_reasoning: step4.layer_4a_positive_reasoning,
     layer_4a: step4.layer_4a,
     layer_4a_verified: step4.layer_4a_verified,
+    testing_evidence,
     layer_4b: step6,
     human_review_required: step4.human_review_required,
     human_review_reason: step4.human_review_reason,

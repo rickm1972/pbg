@@ -1,4 +1,6 @@
 import type { ApprovalBlockers } from '../../lib/evidenceVersionFields'
+import { listIncompleteScoreDrivingExternalChecks } from '../../lib/gate1ApprovalEligibility'
+import type { Agent1ProposedInput } from '../../types/lockedInput'
 import type { ProductEvidence, ProductPipelineRow, RequiredEvidenceValidationPayload } from '../../types/agent'
 
 type Props = {
@@ -7,6 +9,7 @@ type Props = {
   validation: RequiredEvidenceValidationPayload | null | undefined
   approvalBlockers: ApprovalBlockers
   legacy: boolean
+  proposedInput?: Agent1ProposedInput | null
 }
 
 export function Gate1DecisionSummary({
@@ -15,14 +18,17 @@ export function Gate1DecisionSummary({
   validation,
   approvalBlockers,
   legacy,
+  proposedInput = null,
 }: Props) {
   const s = validation?.summary
-  const approvalBlocked = s?.approval_blocked ?? !approvalBlockers.canApprove
+  const approvalBlocked = !approvalBlockers.canApprove
   const scoreBlocking = s?.score_blocking_gaps ?? 0
   const nonScore = s?.non_score_gaps ?? 0
+  const externalChecksComplete =
+    listIncompleteScoreDrivingExternalChecks(validation).length === 0
+  const incompleteExternal = listIncompleteScoreDrivingExternalChecks(validation)
 
-  const approvable =
-    !legacy && approvalBlockers.canApprove && !approvalBlocked
+  const approvable = !legacy && approvalBlockers.canApprove
 
   let statement = ''
   if (legacy) {
@@ -30,8 +36,6 @@ export function Gate1DecisionSummary({
   } else if (approvable) {
     statement =
       'Evidence packet is approvable: required matrix and canonical mappings have no score-blocking gaps. Acknowledge any non-score warnings, then approve.'
-  } else if (approvalBlocked && validation?.approval_blockers?.length) {
-    statement = validation.approval_blockers[0]
   } else if (!approvalBlockers.canApprove) {
     statement = approvalBlockers.reasons[0] ?? 'Resolve blockers below before approving.'
   } else {
@@ -84,12 +88,20 @@ export function Gate1DecisionSummary({
         />
         <Metric
           label="External checks"
-          value={
-            s ? (s.required_external_checks_complete ? 'Complete' : 'Incomplete') : legacy ? 'N/A' : '—'
-          }
-          ok={s?.required_external_checks_complete ?? false}
+          value={s ? (externalChecksComplete ? 'Complete' : 'Incomplete') : legacy ? 'N/A' : '—'}
+          ok={externalChecksComplete}
         />
       </div>
+
+      {!externalChecksComplete && incompleteExternal.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-red-900">
+          {incompleteExternal.map((item) => (
+            <li key={item.id}>
+              {item.label}: {item.detail ?? item.status}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <p className="mt-4 text-sm font-medium text-ink-900">{statement}</p>
 
@@ -100,6 +112,19 @@ export function Gate1DecisionSummary({
           ))}
         </ul>
       ) : null}
+
+      {proposedInput ? (
+        <p className="mt-3 text-xs text-slate-600">
+          Proposed closed-field draft:{' '}
+          <span className="font-mono text-slate-800">{proposedInput.proposed_input_id}</span>
+          {' · '}
+          status <span className="font-semibold">{proposedInput.proposal_status}</span>
+          {' · '}
+          non-authoritative (Phase 2)
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-slate-500">No proposed closed-field draft linked to this evidence bundle yet.</p>
+      )}
     </section>
   )
 }

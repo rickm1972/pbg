@@ -5,6 +5,12 @@
 
 import { LAYER_4A_POSITIVE_MAX, lookupLayer4aPositive } from '../layer4a-positive.mjs'
 import { isUnknownFoodContactCoatingMaterial } from './material-taxonomy.mjs'
+import {
+  isKnownProprietaryCeramicNonstickMaterial,
+  isTrulyUnknownProprietaryCoatingMaterial,
+  LAYER_4A_PROPRIETARY_CHEMISTRY_UNDISCLOSED,
+  LAYER_4A_UNKNOWN_PROPRIETARY_COATING,
+} from '../../../src/shared/agent2/proprietary-ceramic-nonstick.mjs'
 import { factByKey, factValue } from './evidence-facts.mjs'
 import {
   safetyClaimContradictsMaterials,
@@ -15,15 +21,14 @@ import {
   getSafetyClaims,
   tokensFromStructuredVerifiedCerts,
 } from './schema-input.mjs'
+import { hasManufacturerPublishedLabTesting } from '../../../src/shared/agent2/manufacturer-lab-testing-evidence.mjs'
 
 const NEG_BPA_ONLY = {
   reason: 'BPA-free claim only, no BPS/BPF testing',
   value: -1,
 }
-const NEG_UNKNOWN_COATING = {
-  reason: 'Unknown proprietary food-contact coating',
-  value: -3,
-}
+const NEG_UNKNOWN_COATING = LAYER_4A_UNKNOWN_PROPRIETARY_COATING
+const NEG_PROPRIETARY_CHEMISTRY = LAYER_4A_PROPRIETARY_CHEMISTRY_UNDISCLOSED
 const NEG_MARKETING = {
   reason: 'Marketing language only, no verifiable claims',
   value: -2,
@@ -178,15 +183,29 @@ function appliesBpaFreeOnlyNegative(evidence, components) {
   return true
 }
 
-function appliesUnknownCoatingNegative(components) {
-  return components.some(
-    (c) =>
-      (c.role === 'primary_food_contact' || c.role === 'coating') &&
-      isUnknownFoodContactCoatingMaterial(c.material_id),
-  )
+function appliesTrulyUnknownCoatingNegative(components, evidence) {
+  return components.some((c) => {
+    const role = c.role ?? c.component_role
+    if (role !== 'primary_food_contact' && role !== 'coating') return false
+    if (isKnownProprietaryCeramicNonstickMaterial(c.material_id, c, evidence)) return false
+    return (
+      isTrulyUnknownProprietaryCoatingMaterial(c.material_id, c, evidence) ||
+      isUnknownFoodContactCoatingMaterial(c.material_id)
+    )
+  })
+}
+
+function appliesProprietaryCeramicUndisclosedNegative(components, evidence) {
+  return components.some((c) => {
+    const role = c.role ?? c.component_role
+    if (role !== 'primary_food_contact' && role !== 'coating') return false
+    return isKnownProprietaryCeramicNonstickMaterial(c.material_id, c, evidence)
+  })
 }
 
 function appliesMarketingLanguageNegative(evidence, components, unknownCoating) {
+  if (hasManufacturerPublishedLabTesting(evidence)) return false
+
   if (unknownCoating) return true
 
   const safety = getSafetyClaims(evidence)
@@ -243,11 +262,17 @@ export function buildLayer4a(evidence, components, category) {
   if (appliesBpaFreeOnlyNegative(evidence, components)) {
     negative_candidates.push(NEG_BPA_ONLY)
   }
-  const unknownCoating = appliesUnknownCoatingNegative(components)
-  if (unknownCoating) {
+  const trulyUnknownCoating = appliesTrulyUnknownCoatingNegative(components, evidence)
+  const proprietaryCeramicUndisclosed = appliesProprietaryCeramicUndisclosedNegative(
+    components,
+    evidence,
+  )
+  if (trulyUnknownCoating) {
     negative_candidates.push(NEG_UNKNOWN_COATING)
+  } else if (proprietaryCeramicUndisclosed) {
+    negative_candidates.push(NEG_PROPRIETARY_CHEMISTRY)
   }
-  if (appliesMarketingLanguageNegative(evidence, components, unknownCoating)) {
+  if (appliesMarketingLanguageNegative(evidence, components, trulyUnknownCoating)) {
     negative_candidates.push(NEG_MARKETING)
   }
   if (appliesTextileDyeNegative(category, evidence)) {
@@ -262,7 +287,8 @@ export function buildLayer4a(evidence, components, category) {
       positive_adjustments,
       negative_adjustments: negative_candidates,
       net_adjustment: Math.max(-5, Math.min(5, positiveSum + negativeSum)),
-      unknown_coating_cap_applies: unknownCoating,
+      unknown_coating_cap_applies: trulyUnknownCoating,
+      proprietary_ceramic_formula_undisclosed: proprietaryCeramicUndisclosed,
     },
   }
 }

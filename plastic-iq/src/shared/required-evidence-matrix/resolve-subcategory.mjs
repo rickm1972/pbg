@@ -22,6 +22,8 @@ export function isFormulationSubcategory(subcategory) {
 export const MATRIX_SUBCATEGORY_KEYS = [
   'cookware',
   'food_storage',
+  'water_bottles',
+  'drinkware',
   'water_bottles_drinkware',
   'cooking_utensils',
   'textiles',

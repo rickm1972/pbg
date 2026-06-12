@@ -7,6 +7,11 @@ import {
   hasPrimaryInferredComponent,
 } from '../agent3/confidence-interval.mjs'
 import { deriveLayer4bTransparencyFromContract } from '../../src/shared/agent2/layer4b-transparency-contract.mjs'
+import {
+  hasManufacturerPublishedLabTesting,
+  marketingLanguageStripNormalizationNote,
+  marketingLanguageStripVerifiedAction,
+} from '../../src/shared/agent2/manufacturer-lab-testing-evidence.mjs'
 import { safetyClaimContradictsMaterials } from './safety-claim-contradiction.mjs'
 
 const MARKETING_LANGUAGE_REASON = 'marketing language only, no verifiable claims'
@@ -49,6 +54,7 @@ function hasUnknownFoodContactCoating(inputs) {
 
 /** Marketing-language -2 does not apply when materials are fully disclosed (e.g. Lodge cast iron). */
 export function shouldStripMarketingLanguageNegative(inputs) {
+  if (hasManufacturerPublishedLabTesting(inputs.evidence)) return true
   if (inputs.layer_4a?.unknown_coating_cap_applies) return false
   if (hasPrimaryInferredComponent(inputs)) return false
   if (hasUnknownFoodContactCoating(inputs)) return false
@@ -94,8 +100,7 @@ export function stripMarketingLanguageNegative(inputs) {
     adjustment: MARKETING_LANGUAGE_REASON,
     matched: false,
     value: 0,
-    action_taken:
-      'stripped — materials fully disclosed; no unknown food-contact coating (V2.3.4)',
+    action_taken: marketingLanguageStripVerifiedAction(inputs.evidence),
   })
   inputs.layer_4a_verified = verified
 
@@ -170,7 +175,7 @@ export function finalizeNormalization(inputs) {
   if (stripped) {
     current.normalization_notes = [
       current.normalization_notes,
-      'Server stripped Marketing language only Layer 4A — not applicable when manufacturer fully discloses materials.',
+      marketingLanguageStripNormalizationNote(current.evidence),
     ]
       .filter(Boolean)
       .join(' ')

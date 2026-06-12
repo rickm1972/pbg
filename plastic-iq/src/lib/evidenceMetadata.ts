@@ -1,7 +1,8 @@
 import type { AgentMetadata, StructuredEvidencePayload } from '../types/agent'
+import { collectGate1AcknowledgmentWarnings } from '../shared/agent1/approval-gating-contract.mjs'
 
 export function getWarnings(metadata: AgentMetadata): string[] {
-  return metadata.warnings ?? []
+  return collectGate1AcknowledgmentWarnings(metadata)
 }
 
 export function getStructuredEvidence(

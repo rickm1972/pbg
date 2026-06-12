@@ -1,0 +1,207 @@
+{
+  "meta": {
+    "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017045674",
+    "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+    "version_sequence": 5,
+    "source_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017002241",
+    "reason": "description_override",
+    "override_id": "desc-override-5139fd79-889a-4a74-bdff-bc2f9c89f276",
+    "approved_at": "2026-06-09T14:57:25.674Z",
+    "approved_by": "admin-editor",
+    "low_score_publication_review": {
+      "reviewer_id": "fixture-reviewer",
+      "reviewed_at": "2026-06-05T12:00:00.000Z",
+      "low_score_gate_version": "4.5.0",
+      "score_at_review": 66,
+      "primary_score_driving_concern": "Admin-approved override",
+      "evidence_sufficiency": "passed",
+      "language_safety": "passed",
+      "approval_status": "approved",
+      "reviewer_notes": "Fixture-approved low-score publication review."
+    },
+    "immutable": true
+  },
+  "record": {
+    "contract_version": "0.25.0",
+    "published_at": "2026-06-09T14:57:25.674Z",
+    "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+    "evidence_content_hash": "",
+    "normalization_content_hash": "",
+    "display_content_hash": "",
+    "score_content_hash": "",
+    "assembled_content_hash": "",
+    "display": {
+      "input_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "evidence_id": "",
+      "evidence_content_hash": "",
+      "normalization_content_hash": "",
+      "product_title": "Caraway Nonstick Ceramic Frying Pan 10.5 Inch",
+      "primary_material": "Ceramic nonstick sol-gel coating",
+      "disclosure_sentence": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+      "product_description": "Caraway's cooking surface is a ceramic nonstick sol-gel coating. Unlike traditional Teflon-style nonstick, ceramic sol-gel coatings do not rely on fluoropolymer chemistry, which is a point in their favor. However, Caraway's exact coating formulation is proprietary and not publicly disclosed, so its composition can't be independently verified. Under the PAC Safety Score methodology, this pan sits in the Caution range because of that disclosure gap — the score reflects incomplete material transparency, not a problem found with the product itself.",
+      "secondary_materials": [
+        {
+          "name": "Aluminum core",
+          "note": null
+        },
+        {
+          "name": "Stainless steel handle",
+          "note": null
+        }
+      ],
+      "coatings": "Ceramic nonstick sol-gel coating",
+      "use_conditions": [
+        "Oven heat with fat exposure",
+        "Stovetop heat with fat exposure"
+      ],
+      "disclosure_quality": "Material Uncertain",
+      "cert_line": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+      "risk_bars": [
+        {
+          "id": "material",
+          "label": "Contact material: Ceramic nonstick sol-gel coating",
+          "fill_percent": 56,
+          "color_token": "amber",
+          "status_label": "Moderate concern · coating uncertainty"
+        },
+        {
+          "id": "migration",
+          "label": "Migration",
+          "fill_percent": 50,
+          "color_token": "amber",
+          "status_label": "Moderate migration"
+        },
+        {
+          "id": "use_conditions",
+          "label": "Use conditions",
+          "fill_percent": 4,
+          "color_token": "red",
+          "status_label": "Harsh"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://www.amazon.com/Caraway-Nonstick-Ceramic-Frying-10-5/dp/B09SS34H3K",
+          "group": "Retailer",
+          "label": "Amazon — Caraway Nonstick Ceramic Frying Pan 10.5 Inch",
+          "public_source_eligible": true,
+          "source_role": "retailer_primary",
+          "variant_mismatch": false,
+          "footnote": null
+        },
+        {
+          "url": "https://www.carawayhome.com/products/fry-pan",
+          "group": "Manufacturer",
+          "label": "Manufacturer product",
+          "public_source_eligible": true,
+          "source_role": "manufacturer",
+          "variant_mismatch": false,
+          "footnote": null
+        },
+        {
+          "url": "https://thenewknew.com/caraway-cookware-review/",
+          "group": "Context",
+          "label": "My Honest Review of Caraway Cookware (Is It Safe?) | The New Knew",
+          "public_source_eligible": true,
+          "source_role": "context",
+          "variant_mismatch": false,
+          "footnote": "Third-party or background context — not manufacturer product confirmation."
+        }
+      ],
+      "why_this_score": {
+        "primary_material": "Ceramic nonstick sol-gel coating",
+        "secondary_materials": [
+          "Aluminum core",
+          "Stainless steel handle"
+        ],
+        "coatings": "Ceramic nonstick sol-gel coating",
+        "use_conditions": [
+          "Oven heat with fat exposure",
+          "Stovetop heat with fat exposure"
+        ],
+        "disclosure_quality": "Material Uncertain",
+        "cert_line": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+        "sections": [
+          {
+            "title": "Primary material",
+            "items": [
+              {
+                "text": "Ceramic nonstick sol-gel coating",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Secondary materials",
+            "items": [
+              {
+                "text": "Aluminum core",
+                "note": null
+              },
+              {
+                "text": "Stainless steel handle",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Coatings & finishes",
+            "items": [
+              {
+                "text": "Ceramic nonstick sol-gel coating",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Use conditions",
+            "items": [
+              {
+                "text": "Oven heat with fat exposure",
+                "note": null
+              },
+              {
+                "text": "Stovetop heat with fat exposure",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Disclosure quality",
+            "items": [
+              {
+                "text": "Material Uncertain",
+                "note": null
+              }
+            ]
+          },
+          {
+            "title": "Certifications & testing",
+            "items": [
+              {
+                "text": "No third-party certification found; most materials are identified, but some manufacturer documentation details remain incomplete.",
+                "note": null
+              }
+            ]
+          }
+        ]
+      },
+      "badge_summary": "Material Uncertain — the material family is identified, but key details that affect exposure risk are not fully disclosed.",
+      "buy_section_title": "Product listings",
+      "retailer_caution_note": null,
+      "sources_intro": "Sources used for this score, including retailer, manufacturer, and context sources where applicable.",
+      "safer_alternatives_subhead": "Higher PAC Safety Scores in this category.",
+      "safer_alternatives_footer": "These alternatives have higher PAC Safety Scores.",
+      "methodology_disclaimer": "The PAC Safety Score reflects plastic-associated-chemical exposure risk under our methodology, based on disclosed materials as of the review date. It is not an overall product safety or quality judgment.",
+      "low_score_last_reviewed_at": "2026-06-08"
+    },
+    "score": {
+      "pac_safety_score": 66,
+      "tier": "Caution",
+      "displayed_confidence_range": "54–78",
+      "transparency_badge": "Material Uncertain"
+    },
+    "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017045674",
+    "content_hash": "e1ad423b1dc33bc73a2a9322b066137e5030b606a938d80f91ae30b40cca4c6a"
+  }
+}

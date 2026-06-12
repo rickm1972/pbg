@@ -4,6 +4,10 @@
  */
 
 import { isPacRelevant, resolveCertEntry } from '../../src/shared/certification-taxonomy.mjs'
+import {
+  extractManufacturerPublishedLabTesting,
+  formatManufacturerLabTestingCertOption,
+} from '../../src/shared/agent2/manufacturer-lab-testing-evidence.mjs'
 import { isExpansionRequired } from '../../src/shared/canonical-taxonomy/constants.mjs'
 import {
   isFoodContactCoatingPrimaryMaterial,
@@ -151,7 +155,7 @@ function mapDisclosureQuality(inputs, evidence) {
   return finalizeOptions([], 'disclosure_quality_options')
 }
 
-function mapCertifications(evidence) {
+function mapCertifications(evidence, inputs) {
   const rows = evidence?.agent_metadata?.certifications_verified ?? []
   const picked = []
   for (const row of rows) {
@@ -163,8 +167,19 @@ function mapCertifications(evidence) {
     const label = resolveCertEntry(raw)?.name ?? raw
     if (!picked.includes(label)) picked.push(label)
   }
-  if (!picked.length) {
-    return finalizeOptions([CERT_VERIFICATION_ABSENT], 'certifications_options')
+
+  const lab =
+    inputs?.testing_evidence ?? extractManufacturerPublishedLabTesting(evidence)
+  const labOption = formatManufacturerLabTestingCertOption(lab)
+  if (labOption && !picked.includes(labOption)) picked.push(labOption)
+
+  const pacCerts = picked.filter(
+    (p) => p !== CERT_VERIFICATION_ABSENT && p !== labOption,
+  )
+  if (!pacCerts.length) {
+    const base = [CERT_VERIFICATION_ABSENT]
+    if (labOption) base.push(labOption)
+    return finalizeOptions(base, 'certifications_options')
   }
   return finalizeOptions(picked, 'certifications_options')
 }
@@ -180,7 +195,7 @@ export function buildWhyThisScoreOptions(evidence, inputs) {
     coatings_finishes_options: mapCoatingsFinishes(evidence, inputs),
     use_conditions_options: mapUseConditions(evidence, inputs),
     disclosure_quality_options: mapDisclosureQuality(inputs, evidence),
-    certifications_options: mapCertifications(evidence),
+    certifications_options: mapCertifications(evidence, inputs),
   }
 }
 

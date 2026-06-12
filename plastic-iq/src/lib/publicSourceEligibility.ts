@@ -7,6 +7,13 @@ import {
   stripPublicSourceRolePrefix,
   urlPathContainsSizeSlug,
 } from './publicSourceTitleFormat'
+import { isThirdPartySource } from '../shared/agent1/source-authority.mjs'
+import {
+  isCrossBrandContextArticle,
+  isLegitimateManufacturerPublicSource,
+  isVideoContextHost,
+  manufacturerHostMatchesBrand,
+} from './publicSourceClassification'
 
 export type PublicSourceContractEligibility = {
   public_source_eligible: boolean
@@ -25,7 +32,7 @@ function parseSlugDecimalInch(wholePart: string, fracPart: string): number | nul
 /** Inch sizes explicitly stated in prose (avoids G5 / slug false positives). */
 function explicitTitleInchSizes(text: string): number[] {
   const sizes: number[] = []
-  const re = /(\d+(?:\.\d+)?)\s*(?:inch|in\.?|")\b/gi
+  const re = /(\d+(?:\.\d+)?)\s*(?:inch|in\.?|"|″|\u201d|\u2033)/gi
   for (const match of String(text ?? '').matchAll(re)) {
     const n = Number(match[1])
     if (Number.isFinite(n)) sizes.push(n)
@@ -94,15 +101,6 @@ function isManufacturerCollectionPath(url: string): boolean {
   return /\/collections?\//i.test(urlPathname(url))
 }
 
-function manufacturerHostMatchesBrand(url: string, brand: string | null | undefined): boolean {
-  const normalizedBrand = String(brand ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-  if (!normalizedBrand) return false
-  const host = hostOf(url).replace(/[^a-z0-9]/g, '')
-  return host.includes(normalizedBrand)
-}
-
 /**
  * Derived public display contract: whether a source may render on the product page.
  * Variant-mismatched manufacturer/context product pages are excluded — not renamed.
@@ -135,6 +133,24 @@ export function resolvePublicSourceContractEligibility(
   }
 
   if (source.public_label === 'Manufacturer') {
+    if (
+      isThirdPartySource(
+        { source_type: source.source_type, url },
+        url,
+      ) ||
+      isVideoContextHost(url) ||
+      !isLegitimateManufacturerPublicSource(
+        { source_type: source.source_type, url },
+        url,
+        contract?.brand,
+      )
+    ) {
+      return {
+        public_source_eligible: false,
+        hide_reason: 'Third-party or non-brand host — not manufacturer product confirmation.',
+      }
+    }
+
     const isProductPath = isManufacturerProductPath(url)
     const isCollection = isManufacturerCollectionPath(url)
 
@@ -184,6 +200,13 @@ export function resolvePublicSourceContractEligibility(
   }
 
   if (source.public_label === 'Context') {
+    if (isCrossBrandContextArticle(url, title, contract?.brand)) {
+      return {
+        public_source_eligible: false,
+        hide_reason: 'Cross-brand background article — not shown on this product page.',
+      }
+    }
+
     const onManufacturerHost =
       manufacturerHostMatchesBrand(url, contract?.brand) || isManufacturerProductPath(url)
     if (

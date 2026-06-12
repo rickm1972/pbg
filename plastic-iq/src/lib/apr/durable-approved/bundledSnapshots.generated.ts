@@ -4,13 +4,17 @@ import TFalApproved from './t-fal-approved.json' with { type: 'json' }
 import CarawayApproved from './caraway-approved.json' with { type: 'json' }
 import LodgeApproved from './lodge-approved.json' with { type: 'json' }
 import AllCladApproved from './all-clad-approved.json' with { type: 'json' }
+import HexcladApproved from './hexclad-approved.json' with { type: 'json' }
+import GreenpanApproved from './greenpan-approved.json' with { type: 'json' }
 
 export const BUNDLED_MANIFEST = {
   "latest_by_product": {
-    "7a457a86-ab62-4cbf-90b9-ccaeafe06896": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1780927667891",
-    "e451b158-6094-44f9-9628-a2a25974482e": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780928395382",
-    "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1780927989584",
-    "c645ae86-0b82-429d-8f46-78b8007041b5": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780928046586"
+    "7a457a86-ab62-4cbf-90b9-ccaeafe06896": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017505122",
+    "e451b158-6094-44f9-9628-a2a25974482e": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781018384477",
+    "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1781014932025",
+    "c645ae86-0b82-429d-8f46-78b8007041b5": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1781014973615",
+    "fd05c5fb-19c2-4bc0-9882-ce73a7644ef5": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781016048493",
+    "860b2128-015b-4d8d-8710-7ad7751ec7c5": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781018368761"
   }
 } as const
 
@@ -18,10 +22,14 @@ export const TFalApproved_STORED = TFalApproved as StoredApprovedSnapshotVersion
 export const CarawayApproved_STORED = CarawayApproved as StoredApprovedSnapshotVersion
 export const LodgeApproved_STORED = LodgeApproved as StoredApprovedSnapshotVersion
 export const AllCladApproved_STORED = AllCladApproved as StoredApprovedSnapshotVersion
+export const HexcladApproved_STORED = HexcladApproved as StoredApprovedSnapshotVersion
+export const GreenpanApproved_STORED = GreenpanApproved as StoredApprovedSnapshotVersion
 
 export const BUNDLED_BY_PRODUCT: Record<string, StoredApprovedSnapshotVersion> = {
   ['7a457a86-ab62-4cbf-90b9-ccaeafe06896']: TFalApproved_STORED,
   ['e451b158-6094-44f9-9628-a2a25974482e']: CarawayApproved_STORED,
   ['1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8']: LodgeApproved_STORED,
   ['c645ae86-0b82-429d-8f46-78b8007041b5']: AllCladApproved_STORED,
+  ['fd05c5fb-19c2-4bc0-9882-ce73a7644ef5']: HexcladApproved_STORED,
+  ['860b2128-015b-4d8d-8710-7ad7751ec7c5']: GreenpanApproved_STORED,
 }

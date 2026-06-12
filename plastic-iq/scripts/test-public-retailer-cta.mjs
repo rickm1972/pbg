@@ -85,8 +85,12 @@ const lodgeWalmart = evaluatePublicRetailerCtaEligibility(
   null,
   lodgeProduct,
 )
-assert.equal(lodgeWalmart.allowed, true, 'admin walmart_url always allowed unless Gate 1 rejects exact URL')
-assert.equal(lodgeWalmart.reason, 'admin_curated_product_link')
+assert.equal(
+  lodgeWalmart.allowed,
+  false,
+  '12″ Walmart listing must be hidden for 10.25″ Lodge product',
+)
+assert.equal(lodgeWalmart.reason, 'admin_url_variant_mismatch')
 
 assert.equal(publicRetailerSectionTitle('Excellent'), 'Where to buy')
 assert.equal(publicRetailerSectionTitle('Caution'), 'Product listings')

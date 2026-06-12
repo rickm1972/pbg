@@ -8,9 +8,16 @@ import {
   resolvePrimaryContactEntry,
   resolveSubstrateEntry,
 } from '../../src/shared/canonical-taxonomy/map-structured-evidence.mjs'
+import {
+  detectHybridCookwareEvidenceSignals,
+} from '../../src/shared/canonical-taxonomy/hybrid-cookware-structural.mjs'
+import {
+  INERT_UNCOATED_PRIMARY_IDS,
+  UNCOATED_COATING_MODIFIER_IDS,
+} from '../../src/shared/canonical-taxonomy/inert-cookware-structural.mjs'
 
 const KNOWN_COOKWARE_MATERIAL_TOKEN =
-  /stainless|cast_iron|carbon_steel|graphite|aluminum|aluminium|ptfe|teflon|ceramic_nonstick|sol_gel|glass|borosilicate|enameled/i
+  /stainless|cast_iron|carbon_steel|graphite|aluminum|aluminium|ptfe|teflon|ceramic_nonstick|sol_gel|glass|borosilicate|enameled|hybrid|terrabond/i
 
 /**
  * Fail before persisting Gate 1 when common cookware tokens still map to TAXONOMY_EXPANSION_REQUIRED.
@@ -56,6 +63,19 @@ export function assertCookwareMaterialsResolved(structured, product = {}) {
     if (!compound.substrateCanonicalId && /graphite|aluminum|aluminium|core|ply/.test(pcmRaw)) {
       throw new Error(
         `Agent 1 pre-save guard: compound cookware material failed substrate/core extraction for "${name}". raw=${pcmRaw} path=compound-cookware-material.mjs→pickSubstrateCanonicalId`,
+      )
+    }
+  }
+
+  if (detectHybridCookwareEvidenceSignals(structured, [])) {
+    const primaryId = primary?.canonical_id ?? ''
+    const coatingId = mappings.coating_modifier_id?.canonical_id ?? ''
+    if (
+      INERT_UNCOATED_PRIMARY_IDS.has(primaryId) &&
+      UNCOATED_COATING_MODIFIER_IDS.has(coatingId)
+    ) {
+      throw new Error(
+        `Agent 1 pre-save guard: hybrid/coated cookware evidence collapsed to inert stainless (${primaryId} + ${coatingId}) for "${name}". Map to hybrid_stainless_nonstick_food_contact or return TAXONOMY_EXPANSION_REQUIRED — never route coated hybrid pans down the inert-metal path.`,
       )
     }
   }

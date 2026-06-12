@@ -27,6 +27,14 @@ export type Product = {
   /** e.g. "Williams Sonoma" — shown on buy buttons with `other_retailer_url`. */
   other_retailer_label: string | null
   other_retailer_url: string | null
+  /** Verified primary retailer evidence URL for Agent 1 (falls back to amazon_url). Not buy CTA. */
+  primary_retailer_evidence_url: string | null
+  /** Verified manufacturer product detail page for Agent 1 (exact PDP). */
+  manufacturer_product_url: string | null
+  manufacturer_lab_results_url: string | null
+  manufacturer_materials_faq_url: string | null
+  /** Optional hints for Agent 1 synthesis. */
+  agent1_source_notes: string | null
   image_url: string | null
   date_added: string
   date_last_updated: string

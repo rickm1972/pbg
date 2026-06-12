@@ -149,7 +149,8 @@ export function inferConfidenceForSafetyClaim(claimKey, sourceUrl, sources, stru
   if (claimKey === 'pfoa_free_claim') {
     if (tier === 'manufacturer') return BRAND_SOURCE_CONFIRMED
     if (tier === 'amazon' || tier === 'retailer') return 'retailer_confirmed'
-    return 'manufacturer_confirmed'
+    if (tier === 'third_party_review') return 'third_party_context_source'
+    return 'unknown'
   }
 
   if (claimKey === 'non_toxic_marketing_claim') {
@@ -172,7 +173,8 @@ export function inferConfidenceForSafetyClaim(claimKey, sourceUrl, sources, stru
 
   if (tier === 'manufacturer') return 'manufacturer_confirmed'
   if (tier === 'amazon' || tier === 'retailer') return 'retailer_confirmed'
-  return 'manufacturer_confirmed'
+  if (tier === 'third_party_review') return 'third_party_context_source'
+  return 'unknown'
 }
 
 /**
@@ -219,6 +221,11 @@ export function reconcileMappingConfidence(row, sources, structured = {}) {
     label !== 'retailer_confirmed'
   ) {
     label = 'manufacturer_claim_via_secondary_source'
+  } else if (
+    tier === 'third_party_review' &&
+    (label === 'manufacturer_confirmed' || label === 'fully_disclosed_by_manufacturer')
+  ) {
+    label = 'third_party_review_citing_manufacturer'
   }
 
   return { ...row, confidence_label: label }

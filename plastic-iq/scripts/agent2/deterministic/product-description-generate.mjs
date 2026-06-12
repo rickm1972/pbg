@@ -24,6 +24,10 @@ import {
   getProductDescriptionWordLimits,
   validateProductDescriptionWordCount,
 } from '../../../src/shared/agent2/output-contract.mjs'
+import {
+  extractManufacturerPublishedLabTesting,
+  hasManufacturerPublishedLabTesting,
+} from '../../../src/shared/agent2/manufacturer-lab-testing-evidence.mjs'
 
 export const PRODUCT_DESCRIPTION_GENERATOR_VERSION = '2026-06-03-output-contract'
 
@@ -131,10 +135,34 @@ function cosmeticDescriptionResult(result) {
  * @param {string} strategy
  */
 function buildDescription(ctx, strategy) {
-  const sentence1 = buildSentence1(ctx.product, ctx.primaryLabels)
+  const sentence1 = buildSentence1(ctx.product, ctx.primaryLabels, ctx)
   const sentence2 = buildSentence2({ ...ctx, copyStrategy: strategy })
   const sentence3 = buildSentence3({ ...ctx, copyStrategy: strategy })
   return [sentence1, sentence2, sentence3].join(' ')
+}
+
+/**
+ * Proprietary coating with manufacturer-published lab testing — dedicated copy path.
+ * @param {object} ctx
+ */
+function usesOpaqueLabDescriptionPath(ctx) {
+  const lab = ctx.inputs?.testing_evidence ?? extractManufacturerPublishedLabTesting(ctx.evidence)
+  const hasLab =
+    Boolean(lab?.testing_evidence_present) || hasManufacturerPublishedLabTesting(ctx.evidence)
+  if (!hasLab) return false
+  if (String(ctx.badge ?? '').trim() === BADGES.OPAQUE) return true
+  return Boolean(ctx.inputs?.layer_4a?.proprietary_ceramic_formula_undisclosed)
+}
+
+/**
+ * @param {string[]} analytes
+ */
+function formatAnalytesForDescription(analytes) {
+  const list = (analytes ?? []).slice(0, 4).filter(Boolean)
+  if (!list.length) return 'PFAS, PTFE, PFOA, and related'
+  if (list.length === 1) return list[0]
+  if (list.length === 2) return `${list[0]} and ${list[1]}`
+  return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`
 }
 
 /**
@@ -263,8 +291,22 @@ function findPrimaryComponent(components) {
  * @param {object} product
  * @param {string[]} primaryLabels
  */
-function buildSentence1(product, primaryLabels) {
+function buildSentence1(product, primaryLabels, ctx = null) {
   const brand = String(product.brand ?? '').trim()
+  if (ctx && usesOpaqueLabDescriptionPath(ctx)) {
+    const coating =
+      coatingPhrase(ctx.whyThisScore) ||
+      primaryLabels.find(
+        (l) => /proprietary|undisclosed|nonstick/i.test(l) && !/laser|etched|peak/i.test(l),
+      )
+    const laserLabel =
+      primaryLabels.find((l) => /laser|etched|peak/i.test(l)) ||
+      primaryMaterialOptions(ctx.whyThisScore).find((l) => /laser|etched|peak/i.test(l))
+    if (coating && laserLabel) {
+      const coatingText = formatDescriptionPhrase(coating).replace(/^proprietary\s+/i, '')
+      return `${brand} uses a proprietary ${coatingText} in the cooking-surface valleys, with ${formatDescriptionPhrase(laserLabel)}.`
+    }
+  }
   const materials = primaryLabels.map((l) => formatDescriptionPhrase(l))
   if (materials.length <= 1) {
     return `${brand} uses ${materials[0] ?? 'undisclosed material'} as its food-contact surface.`
@@ -308,8 +350,17 @@ function buildSentence2(ctx) {
     return `${brand} markets this product as ${claim}, but manufacturer disclosures list ${coating} in the food-contact layer, which contradicts that marketing claim.`
   }
 
-  if (badge === BADGES.OPAQUE) {
-    return 'The coating chemistry is not disclosed by the manufacturer, so we cannot verify the safety of the materials in direct food contact.'
+  if (badge === BADGES.OPAQUE || usesOpaqueLabDescriptionPath(ctx)) {
+    const lab =
+      inputs?.testing_evidence ?? extractManufacturerPublishedLabTesting(evidence)
+    if (lab?.testing_evidence_present) {
+      const labName = lab.testing_lab ? `${lab.testing_lab} ` : 'third-party '
+      const analytes = formatAnalytesForDescription(lab.tested_analytes)
+      return `The manufacturer displays ${labName}Non-Detect testing for ${analytes} compounds, but the complete coating formula is not disclosed.`
+    }
+    if (badge === BADGES.OPAQUE) {
+      return 'The coating chemistry is not disclosed by the manufacturer, so we cannot verify the safety of the materials in direct food contact.'
+    }
   }
 
   if (badge === BADGES.MATERIAL_UNCERTAIN) {
@@ -344,7 +395,7 @@ function buildSentence2(ctx) {
  * @param {object} ctx
  */
 function buildSentence3(ctx) {
-  const { badge, hazard, category, useConditions, materialName, copyStrategy = 'default' } = ctx
+  const { badge, hazard, category, useConditions, materialName, copyStrategy = 'default', inputs, evidence } = ctx
   const useText = formatUseConditionsList(useConditions)
   const namePhrase = formatDescriptionPhrase(materialName)
   const nonPacInert = isNonPacInertFoodContactMaterial(
@@ -361,6 +412,11 @@ function buildSentence3(ctx) {
       return `It's used for ${useText}; because ${namePhrase} is an inert material, routine heat and use conditions do not increase plastic-associated chemical migration.`
     }
     return `It's used for ${useText}; because ${namePhrase} is an inert material, routine heat and use conditions do not increase plastic-associated chemical migration.`
+  }
+
+  if (usesOpaqueLabDescriptionPath(ctx)) {
+    const useSentence = formatUseConditionsForPublicSentence(useConditions)
+    return `The product is used under ${useSentence}, so the score reflects both the available lab evidence and remaining uncertainty from proprietary food-contact chemistry.`
   }
 
   if (badge === BADGES.OPAQUE || badge === BADGES.MATERIAL_UNCERTAIN || badge === BADGES.DOCUMENTATION_INCOMPLETE) {

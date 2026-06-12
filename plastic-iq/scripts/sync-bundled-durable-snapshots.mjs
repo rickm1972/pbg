@@ -14,6 +14,8 @@ const SLUG_BY_PRODUCT = {
   'c645ae86-0b82-429d-8f46-78b8007041b5': 'all-clad-approved.json',
   'e451b158-6094-44f9-9628-a2a25974482e': 'caraway-approved.json',
   '7a457a86-ab62-4cbf-90b9-ccaeafe06896': 't-fal-approved.json',
+  'fd05c5fb-19c2-4bc0-9882-ce73a7644ef5': 'hexclad-approved.json',
+  '860b2128-015b-4d8d-8710-7ad7751ec7c5': 'greenpan-approved.json',
 }
 
 mkdirSync(dest, { recursive: true })
@@ -23,8 +25,7 @@ copyFileSync(join(src, 'index.json'), join(dest, 'manifest.json'))
 
 const bundledEntries = []
 for (const [productId, snapshotId] of Object.entries(index.latest_by_product)) {
-  const slug = SLUG_BY_PRODUCT[productId]
-  if (!slug) continue
+  const slug = SLUG_BY_PRODUCT[productId] ?? `${productId}-approved.json`
   const recordPath = join(src, 'records', `${snapshotId}.json`)
   if (!existsSync(recordPath)) {
     throw new Error(`Missing approved snapshot record: ${recordPath}`)

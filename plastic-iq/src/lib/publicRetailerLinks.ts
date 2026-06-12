@@ -3,6 +3,8 @@ import { hostOf, normalizeUrlKey } from './publicSourceDisplay'
 import { orderedRetailerLinks, type RetailerLink } from './retailerLinks'
 import type { ProductEvidence } from '../types/agent'
 import type { Product } from '../types'
+import { buildPublicDisplayContract } from './publicProductDisplayContract'
+import { retailerListingHasConfirmedVariantMismatch } from './retailerVariantMatch'
 
 type ProductRetailerFields = Pick<
   Product,
@@ -73,6 +75,18 @@ function evaluateAdminCuratedCta(
         source: 'admin_product_field',
         reason: `gate1_exact_url_rejected:${row?.usageStatus}:${row?.section}`,
       }
+    }
+  }
+
+  const reviewedTitle =
+    buildPublicDisplayContract(_product, evidence ?? null).reviewedProductName ||
+    _product.product_name ||
+    ''
+  if (retailerListingHasConfirmedVariantMismatch(reviewedTitle, url, '')) {
+    return {
+      allowed: false,
+      source: 'admin_product_field',
+      reason: 'admin_url_variant_mismatch',
     }
   }
 

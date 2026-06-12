@@ -10,6 +10,7 @@ import {
 import { buildFieldProvenance } from './evidenceFieldProvenance'
 import { COOKWARE_SCORE_DRIVING_FIELDS } from './canonicalEvidenceMapping'
 import { sourceLabelForUrl } from './evidenceSourceLabels'
+import { isThirdPartySource } from '../shared/agent1/source-authority.mjs'
 import type {
   AgentMetadata,
   CanonicalFieldMapping,
@@ -55,11 +56,25 @@ export type Gate1SourcesCoverageSummary = {
   rejectedMismatchCount: number
 }
 
+export type ProvidedSourceIntakeRow = {
+  url: string
+  intendedRole: string
+  assignedSourceRole: string
+  validationPassed: boolean | null
+  failureReason: string | null
+  fieldsSupported: string[]
+  searchDiscoveredAlternateUrl: string | null
+  usedAsPrimaryEvidence: boolean
+  fetchOk: boolean
+}
+
 export type Gate1SourcesReviewModel = {
   coverage: Gate1SourcesCoverageSummary
   sections: Record<Gate1SourceSection, Gate1SourceRow[]>
   allRows: Gate1SourceRow[]
   missingUrlNotes: string[]
+  providedIntake: ProvidedSourceIntakeRow[]
+  agent1SourceNotes: string | null
 }
 
 export type Gate1SourceCitation = {
@@ -233,8 +248,11 @@ function reviewerLabelForSource(
     return primaryRetailerReviewerLabel(url)
   }
   if (type === 'amazon' && !isAmazonUrl(url)) return primaryRetailerReviewerLabel(url)
+  if (source && isThirdPartySource(source, url)) return 'Context source only'
+  if (/youtube\.com|youtu\.be|vimeo\.com/i.test(hostOf(url))) return 'Context source only'
   if (type === 'manufacturer' || (type === 'retailer' && !isAlternateRetailerUrl(url))) {
     if (isRegulatoryUrl(url)) return 'Government/regulatory source'
+    if (isThirdPartySource(source, url)) return 'Context source only'
     return 'Manufacturer product page'
   }
   if (type === 'ingredient_page' || type === 'faq') return 'Manufacturer disclosure page'
@@ -392,6 +410,54 @@ function buildCoverage(
   }
 }
 
+const PROVIDED_ROLE_LABELS: Record<string, string> = {
+  primary_retailer_evidence: 'Primary retailer evidence',
+  amazon_evidence: 'Amazon evidence',
+  manufacturer_product: 'Manufacturer product PDP',
+  manufacturer_lab_results: 'Manufacturer lab results',
+  manufacturer_materials_faq: 'Manufacturer materials / FAQ',
+}
+
+function buildProvidedSourceIntakeRows(
+  structured: StructuredEvidencePayload | null,
+): { rows: ProvidedSourceIntakeRow[]; notes: string | null } {
+  const intake = structured?.agent1_source_validation?.provided_source_intake as
+    | {
+        entries?: Array<{
+          url?: string
+          intended_role?: string
+          assigned_source_role?: string
+          validation?: { passed?: boolean }
+          failure_reason?: string | null
+          fields_supported?: string[]
+          search_discovered_alternate_url?: string | null
+          used_as_primary_evidence?: boolean
+          fetch_ok?: boolean
+        }>
+        agent1_source_notes?: string | null
+      }
+    | null
+    | undefined
+
+  const rows: ProvidedSourceIntakeRow[] = []
+  for (const entry of intake?.entries ?? []) {
+    if (!entry.url?.trim()) continue
+    rows.push({
+      url: entry.url,
+      intendedRole: PROVIDED_ROLE_LABELS[entry.intended_role ?? ''] ?? entry.intended_role ?? 'Provided',
+      assignedSourceRole: entry.assigned_source_role ?? 'provided',
+      validationPassed:
+        entry.validation?.passed === true ? true : entry.validation?.passed === false ? false : null,
+      failureReason: entry.failure_reason ?? null,
+      fieldsSupported: entry.fields_supported ?? [],
+      searchDiscoveredAlternateUrl: entry.search_discovered_alternate_url ?? null,
+      usedAsPrimaryEvidence: Boolean(entry.used_as_primary_evidence),
+      fetchOk: Boolean(entry.fetch_ok),
+    })
+  }
+  return { rows, notes: intake?.agent1_source_notes ?? null }
+}
+
 export function buildGate1SourcesReview(evidence: ProductEvidence): Gate1SourcesReviewModel {
   const meta = evidence.agent_metadata ?? {}
   const structured = getStructuredEvidence(meta)
@@ -403,6 +469,7 @@ export function buildGate1SourcesReview(evidence: ProductEvidence): Gate1Sources
   const provenanceByUrl = collectProvenanceLabels(structured, sources)
   const validation = structured?.required_evidence_validation
   const requiredResults = structured?.required_check_results
+  const { rows: providedIntake, notes: agent1SourceNotes } = buildProvidedSourceIntakeRows(structured)
 
   const usedUrlKeys = new Set<string>()
   function markUsed(url: string | null | undefined) {
@@ -522,6 +589,30 @@ export function buildGate1SourcesReview(evidence: ProductEvidence): Gate1Sources
     }
   }
 
+  for (const entry of providedIntake) {
+    markUsed(entry.url)
+    const supplementalNote = entry.searchDiscoveredAlternateUrl
+      ? `Search discovered alternate URL (supplemental only): ${entry.searchDiscoveredAlternateUrl}`
+      : null
+    upsertRow(entry.url, {
+      title: `Provided source · ${entry.intendedRole}`,
+      reviewerLabel: `Provided intake · ${entry.intendedRole}`,
+      technicalSourceType: 'provided_intake',
+      section: entry.usedAsPrimaryEvidence
+        ? 'primary_product'
+        : entry.failureReason
+          ? 'rejected_mismatch'
+          : 'other_context',
+      usageStatus: entry.usedAsPrimaryEvidence
+        ? 'primary'
+        : entry.failureReason
+          ? 'rejected'
+          : 'context-only',
+      reason: entry.failureReason ?? supplementalNote,
+      fieldsSupported: entry.fieldsSupported,
+    })
+  }
+
   for (const s of sources) {
     if (!s.url?.trim()) continue
     upsertRow(s.url, { title: s.title?.trim() || s.url })
@@ -607,7 +698,7 @@ export function buildGate1SourcesReview(evidence: ProductEvidence): Gate1Sources
     }
   }
 
-  return { coverage, sections, allRows, missingUrlNotes }
+  return { coverage, sections, allRows, missingUrlNotes, providedIntake, agent1SourceNotes }
 }
 
 export function getCanonicalSourceCitation(

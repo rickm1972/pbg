@@ -28,6 +28,11 @@ const PRODUCT_SELECT = `
   walmart_url,
   other_retailer_label,
   other_retailer_url,
+  primary_retailer_evidence_url,
+  manufacturer_product_url,
+  manufacturer_lab_results_url,
+  manufacturer_materials_faq_url,
+  agent1_source_notes,
   image_url,
   agent_status,
   score_details ( data_sources )

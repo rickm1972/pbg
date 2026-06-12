@@ -9,6 +9,12 @@ import {
   runAgent4Batch,
   runAgent4Remote,
 } from '../../lib/agent4Review'
+import {
+  fetchAgent4LockedAuditDashboard,
+  rejectAgent4LockedAudit,
+  type Agent4LockedAuditDashboardItem,
+} from '../../lib/agent4LockedAuditReview'
+import { Gate4LockedOutputAuditPanel } from './Gate4LockedOutputAuditPanel'
 import { colorForTier } from '../../lib/score'
 import type { ProductTier } from '../../types'
 import type {
@@ -27,7 +33,7 @@ type Props = {
   onError: (message: string | null) => void
 }
 
-type ListFilter = 'review' | 'run'
+type ListFilter = 'review' | 'run' | 'locked'
 
 const CHECK_META: Array<{
   key: keyof ProductQaChecks
@@ -42,9 +48,11 @@ const CHECK_META: Array<{
 
 export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Props) {
   const [data, setData] = useState<Agent4DashboardData | null>(null)
+  const [lockedData, setLockedData] = useState<Agent4LockedAuditDashboardItem[]>([])
   const [loading, setLoading] = useState(true)
   const [listFilter, setListFilter] = useState<ListFilter>('review')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedLockedAuditId, setSelectedLockedAuditId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -59,10 +67,15 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     setLoading(true)
     onError(null)
     try {
-      const dashboard = await fetchAgent4Dashboard()
+      const [dashboard, locked] = await Promise.all([
+        fetchAgent4Dashboard(),
+        fetchAgent4LockedAuditDashboard(),
+      ])
       setData(dashboard)
+      setLockedData(locked.audits)
     } catch (e: unknown) {
       setData(null)
+      setLockedData([])
       onError(formatSupabaseUnknownError(e, 'Failed to load Agent 4 dashboard'))
     } finally {
       setLoading(false)
@@ -119,16 +132,31 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     }
   }, [data, listFilter, reviewQueue, selectedId])
 
+  const selectedLockedItem = useMemo(() => {
+    if (!selectedLockedAuditId) return null
+    return lockedData.find((x) => x.audit.locked_audit_id === selectedLockedAuditId) ?? null
+  }, [lockedData, selectedLockedAuditId])
+
   function switchListFilter(filter: ListFilter) {
     setListFilter(filter)
     setRejecting(false)
     setRejectNotes('')
     if (filter === 'run') {
       setSelectedId(null)
+      setSelectedLockedAuditId(null)
+    } else if (filter === 'locked') {
+      setSelectedId(null)
+      if (lockedData.length > 0) {
+        setSelectedLockedAuditId(lockedData[0].audit.locked_audit_id)
+      } else {
+        setSelectedLockedAuditId(null)
+      }
     } else if (filter === 'review' && reviewQueue.length > 0) {
+      setSelectedLockedAuditId(null)
       setSelectedId(reviewQueue[0].product_id)
     } else {
       setSelectedId(null)
+      setSelectedLockedAuditId(null)
     }
   }
 
@@ -251,6 +279,25 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
     }
   }
 
+  async function handleRejectLockedAudit(notes: string) {
+    if (!selectedLockedItem || !authUserEmail) return
+    setBusyId(selectedLockedItem.audit.locked_audit_id)
+    onError(null)
+    try {
+      await rejectAgent4LockedAudit({
+        locked_audit_id: selectedLockedItem.audit.locked_audit_id,
+        reviewed_by: authUserEmail,
+        review_notes: notes.trim() || null,
+      })
+      onNotice('Locked-output audit marked rejected.')
+      await load()
+    } catch (e: unknown) {
+      onError(formatSupabaseUnknownError(e, 'Reject locked audit failed'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   if (loading && !data) {
     return <p className="mt-6 text-sm text-slate-600">Loading Agent 4 dashboard…</p>
   }
@@ -294,6 +341,7 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
                   [
                     ['review', `Awaiting review (${reviewQueue.length})`],
                     ['run', `Run Agent 4 (${runnableProducts.length})`],
+                    ['locked', `Locked output (${lockedData.length})`],
                   ] as const
                 ).map(([filter, label]) => (
                   <button
@@ -349,7 +397,36 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
               ) : null}
             </div>
             <ul className="max-h-[60dvh] divide-y divide-slate-100 overflow-auto">
-              {listProducts.length === 0 ? (
+              {listFilter === 'locked' ? (
+                lockedData.length === 0 ? (
+                  <li className="p-4 text-sm text-slate-600">
+                    No locked-output Agent 4 audits yet. Run locked audit from fixtures or persist path.
+                  </li>
+                ) : (
+                  lockedData.map((item) => {
+                    const isSelected = item.audit.locked_audit_id === selectedLockedAuditId
+                    return (
+                      <li key={item.audit.locked_audit_id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLockedAuditId(item.audit.locked_audit_id)}
+                          className={`w-full px-4 py-3 text-left transition hover:bg-amber-50/60 ${
+                            isSelected ? 'bg-amber-50' : ''
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-ink-900">
+                            {item.product_name ?? 'Product'}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {item.audit.audit_payload.score_summary.pac_safety_score} ·{' '}
+                            {item.audit.audit_payload.score_summary.tier} · {item.audit.audit_status}
+                          </p>
+                        </button>
+                      </li>
+                    )
+                  })
+                )
+              ) : listProducts.length === 0 ? (
                 <li className="p-4 text-sm text-slate-600">
                   {listFilter === 'review'
                     ? 'Nothing awaiting QA review. Approve Agent 3 scores, run Agent 4, then review here.'
@@ -410,7 +487,34 @@ export function Agent4ReviewDashboard({ authUserEmail, onNotice, onError }: Prop
         </div>
 
         <div className="lg:col-span-8">
-          {listFilter === 'run' ? (
+          {listFilter === 'locked' ? (
+            selectedLockedItem ? (
+              <Gate4LockedOutputAuditPanel
+                product={
+                  data?.products.find((p) => p.product_id === selectedLockedItem.audit.product_id) ?? {
+                    product_id: selectedLockedItem.audit.product_id,
+                    product_name: selectedLockedItem.product_name ?? 'Product',
+                    brand: selectedLockedItem.brand,
+                    category: null,
+                    subcategory: null,
+                    agent_status: 'draft',
+                    publish_status: 'draft',
+                    active: true,
+                    pac_safety_score: null,
+                    tier: null,
+                  }
+                }
+                audit={selectedLockedItem.audit}
+                busy={busyId === selectedLockedItem.audit.locked_audit_id}
+                authUserEmail={authUserEmail}
+                onReject={handleRejectLockedAudit}
+              />
+            ) : (
+              <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">
+                Select a locked-output audit to review.
+              </div>
+            )
+          ) : listFilter === 'run' ? (
             <Agent4RunTabPanel
               selectedProduct={selectedProduct}
               selectedRunnable={selectedRunnable}

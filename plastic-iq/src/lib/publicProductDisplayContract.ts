@@ -6,6 +6,7 @@ import { sortComponentsByHazardDesc } from './whyThisScoreSort'
 import {
   contextFallbackTitleFromUrl,
   isFilenameLikeSourceTitle,
+  isGenericManufacturerSourceTitle,
   isMalformedPublicSourceTitle,
   manufacturerFallbackTitleFromUrl,
   retailerFallbackTitleFromUrl,
@@ -131,10 +132,20 @@ function cleanManufacturerPublicTitle(
   url: string,
   rawTitle: string,
   brand?: string | null,
+  reviewedProductName?: string | null,
 ): string {
   const raw = stripPublicSourceRolePrefix(rawTitle)
 
   if (isFilenameLikeSourceTitle(raw)) {
+    return manufacturerFallbackTitleFromUrl(url, brand)
+  }
+
+  if (isGenericManufacturerSourceTitle(raw) || isMalformedPublicSourceTitle(raw)) {
+    const reviewed = reviewedProductName?.trim()
+    const brandName = String(brand ?? '').trim()
+    if (reviewed && brandName) return `${brandName} — ${reviewed}`
+    if (reviewed) return `${reviewed} — manufacturer product page`
+    if (brandName) return `${brandName} manufacturer product page`
     return manufacturerFallbackTitleFromUrl(url, brand)
   }
 
@@ -145,7 +156,12 @@ function cleanManufacturerPublicTitle(
   }
 
   const cleaned = sanitizePublicSourceTitleText(stripped)
-  if (isMalformedPublicSourceTitle(cleaned)) {
+  if (isGenericManufacturerSourceTitle(cleaned) || isMalformedPublicSourceTitle(cleaned)) {
+    const reviewed = reviewedProductName?.trim()
+    const brandName = String(brand ?? '').trim()
+    if (reviewed && brandName) return `${brandName} — ${reviewed}`
+    if (reviewed) return `${reviewed} — manufacturer product page`
+    if (brandName) return `${brandName} manufacturer product page`
     return manufacturerFallbackTitleFromUrl(url, brand)
   }
   return cleaned
@@ -183,7 +199,7 @@ export function publicSourceDisplayTitle(
   }
 
   if (source.public_label === 'Manufacturer') {
-    return cleanManufacturerPublicTitle(source.url, base, brand)
+    return cleanManufacturerPublicTitle(source.url, base, brand, reviewed)
   }
 
   if (source.public_label === 'Context') {

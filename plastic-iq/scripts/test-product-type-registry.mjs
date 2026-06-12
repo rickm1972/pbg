@@ -39,9 +39,9 @@ console.log('Product-type registry tests\n')
 for (const config of STARTER_PRODUCT_TYPE_CONFIGS) {
   const result = validateProductTypeConfig(config)
   assert.equal(result.valid, true, `${config.registry_key}: ${result.errors.join('; ')}`)
-  assert.ok(config.scoring_assumption_ref.startsWith('v2.3.4.'))
+  assert.ok(config.scoring_assumption_ref.startsWith('v2.3.5.'))
 }
-console.log(`✓ ${STARTER_PRODUCT_TYPE_CONFIGS.length} starter configs validate with V2.3.4 scoring_assumption_ref`)
+console.log(`✓ ${STARTER_PRODUCT_TYPE_CONFIGS.length} starter configs validate with V2.3.5 scoring_assumption_ref`)
 
 // Missing scoring_assumption_ref fails validation
 {
@@ -55,7 +55,20 @@ console.log('✓ config without scoring_assumption_ref fails registry validation
 // Required starter types resolve
 const expectedTypes = [
   { category: 'Kitchen', subcategory: 'Cookware', matrix: 'cookware', scoring: 'cookware' },
-  { category: 'Kitchen', subcategory: 'Drinkware', matrix: 'water_bottles_drinkware', scoring: 'drinkware' },
+  {
+    category: 'Kitchen',
+    subcategory: 'Drinkware',
+    product_type: 'Water bottle',
+    matrix: 'water_bottles',
+    scoring: 'water-bottles',
+  },
+  {
+    category: 'Kitchen',
+    subcategory: 'Drinkware',
+    product_type: 'Tumbler',
+    matrix: 'drinkware',
+    scoring: 'drinkware',
+  },
   { category: 'Kitchen', subcategory: 'Food storage', matrix: 'food_storage', scoring: 'food-storage' },
   { category: 'Kitchen', subcategory: 'Utensils', matrix: 'cooking_utensils', scoring: 'utensils' },
   { category: 'Textiles', subcategory: 'Bedding', matrix: 'textiles', scoring: 'textiles' },
@@ -63,18 +76,32 @@ const expectedTypes = [
   { category: 'Personal care', subcategory: 'Rinse-off', matrix: 'rinse_off', scoring: 'rinse-off' },
 ]
 for (const row of expectedTypes) {
-  const config = resolveProductTypeConfig({ category: row.category, subcategory: row.subcategory })
-  assert.ok(config, `missing config for ${row.category}/${row.subcategory}`)
-  assert.equal(resolveMatrixKeyFromRegistry(row.subcategory, { category: row.category }), row.matrix)
+  const config = resolveProductTypeConfig({
+    category: row.category,
+    subcategory: row.subcategory,
+    product_type: row.product_type,
+  })
+  assert.ok(config, `missing config for ${row.category}/${row.subcategory}/${row.product_type ?? ''}`)
+  assert.equal(
+    resolveMatrixKeyFromRegistry(row.subcategory, {
+      category: row.category,
+      product_type: row.product_type,
+    }),
+    row.matrix,
+  )
   const scoringCategory = deriveProductCategory(
     {
       agent_metadata: {
         structured_evidence: {
-          product_identity: { subcategory: row.subcategory, category: row.category },
+          product_identity: {
+            subcategory: row.subcategory,
+            category: row.category,
+            product_type: row.product_type,
+          },
         },
       },
     },
-    { subcategory: row.subcategory, category: row.category },
+    { subcategory: row.subcategory, category: row.category, product_type: row.product_type },
   )
   assert.equal(scoringCategory, row.scoring, `${row.category}/${row.subcategory}`)
 }
@@ -106,7 +133,7 @@ console.log('✓ cookware config references Phase 3 canonical fixture scripts')
     disclosure_rule_refs: [],
     matrix_key: 'cookware',
     source_requirements: ['manufacturer'],
-    scoring_assumption_ref: 'v2.3.4.cookware',
+    scoring_assumption_ref: 'v2.3.5.cookware',
     display_template_refs: [],
     fixture_refs: [],
   })

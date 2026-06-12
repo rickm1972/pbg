@@ -16,6 +16,7 @@ export {
   AGENT1_LODGE_PRODUCT_ID,
   AGENT1_TFAL_PRODUCT_ID,
   canAgent1RetestReset,
+  mustResetAgent1BeforeRerun,
   showAgent1RetestResetButton,
 } from './agent1RunTabOnly'
 
@@ -631,14 +632,26 @@ export function canShowOnAgent1RunTab(product: {
   agent_status: string
   product_id: string
 }): boolean {
+  if (
+    isAgent1ValidationRerunProduct(product.product_id) &&
+    product.agent_status === 'evidence_awaiting_review'
+  ) {
+    return true
+  }
+  if (
+    isAgent1ValidationRerunProduct(product.product_id) &&
+    AGENT1_VALIDATION_RERUN_STATUSES.has(product.agent_status)
+  ) {
+    return true
+  }
   return AGENT1_RUN_TAB_STATUSES.has(product.agent_status)
 }
 
 /**
- * Re-run from Gate 1 review card — not used for validation trio (Run Agent 1 tab only).
+ * Re-run from Gate 1 review card. Validation trio (Lodge / HexClad / T-Fal) use the same
+ * awaiting-review re-run path — they were previously blocked with no Run-tab escape hatch.
  */
 export function canRerunAgent1FromReviewCard(status: string, productId: string): boolean {
-  if (isAgent1ValidationRerunProduct(productId)) return false
   return canRerunAgent1FromReviewSequential(status)
 }
 

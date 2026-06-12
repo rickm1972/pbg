@@ -413,6 +413,17 @@ export type NormalizationMetadata = {
   run_timestamp?: string
 }
 
+export type ManufacturerPublishedLabTestingEvidence = {
+  testing_evidence_present: boolean
+  testing_evidence_type?: string
+  testing_lab?: string | null
+  testing_result?: string | null
+  tested_analytes?: string[]
+  testing_source_url?: string | null
+  certification?: boolean
+  source_check_id?: string | null
+}
+
 export type NormalizationInputs = {
   product_id: string
   evidence_id: string
@@ -421,6 +432,7 @@ export type NormalizationInputs = {
   common_foreseeable_use?: string
   is_formulation_product?: boolean
   components: NormalizationComponent[]
+  testing_evidence?: ManufacturerPublishedLabTestingEvidence
   layer_4a?: NormalizationLayer4a
   layer_4b?: NormalizationLayer4b
   human_review_required?: boolean

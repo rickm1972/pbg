@@ -10,6 +10,29 @@
 /** @type {TaxonomyEntry[]} */
 export const PRIMARY_CONTACT_MATERIAL_TAXONOMY = [
   {
+    canonical_id: 'hybrid_stainless_nonstick_food_contact',
+    display_label: 'Hybrid stainless lattice + nonstick-coated food-contact surface',
+    description:
+      'Laser-etched or raised stainless peaks with nonstick coating in food-contact valleys — metal and coating both participate in the cooking surface.',
+    aliases: [
+      /hybrid[_\s-]*stainless[_\s-]*nonstick/i,
+      /hybrid.*nonstick/i,
+      /hybrid.*stainless/i,
+      /stainless.*hybrid/i,
+      /laser[-\s]?etched.*nonstick/i,
+      /nonstick.*laser[-\s]?etched/i,
+      /hexagonal.*nonstick/i,
+      /nonstick.*hexagonal/i,
+      /terrabond/i,
+      /terrabond[_\s-]*proprietary/i,
+      /terra\s*bond/i,
+      /proprietary[_\s-]*nonstick/i,
+    ],
+    mapping_rule_id: 'cookware_hybrid_stainless_nonstick_v1',
+    agent2_material_id: 'hybrid_stainless_nonstick_food_contact',
+    taxonomy_file: 'primary-contact-material-taxonomy.mjs',
+  },
+  {
     canonical_id: 'ceramic_nonstick_sol_gel_coating',
     display_label: 'Ceramic nonstick sol-gel coating (food contact)',
     description: 'Manufactured ceramic / sol-gel nonstick cooking surface — not PTFE.',

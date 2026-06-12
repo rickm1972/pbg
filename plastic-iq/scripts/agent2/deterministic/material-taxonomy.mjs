@@ -63,7 +63,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Plant- and mineral-based aqueous formulation',
     hazard: 0.08,
     migration: 0.1,
-    tier: 'Natural Low Risk',
+    tier: 'Natural low risk',
     hazardTableEntry: 'certified organic clean formulation — 0.08',
     migrationTableEntry: 'full ingredient disclosure clean formulation — 0.10',
     roles: ['formulation'],
@@ -73,7 +73,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Plant-based formulation',
     hazard: 0.1,
     migration: 0.12,
-    tier: 'Natural Low Risk',
+    tier: 'Natural low risk',
     hazardTableEntry: 'plant-based formulation — 0.10',
     migrationTableEntry: 'plant-based formulation — 0.12',
     roles: ['formulation'],
@@ -83,7 +83,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Synthetic surfactant formulation',
     hazard: 0.35,
     migration: 0.38,
-    tier: 'Moderate Risk',
+    tier: 'Moderate',
     hazardTableEntry: 'synthetic surfactant formulation — 0.35',
     migrationTableEntry: 'synthetic surfactant formulation — 0.38',
     roles: ['formulation'],
@@ -129,7 +129,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Unknown proprietary food-contact coating (PROPRIETARY_NAMED)',
     hazard: 0.8,
     migration: 0.875,
-    tier: 'Extreme Risk',
+    tier: 'Extreme',
     hazardTableEntry:
       'unknown proprietary food-contact coating — 0.80 (TRIGGERS HARD CAP AT 72 + Layer 4A -3)',
     migrationTableEntry:
@@ -139,25 +139,35 @@ export const MATERIAL_TAXONOMY = {
     coatingOptions: ['Proprietary ceramic nonstick (undisclosed)'],
     unknownFoodContactCoating: true,
   },
+  hybrid_stainless_nonstick_food_contact: {
+    name: 'Hybrid stainless lattice + nonstick surface',
+    hazard: 0.35,
+    migration: 0.38,
+    tier: 'Moderate',
+    hazardTableEntry: 'Hybrid stainless + nonstick food-contact — 0.35 (coated surface; inert protection blocked)',
+    migrationTableEntry: 'Hybrid nonstick food-contact — 0.38 (coated surface; inert protection blocked)',
+    roles: ['primary_food_contact', 'coating'],
+    primaryOptions: ['Hybrid stainless + nonstick food-contact surface'],
+    coatingOptions: ['Proprietary ceramic nonstick (undisclosed)', 'Ceramic nonstick sol-gel coating'],
+    inertProtection: false,
+  },
   terrabond_proprietary: {
     name: 'Proprietary ceramic nonstick coating (TerraBond™)',
-    hazard: 0.8,
-    migration: 0.875,
-    tier: 'Extreme Risk',
-    hazardTableEntry:
-      'unknown proprietary food-contact coating — 0.80 (TRIGGERS HARD CAP AT 72 + Layer 4A -3)',
-    migrationTableEntry:
-      'Extreme-risk migration band lower midpoint 0.875 (server-enforced for undisclosed food-contact coatings)',
+    hazard: 0.35,
+    migration: 0.38,
+    tier: 'Moderate',
+    hazardTableEntry: 'Ceramic nonstick sol-gel — 0.35 (category-known proprietary ceramic)',
+    migrationTableEntry: 'Ceramic nonstick sol-gel — 0.38 (category-known proprietary ceramic)',
     roles: ['primary_food_contact', 'coating'],
     primaryOptions: ['Proprietary ceramic coating (undisclosed)'],
     coatingOptions: ['Proprietary ceramic nonstick (undisclosed)'],
-    unknownFoodContactCoating: true,
+    inertProtection: false,
   },
   ceramic_nonstick_sol_gel: {
     name: 'Ceramic nonstick sol-gel coating',
     hazard: 0.35,
     migration: 0.38,
-    tier: 'Moderate Risk',
+    tier: 'Moderate',
     hazardTableEntry: 'Ceramic nonstick sol-gel — 0.35',
     migrationTableEntry: 'Ceramic nonstick sol-gel — 0.38',
     roles: ['primary_food_contact', 'coating'],
@@ -168,7 +178,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Thermolon ceramic coating',
     hazard: 0.35,
     migration: 0.38,
-    tier: 'Moderate Risk',
+    tier: 'Moderate',
     hazardTableEntry: 'Thermolon ceramic — 0.35',
     migrationTableEntry: 'Thermolon ceramic — 0.38',
     roles: ['primary_food_contact', 'coating'],
@@ -176,12 +186,12 @@ export const MATERIAL_TAXONOMY = {
     coatingOptions: ['Thermolon ceramic nonstick coating'],
   },
   ptfe_coating: {
-    name: 'PTFE nonstick coating',
+    name: 'PTFE coating (lower band)',
     hazard: 0.6,
     migration: 0.65,
-    tier: 'Moderate Risk',
-    hazardTableEntry: 'conventional PTFE/Teflon — 0.60',
-    migrationTableEntry: 'PTFE nonstick — 0.65',
+    tier: 'Moderate',
+    hazardTableEntry: 'PTFE coating (lower band) — 0.60',
+    migrationTableEntry: 'PTFE coating (lower band) — 0.65',
     roles: ['primary_food_contact', 'coating'],
     primaryOptions: ['PTFE coating'],
     coatingOptions: ['PTFE nonstick coating'],
@@ -190,7 +200,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'PTFE nonstick coating',
     hazard: 0.85,
     migration: 0.75,
-    tier: 'High Risk',
+    tier: 'High',
     hazardTableEntry: 'PTFE nonstick coating — 0.85',
     migrationTableEntry: 'PTFE nonstick coating — 0.75',
     roles: ['primary_food_contact', 'coating'],
@@ -201,7 +211,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'PTFE nonstick coating (titanium reinforced)',
     hazard: 0.85,
     migration: 0.75,
-    tier: 'High Risk',
+    tier: 'High',
     hazardTableEntry: 'PTFE nonstick coating (titanium reinforced) — 0.85',
     migrationTableEntry: 'PTFE nonstick coating (titanium reinforced) — 0.75',
     roles: ['primary_food_contact', 'coating'],
@@ -212,7 +222,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Hard anodized aluminum',
     hazard: 0.2,
     migration: 0.15,
-    tier: 'Moderate Risk',
+    tier: 'Moderate',
     hazardTableEntry: 'hard anodized aluminum — 0.20',
     migrationTableEntry: 'hard anodized aluminum — 0.15',
     roles: ['primary_food_contact', 'structural'],
@@ -222,7 +232,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Silicone-coated handle',
     hazard: 0.1,
     migration: 0.08,
-    tier: 'Low Risk',
+    tier: 'Low risk',
     hazardTableEntry: 'silicone-coated handle — 0.10',
     migrationTableEntry: 'silicone-coated handle — 0.08',
     roles: ['handle'],
@@ -244,7 +254,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Natural vegetable oil seasoning',
     hazard: 0.08,
     migration: 0.08,
-    tier: 'Natural Low Risk',
+    tier: 'Natural low risk',
     hazardTableEntry: 'natural vegetable oil seasoning — 0.08',
     migrationTableEntry: 'natural vegetable oil seasoning — 0.08',
     roles: ['coating'],
@@ -266,7 +276,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Hard anodized aluminum',
     hazard: 0.15,
     migration: 0.2,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'aluminum anodized — 0.15',
     migrationTableEntry: 'hard anodized aluminum — 0.20',
     roles: ['primary_food_contact', 'structural'],
@@ -277,7 +287,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Aluminum core',
     hazard: 0.22,
     migration: 0.25,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'aluminum uncoated — 0.22',
     migrationTableEntry: 'aluminum core — 0.25',
     roles: ['structural'],
@@ -311,7 +321,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Plastic lid (resin unspecified)',
     hazard: 0.2,
     migration: 0.29,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'plastic lid resin unspecified — 0.20',
     migrationTableEntry: 'Lower risk synthetics — 0.29',
     roles: ['lid'],
@@ -321,7 +331,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'BPA-free plastic lid',
     hazard: 0.2,
     migration: 0.29,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'BPA-free plastic lid — 0.20',
     migrationTableEntry: 'Lower risk synthetics — 0.29',
     roles: ['lid'],
@@ -331,7 +341,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Bamboo lid with silicone seal',
     hazard: 0.12,
     migration: 0.15,
-    tier: 'Natural Low Risk',
+    tier: 'Natural low risk',
     hazardTableEntry: 'bamboo lid — 0.12',
     migrationTableEntry: 'bamboo lid with silicone — 0.15',
     roles: ['lid'],
@@ -352,7 +362,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Stay-cool handle (material undisclosed)',
     hazard: 0.15,
     migration: 0.2,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'undisclosed stay-cool handle — pending server inference',
     migrationTableEntry: 'undisclosed handle — pending server inference',
     roles: ['handle'],
@@ -372,7 +382,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'TPR soft grip handle',
     hazard: 0.38,
     migration: 0.4,
-    tier: 'Moderate Risk',
+    tier: 'Moderate',
     hazardTableEntry: 'thermoplastic rubber (TPR) — 0.38',
     migrationTableEntry: 'TPR handle — 0.40',
     roles: ['handle'],
@@ -393,7 +403,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Silicone gasket (food-grade verified)',
     hazard: 0.15,
     migration: 0.18,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'silicone food-grade verified — 0.15',
     migrationTableEntry: 'silicone gasket — 0.18',
     roles: ['gasket'],
@@ -403,7 +413,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Silicone gasket (unverified)',
     hazard: 0.25,
     migration: 0.3,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'silicone unverified — 0.25',
     migrationTableEntry: 'silicone gasket — 0.30',
     roles: ['gasket'],
@@ -424,7 +434,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Refill container (HDPE or similar, resin unspecified)',
     hazard: 0.18,
     migration: 0.29,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'HDPE 0.18 (resin unspecified; conservative)',
     migrationTableEntry: 'Lower risk synthetics midpoint 0.29',
     roles: ['packaging'],
@@ -434,7 +444,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'HDPE',
     hazard: 0.18,
     migration: 0.29,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'HDPE — 0.18',
     migrationTableEntry: 'HDPE — 0.29',
     roles: ['packaging', 'primary_food_contact'],
@@ -467,7 +477,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Tritan plastic',
     hazard: 0.45,
     migration: 0.48,
-    tier: 'Moderate Risk',
+    tier: 'Moderate',
     hazardTableEntry: 'Tritan BPA-free claim — 0.45',
     migrationTableEntry: 'Tritan — 0.48',
     roles: ['primary_food_contact', 'packaging'],
@@ -477,7 +487,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'BPA-free plastic (resin unspecified)',
     hazard: 0.2,
     migration: 0.29,
-    tier: 'Lower Risk Synthetics',
+    tier: 'Lower-risk synthetic',
     hazardTableEntry: 'BPA-free plastic unspecified — 0.20',
     migrationTableEntry: 'Lower risk synthetics — 0.29',
     roles: ['packaging', 'primary_food_contact'],
@@ -487,7 +497,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Natural teak wood',
     hazard: 0.06,
     migration: 0.08,
-    tier: 'Natural Low Risk',
+    tier: 'Natural low risk',
     hazardTableEntry: 'teak untreated — 0.06',
     migrationTableEntry: 'natural teak — 0.08',
     roles: ['primary_food_contact'],
@@ -497,7 +507,7 @@ export const MATERIAL_TAXONOMY = {
     name: 'Natural bamboo',
     hazard: 0.08,
     migration: 0.1,
-    tier: 'Natural Low Risk',
+    tier: 'Natural low risk',
     hazardTableEntry: 'bamboo natural — 0.08',
     migrationTableEntry: 'bamboo natural — 0.10',
     roles: ['primary_food_contact'],
@@ -507,11 +517,54 @@ export const MATERIAL_TAXONOMY = {
     name: 'Nylon food-contact',
     hazard: 0.68,
     migration: 0.7,
-    tier: 'High Risk',
+    tier: 'High',
     hazardTableEntry: 'nylon food-contact — 0.68',
     migrationTableEntry: 'nylon food-contact — 0.70',
     roles: ['primary_food_contact'],
     primaryOptions: ['Nylon food-contact'],
+  },
+  titanium: {
+    name: 'Titanium',
+    hazard: 0.01,
+    migration: 0.02,
+    tier: 'Inert',
+    hazardTableEntry: 'titanium — 0.01 (Inert)',
+    migrationTableEntry: 'titanium — 0.02',
+    roles: ['primary_food_contact', 'structural'],
+    primaryOptions: ['Titanium'],
+    inertProtection: true,
+  },
+  food_grade_copper_lined: {
+    name: 'Food-grade copper (lined)',
+    hazard: 0.05,
+    migration: 0.05,
+    tier: 'Inert',
+    hazardTableEntry: 'food-grade copper (lined) — 0.05',
+    migrationTableEntry: 'food-grade copper (lined) — 0.05',
+    roles: ['primary_food_contact'],
+    primaryOptions: ['Food-grade copper (lined)'],
+    inertProtection: true,
+  },
+  bare_copper_acidic_food_contact: {
+    name: 'Bare copper (acidic-food contact)',
+    hazard: 0.55,
+    migration: 0.6,
+    tier: 'High',
+    hazardTableEntry: 'bare copper acidic-food contact — 0.55',
+    migrationTableEntry: 'bare copper acidic-food contact — 0.60',
+    roles: ['primary_food_contact'],
+    primaryOptions: ['Bare copper (acidic-food contact)'],
+  },
+  food_safe_ceramic_verified_glaze: {
+    name: 'Food-safe ceramic (verified glaze)',
+    hazard: 0.05,
+    migration: 0.05,
+    tier: 'Inert',
+    hazardTableEntry: 'food-safe ceramic verified glaze — 0.05',
+    migrationTableEntry: 'food-safe ceramic verified glaze — 0.05',
+    roles: ['primary_food_contact', 'coating'],
+    primaryOptions: ['Food-safe ceramic (verified glaze)'],
+    inertProtection: true,
   },
 }
 
@@ -521,13 +574,23 @@ export const MATERIAL_DETECTORS = [
   { id: 'plant_based_formulation', pattern: /plant.based formula|plant derived|saponified|coconut oil soap/i },
   { id: 'synthetic_surfactant_formulation', pattern: /sles|sodium lauryl sulfate|synthetic surfactant|mit\/bit preservative/i },
   { id: 'cast_iron_seasoned', pattern: /cast iron.*(?:season|vegetable oil)|pre.seasoned.*cast iron/i },
+  { id: 'titanium', pattern: /\btitanium\b/i },
+  { id: 'food_grade_copper_lined', pattern: /food.grade copper.*lined|lined copper/i },
+  {
+    id: 'bare_copper_acidic_food_contact',
+    pattern: /bare copper.*acidic|acidic.food contact.*copper/i,
+  },
+  {
+    id: 'food_safe_ceramic_verified_glaze',
+    pattern: /food.safe ceramic.*verified|verified glaze/i,
+  },
   { id: 'cast_iron', pattern: /cast iron|cast-iron/i },
   { id: 'carbon_steel', pattern: /carbon steel|blue steel/i },
   { id: 'terrabond_proprietary', pattern: /terrabond|terra\s*bond|proprietary.*ceramic.*nonstick/i },
   {
     id: 'ceramic_nonstick_sol_gel',
     pattern:
-      /ceramic_nonstick_sol_gel|sol_gel_ceramic_nonstick|sol[-\s]?gel.*ceramic.*nonstick|ceramic.*non[-\s]?stick.*sol[-\s]?gel|ceramic.*non[-\s]?stick/i,
+      /ceramic_nonstick_sol_gel|diamond[-\s]?infused.*ceramic|ceramic.*diamond[-\s]?infused|sol_gel_ceramic_nonstick|sol[-\s]?gel.*ceramic.*nonstick|ceramic.*non[-\s]?stick.*sol[-\s]?gel|ceramic.*non[-\s]?stick/i,
   },
   { id: 'thermolon_ceramic', pattern: /thermolon/i },
   { id: 'ptfe_coating', pattern: /\bptfe\b|teflon/i, negative: /ptfe-free|without ptfe|no ptfe|pfas-free.*ptfe-free/i },
@@ -583,14 +646,125 @@ export const MATERIAL_ID_ALIASES = {
   stainless_steel_interior_graphite_aluminum_core_5ply: 'stainless_steel_unspecified',
 }
 
+/**
+ * Agent 1 canonical material IDs → MATERIAL_TAXONOMY keys.
+ * Only methodology-documented equivalences (see canonical-taxonomy agent2_material_id links).
+ * Do not add ambiguous proprietary/hybrid/unknown coating aliases here.
+ */
+export const MATERIAL_TAXONOMY_ALIASES = {
+  // Substrate taxonomy — explicit agent2_material_id links
+  cast_iron_body: 'cast_iron',
+  stainless_steel_body: 'stainless_steel_unspecified',
+  graphite_structural_core: 'graphite_core',
+  // Primary taxonomy — canonical_id differs from agent2_material_id
+  ceramic_nonstick_sol_gel_coating: 'ceramic_nonstick_sol_gel',
+  ceramic_nonstick_verified: 'ceramic_nonstick_sol_gel',
+  ptfe_nonstick_coating: 'ptfe_nonstick',
+  enameled_cast_iron_food_contact: 'vitreous_enamel',
+  enamel_coating: 'vitreous_enamel',
+  ceramic_food_contact: 'vitreous_enamel',
+  glass_food_contact: 'borosilicate_glass',
+  stainless_steel_18_8: 'stainless_steel_304',
+  stainless_steel_18_10: 'stainless_steel_316',
+  stainless_steel_cooking_surface: 'stainless_steel_unspecified',
+}
+
+/**
+ * @param {string} materialId
+ * @returns {string | null}
+ */
+export function getMaterialTaxonomyAliasTarget(materialId) {
+  const raw = String(materialId ?? '').trim()
+  if (!raw) return null
+  if (MATERIAL_TAXONOMY_ALIASES[raw]) return MATERIAL_TAXONOMY_ALIASES[raw]
+  if (MATERIAL_ID_ALIASES[raw]) return MATERIAL_ID_ALIASES[raw]
+  return null
+}
+
+/**
+ * Alias-aware material lookup metadata for Agent 1 validation (Phase 4.5).
+ * @param {string | null | undefined} materialId — reviewed / Agent 1 canonical ID
+ * @returns {{
+ *   reviewed_canonical_material_id: string | null
+ *   resolved_material_taxonomy_id: string | null
+ *   alias_applied: boolean
+ *   alias_target: string | null
+ *   canonical_material_lookup_status: 'found' | 'alias_resolved' | 'missing' | 'expansion_required'
+ *   material: MaterialEntry | null
+ *   material_lookup_notes: string | null
+ * }}
+ */
+export function resolveMaterialLookupMeta(materialId) {
+  const reviewed = String(materialId ?? '').trim() || null
+  if (!reviewed) {
+    return {
+      reviewed_canonical_material_id: null,
+      resolved_material_taxonomy_id: null,
+      alias_applied: false,
+      alias_target: null,
+      canonical_material_lookup_status: 'missing',
+      material: null,
+      material_lookup_notes: null,
+    }
+  }
+
+  if (MATERIAL_TAXONOMY[reviewed]) {
+    return {
+      reviewed_canonical_material_id: reviewed,
+      resolved_material_taxonomy_id: reviewed,
+      alias_applied: false,
+      alias_target: null,
+      canonical_material_lookup_status: 'found',
+      material: MATERIAL_TAXONOMY[reviewed],
+      material_lookup_notes: null,
+    }
+  }
+
+  const aliasTarget = getMaterialTaxonomyAliasTarget(reviewed)
+  if (aliasTarget && MATERIAL_TAXONOMY[aliasTarget]) {
+    return {
+      reviewed_canonical_material_id: reviewed,
+      resolved_material_taxonomy_id: aliasTarget,
+      alias_applied: true,
+      alias_target: aliasTarget,
+      canonical_material_lookup_status: 'alias_resolved',
+      material: MATERIAL_TAXONOMY[aliasTarget],
+      material_lookup_notes: `Alias resolved ${reviewed} → ${aliasTarget} via MATERIAL_TAXONOMY_ALIASES`,
+    }
+  }
+
+  const detected = detectMaterialId(reviewed.replace(/_/g, ' '))
+  if (detected && MATERIAL_TAXONOMY[detected]) {
+    return {
+      reviewed_canonical_material_id: reviewed,
+      resolved_material_taxonomy_id: detected,
+      alias_applied: reviewed !== detected,
+      alias_target: reviewed !== detected ? detected : null,
+      canonical_material_lookup_status: reviewed !== detected ? 'alias_resolved' : 'found',
+      material: MATERIAL_TAXONOMY[detected],
+      material_lookup_notes:
+        reviewed !== detected
+          ? `Pattern-detected material ID ${reviewed} → ${detected}`
+          : null,
+    }
+  }
+
+  return {
+    reviewed_canonical_material_id: reviewed,
+    resolved_material_taxonomy_id: aliasTarget ?? reviewed,
+    alias_applied: false,
+    alias_target: aliasTarget,
+    canonical_material_lookup_status:
+      reviewed === 'TAXONOMY_EXPANSION_REQUIRED' ? 'expansion_required' : 'missing',
+    material: null,
+    material_lookup_notes: `ID ${reviewed} not in MATERIAL_TAXONOMY (${Object.keys(MATERIAL_TAXONOMY).length} entries)`,
+  }
+}
+
 /** @param {string} materialId */
 export function resolveMaterialId(materialId) {
-  const raw = String(materialId ?? '').trim()
-  if (!raw) return raw
-  if (MATERIAL_ID_ALIASES[raw]) return MATERIAL_ID_ALIASES[raw]
-  if (MATERIAL_TAXONOMY[raw]) return raw
-  const detected = detectMaterialId(raw.replace(/_/g, ' '))
-  return detected ?? raw
+  const meta = resolveMaterialLookupMeta(materialId)
+  return meta.resolved_material_taxonomy_id ?? String(materialId ?? '').trim()
 }
 
 /** @param {string} materialId */
@@ -607,7 +781,7 @@ export function requireMaterial(materialId) {
   return m
 }
 
-/** Layer 4A -3, score cap 72, and Layer 4B Opaque — any undisclosed food-contact coating. */
+/** Layer 4A -3, score cap 72, and Layer 4B Opaque — truly unknown proprietary food-contact coating only. */
 export function isUnknownFoodContactCoatingMaterial(materialId) {
   return Boolean(MATERIAL_TAXONOMY[materialId]?.unknownFoodContactCoating)
 }

@@ -291,6 +291,10 @@ export type AprPublicRenderInput = {
     snapshot_id: string
     published_at: string
   }
+  /** Live approved score review stamp — omitted for frozen published snapshots. */
+  review_meta?: {
+    reviewed_at: string | null
+  }
 }
 
 /** Field ownership map — each public element maps to exactly one writer. */

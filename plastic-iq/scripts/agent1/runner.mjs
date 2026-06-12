@@ -21,9 +21,51 @@ import {
 } from './required-check-retrieval/invoke.mjs'
 import { getProductTypeRegistryPreflightError } from '../../src/shared/product-type-registry/preflight.mjs'
 
+/** Phase 2 — persist non-authoritative proposed closed fields; never fails evidence save. */
+async function tryPersistProposedInputDraft(supabase, product, evidence) {
+  try {
+    const { createProposedInputDraftForEvidence } = await import('./proposed-input-supabase.mjs')
+    const draft = await createProposedInputDraftForEvidence(supabase, { product, evidence })
+    console.log(
+      `Step 7b: proposed closed-field draft saved (${draft.proposed_input_id}, status=${draft.proposal_status})`,
+    )
+    return draft
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`Step 7b: proposed input draft failed (evidence save retained): ${message}`)
+    return null
+  }
+}
+
+const CANONICAL_TAXONOMY_RELOAD_MODULES = [
+  'canonical-taxonomy-fallbacks.mjs',
+  'hybrid-cookware-structural.mjs',
+  'ceramic-nonstick-structural.mjs',
+  'inert-cookware-structural.mjs',
+  'primary-contact-material-taxonomy.mjs',
+  'substrate-material-taxonomy.mjs',
+  'coating-modifier-taxonomy.mjs',
+  'compound-cookware-material.mjs',
+  'map-structured-evidence.mjs',
+  '../agent1/manufacturer-pdp-validation.mjs',
+  '../agent1/lab-report-evidence.mjs',
+  '../agent1/source-authority.mjs',
+  '../agent1/lab-result-retrieval.mjs',
+  '../agent1/gate1-source-validation.mjs',
+]
+
 /** Dev API sets AGENT1_RELOAD_MODULES=1 so taxonomy edits load without restarting Vite. */
 async function loadCanonicalPipeline() {
   const bust = process.env.AGENT1_RELOAD_MODULES === '1' ? `?t=${Date.now()}` : ''
+  if (bust) {
+    await Promise.all(
+      CANONICAL_TAXONOMY_RELOAD_MODULES.map((file) =>
+        import(
+          new URL(`../../src/shared/canonical-taxonomy/${file}${bust}`, import.meta.url).href,
+        ),
+      ),
+    )
+  }
   const mapHref = new URL(
     `../../src/shared/canonical-taxonomy/map-structured-evidence.mjs${bust}`,
     import.meta.url,
@@ -148,6 +190,33 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
       packet.sources,
     )
     assertRequiredExternalRetrievalComplete(structured, triggers)
+
+    const sourceValidationHref = new URL(
+      `../../src/shared/agent1/gate1-source-validation.mjs${process.env.AGENT1_RELOAD_MODULES === '1' ? `?t=${Date.now()}` : ''}`,
+      import.meta.url,
+    ).href
+    const { applyAgent1SourceValidation } = await import(sourceValidationHref)
+    const sourceValidation = applyAgent1SourceValidation(
+      structured,
+      packet.sources,
+      product,
+      packet.facts,
+      { providedSourceIntake: packet.agent_metadata.provided_source_intake ?? null },
+    )
+    packet.facts = sourceValidation.facts
+    if (sourceValidation.warnings.length) {
+      packet.agent_metadata.warnings = [
+        ...(packet.agent_metadata.warnings ?? []),
+        ...sourceValidation.warnings,
+      ]
+    }
+    if (sourceValidation.blockers.length) {
+      console.log(
+        `  Source validation blockers (${sourceValidation.blockers.length}) — Gate 1 human review required`,
+      )
+      for (const b of sourceValidation.blockers) console.log(`    - ${b}`)
+    }
+
     if (retrieval.pending_count > 0) {
       console.log(
         `  Ran ${retrieval.results?.length ?? 0} retrieval task(s); approval_blocked=${retrieval.validation?.summary?.approval_blocked ?? 'unknown'}`,
@@ -220,6 +289,8 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
     await updateAgentStatus(supabase, id, 'evidence_pending')
     console.log('Agent stopped: In Testing Queue (agent_status → evidence_pending, review_status → draft)')
 
+    await tryPersistProposedInputDraft(supabase, product, draft)
+
     return {
       ok: false,
       product,
@@ -252,6 +323,8 @@ export async function runAgent1({ productId, productName, dryRun = false }) {
   console.log(
     'Steps 6–7: evidence saved, review_status → pending_review, agent_status → evidence_awaiting_review',
   )
+
+  await tryPersistProposedInputDraft(supabase, product, evidence)
 
   return {
     ok: true,

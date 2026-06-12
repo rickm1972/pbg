@@ -5,6 +5,7 @@
 import { CONFIDENCE_TO_LEGACY } from '../../agent1/schema.mjs'
 import { isExpansionRequired } from '../../../src/shared/canonical-taxonomy/constants.mjs'
 import { detectMaterialId, getMaterial } from './material-taxonomy.mjs'
+import { resolvePrimaryContactDisplayIdentity } from './coating-substrate-handoff.mjs'
 
 export function getStructuredEvidence(evidence) {
   return evidence?.agent_metadata?.structured_evidence ?? null
@@ -107,8 +108,15 @@ export function getPrimaryContact(evidence) {
     )
   }
   const mappingConfidence = canonical?.confidence_label ?? pcm.confidence_label
+  const substrate = s.canonical_mappings?.substrate_material_id ?? null
+  const material_identity = resolvePrimaryContactDisplayIdentity(
+    pcm,
+    canonical,
+    substrate,
+    s.coatings_and_finishes ?? [],
+  )
   return {
-    material_identity: pcm.material_identity,
+    material_identity,
     undisclosed_code: pcm.undisclosed_code ?? null,
     material_id,
     canonical_id: canonical?.canonical_id ?? null,

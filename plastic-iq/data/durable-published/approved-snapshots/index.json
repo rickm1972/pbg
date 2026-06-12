@@ -1,9 +1,11 @@
 {
   "latest_by_product": {
-    "7a457a86-ab62-4cbf-90b9-ccaeafe06896": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1780927667891",
-    "e451b158-6094-44f9-9628-a2a25974482e": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780928395382",
-    "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1780927989584",
-    "c645ae86-0b82-429d-8f46-78b8007041b5": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780928046586"
+    "7a457a86-ab62-4cbf-90b9-ccaeafe06896": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017505122",
+    "e451b158-6094-44f9-9628-a2a25974482e": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781018384477",
+    "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1781014932025",
+    "c645ae86-0b82-429d-8f46-78b8007041b5": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1781014973615",
+    "fd05c5fb-19c2-4bc0-9882-ce73a7644ef5": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781016048493",
+    "860b2128-015b-4d8d-8710-7ad7751ec7c5": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781018368761"
   },
   "versions": [
     {
@@ -26,6 +28,18 @@
       "reason": "description_override",
       "override_id": "desc-override-96b591ef-f0a2-4958-8c5f-bb5f5a310878",
       "approved_at": "2026-06-08T14:13:09.584Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": null,
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1781014932025",
+      "product_id": "1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8",
+      "version_sequence": 3,
+      "source_snapshot_id": "snap-1cf2fa4e-5cdd-4798-8f3c-6c273ae69fa8-1780927989584",
+      "reason": "description_override",
+      "override_id": "desc-override-c248def7-54ac-41ea-8500-9f24ae7d2852",
+      "approved_at": "2026-06-09T14:22:12.024Z",
       "approved_by": "admin-editor",
       "low_score_publication_review": null,
       "immutable": true
@@ -97,6 +111,172 @@
       "immutable": true
     },
     {
+      "snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017297707",
+      "product_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+      "version_sequence": 4,
+      "source_snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1780927667891",
+      "reason": "description_override",
+      "override_id": "desc-override-93a3cf64-3a97-4a86-80a2-fc086154e83c",
+      "approved_at": "2026-06-09T15:01:37.707Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 2,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017505122",
+      "product_id": "7a457a86-ab62-4cbf-90b9-ccaeafe06896",
+      "version_sequence": 5,
+      "source_snapshot_id": "snap-7a457a86-ab62-4cbf-90b9-ccaeafe06896-1781017297707",
+      "reason": "description_override",
+      "override_id": "desc-override-69858e6b-e871-4cd9-a89d-7000e6e745d6",
+      "approved_at": "2026-06-09T15:05:05.122Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 2,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781015933980",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "version_sequence": 1,
+      "source_snapshot_id": "baseline-860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "reason": "snapshot_backfill",
+      "override_id": null,
+      "approved_at": "2026-06-09T14:38:53.980Z",
+      "approved_by": "snapshot-backfill",
+      "low_score_publication_review": null,
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016894541",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "version_sequence": 2,
+      "source_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781015933980",
+      "reason": "description_override",
+      "override_id": "desc-override-b54916de-e6e7-46d5-84b2-8404a7dddbab",
+      "approved_at": "2026-06-09T14:54:54.540Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 69,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016898547",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "version_sequence": 3,
+      "source_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016894541",
+      "reason": "description_override",
+      "override_id": "desc-override-3c5df286-f223-44c0-8fae-c276a7af1a9a",
+      "approved_at": "2026-06-09T14:54:58.547Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 69,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016926108",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "version_sequence": 4,
+      "source_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016898547",
+      "reason": "description_override",
+      "override_id": "desc-override-cbe21dc8-0a5e-4f18-acb8-664b6c7e0842",
+      "approved_at": "2026-06-09T14:55:26.108Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 69,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016931839",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "version_sequence": 5,
+      "source_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016926108",
+      "reason": "description_override",
+      "override_id": "desc-override-99f094d8-8555-4940-8a8f-b20513427ee6",
+      "approved_at": "2026-06-09T14:55:31.839Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 69,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781018368761",
+      "product_id": "860b2128-015b-4d8d-8710-7ad7751ec7c5",
+      "version_sequence": 6,
+      "source_snapshot_id": "snap-860b2128-015b-4d8d-8710-7ad7751ec7c5-1781016931839",
+      "reason": "description_override",
+      "override_id": "desc-override-9fd61fff-4d8b-4295-b6c4-ad656b7aa04f",
+      "approved_at": "2026-06-09T15:19:28.761Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 69,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
       "snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780926804249",
       "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
       "version_sequence": 1,
@@ -116,6 +296,18 @@
       "reason": "description_override",
       "override_id": "desc-override-695324ef-295b-4c69-b8fc-b25074186380",
       "approved_at": "2026-06-08T14:14:06.585Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": null,
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1781014973615",
+      "product_id": "c645ae86-0b82-429d-8f46-78b8007041b5",
+      "version_sequence": 3,
+      "source_snapshot_id": "snap-c645ae86-0b82-429d-8f46-78b8007041b5-1780928046586",
+      "reason": "description_override",
+      "override_id": "desc-override-dcf4839f-6335-48be-8e3e-cac603f56e9c",
+      "approved_at": "2026-06-09T14:22:53.615Z",
       "approved_by": "admin-editor",
       "low_score_publication_review": null,
       "immutable": true
@@ -184,6 +376,140 @@
         "approval_status": "approved",
         "reviewer_notes": "Fixture-approved low-score publication review."
       },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017002241",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "version_sequence": 4,
+      "source_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1780928395382",
+      "reason": "description_override",
+      "override_id": "desc-override-511f3c3e-7246-4237-b0a7-865642734b77",
+      "approved_at": "2026-06-09T14:56:42.241Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 66,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017045674",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "version_sequence": 5,
+      "source_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017002241",
+      "reason": "description_override",
+      "override_id": "desc-override-5139fd79-889a-4a74-bdff-bc2f9c89f276",
+      "approved_at": "2026-06-09T14:57:25.674Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 66,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017249196",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "version_sequence": 6,
+      "source_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017045674",
+      "reason": "description_override",
+      "override_id": "desc-override-2c3a9e5d-c8bc-493a-9afd-395a35c06d62",
+      "approved_at": "2026-06-09T15:00:49.196Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 66,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017567254",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "version_sequence": 7,
+      "source_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017249196",
+      "reason": "description_override",
+      "override_id": "desc-override-7342c65d-4362-491b-a27b-0715dbb4195f",
+      "approved_at": "2026-06-09T15:06:07.254Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 66,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781018384477",
+      "product_id": "e451b158-6094-44f9-9628-a2a25974482e",
+      "version_sequence": 8,
+      "source_snapshot_id": "snap-e451b158-6094-44f9-9628-a2a25974482e-1781017567254",
+      "reason": "description_override",
+      "override_id": "desc-override-efda4532-9dce-43d3-8ce8-dce901c0fa4d",
+      "approved_at": "2026-06-09T15:19:44.477Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": {
+        "reviewer_id": "fixture-reviewer",
+        "reviewed_at": "2026-06-05T12:00:00.000Z",
+        "low_score_gate_version": "4.5.0",
+        "score_at_review": 66,
+        "primary_score_driving_concern": "Admin-approved override",
+        "evidence_sufficiency": "passed",
+        "language_safety": "passed",
+        "approval_status": "approved",
+        "reviewer_notes": "Fixture-approved low-score publication review."
+      },
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781015933588",
+      "product_id": "fd05c5fb-19c2-4bc0-9882-ce73a7644ef5",
+      "version_sequence": 1,
+      "source_snapshot_id": "baseline-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5",
+      "reason": "snapshot_backfill",
+      "override_id": null,
+      "approved_at": "2026-06-09T14:38:53.582Z",
+      "approved_by": "snapshot-backfill",
+      "low_score_publication_review": null,
+      "immutable": true
+    },
+    {
+      "snapshot_id": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781016048493",
+      "product_id": "fd05c5fb-19c2-4bc0-9882-ce73a7644ef5",
+      "version_sequence": 2,
+      "source_snapshot_id": "snap-fd05c5fb-19c2-4bc0-9882-ce73a7644ef5-1781015933588",
+      "reason": "description_override",
+      "override_id": "desc-override-4d762a4a-5121-4cab-aa27-d2408677368e",
+      "approved_at": "2026-06-09T14:40:48.493Z",
+      "approved_by": "admin-editor",
+      "low_score_publication_review": null,
       "immutable": true
     }
   ]

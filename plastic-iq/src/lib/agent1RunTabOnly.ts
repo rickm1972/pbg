@@ -15,12 +15,25 @@ export const AGENT1_VALIDATION_DUO_PRODUCT_IDS: readonly string[] = [
   AGENT1_HEXCLAD_PRODUCT_ID,
 ] as const
 
+/** Statuses that must reset to unscored before Agent 1 can run again — never rerun from these as-is. */
+export const AGENT1_MUST_RESET_BEFORE_RERUN_STATUSES = new Set([
+  'evidence_awaiting_review',
+  'evidence_pending',
+  'evidence_in_progress',
+  'evidence_rejected',
+])
+
 /**
  * Partial Agent 1 evidence wipe before re-run (any product not requiring full pipeline reset).
  */
 export function canAgent1RetestReset(agentStatus: string): boolean {
   if (requiresFullPipelineResetBeforeAgent1Run(agentStatus)) return false
   return agentStatus !== 'unscored'
+}
+
+/** True when UI must clear prior bundle and leave Awaiting review before starting Agent 1. */
+export function mustResetAgent1BeforeRerun(agentStatus: string): boolean {
+  return AGENT1_MUST_RESET_BEFORE_RERUN_STATUSES.has(agentStatus)
 }
 
 /** Prior run or stalled in_progress — Run Agent 1 clears evidence first, then runs. */

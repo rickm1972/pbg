@@ -22,7 +22,7 @@ import {
   applyPublicSecondaryMaterialsToFields,
 } from '../publicProductDisplayContract'
 import { applyHazardSortToWhyThisScoreFields, primaryMaterialLabelsFromComponents } from '../whyThisScoreSort'
-import { rewritePublicDescriptionDisclosureGap, publicCertificationAbsenceCopy, publicCertificationOption } from '../publicDisclosureGapCopy'
+import { rewritePublicDescriptionDisclosureGap, publicCertificationAbsenceCopy, publicCertificationsForDisplay, primaryMaterialIndicatesCoatingDisclosureGap, isManufacturerLabTestingCertOption } from '../publicDisclosureGapCopy'
 import {
   applyPublicMaterialLabelsToWhyThisScore,
   humanizePublicContactMaterialDisplay,
@@ -217,8 +217,11 @@ function shapePublicWhyThisScoreFieldsForAssembly(
     disclosure_quality_options: fields.disclosure_quality_options.map((o) =>
       normalizeDisclosureBadge(o),
     ),
-    certifications_options: fields.certifications_options.map((o) =>
-      publicCertificationOption(o, disclosureBadge, primary, fields.coatings_finishes_options),
+    certifications_options: publicCertificationsForDisplay(
+      fields.certifications_options,
+      disclosureBadge,
+      primary,
+      fields.coatings_finishes_options,
     ),
   }
 }
@@ -433,10 +436,7 @@ function assembleBuyCta(
 ) {
   return publicRetailerLinks(product, evidence).filter((link) => {
     const eligibility = evaluatePublicRetailerCtaEligibility(link.url, evidence, product)
-    if (!eligibility.allowed) return false
-    // Admin product fields (affiliate / retailer URLs) are source of truth — Gate 1 is the only block.
-    if (eligibility.reason === 'admin_curated_product_link') return true
-    return !retailerListingHasConfirmedVariantMismatch(reviewedTitle, link.url, link.buyLabel)
+    return eligibility.allowed
   })
 }
 
@@ -534,6 +534,15 @@ export async function assembleAprPublicRenderInput(
 
   const secondaryLabels = shapedWhy ? publicSecondaryMaterialLabels(shapedWhy) : []
 
+  const publicCertRows = shapedWhy?.certifications_options.filter((o) => o !== 'None') ?? []
+  const hasLabTesting = publicCertRows.some(isManufacturerLabTestingCertOption)
+  const coatingFormulaUndisclosed =
+    Boolean(shapedWhy) &&
+    primaryMaterialIndicatesCoatingDisclosureGap(
+      shapedWhy.primary_material_options,
+      shapedWhy.coatings_finishes_options,
+    )
+
   const retailerLinks = assembleBuyCta(product, evidence, reviewedTitle)
   const tier = pageScore.tier ?? 'Good'
 
@@ -556,7 +565,7 @@ export async function assembleAprPublicRenderInput(
     coatings: shapedWhy?.coatings_finishes_options.filter((o) => o !== 'None').join(', ') || 'None',
     use_conditions: shapedWhy?.use_conditions_options.filter((o) => o !== 'None') ?? [],
     disclosure_quality: approvedBadge,
-    cert_line: shapedWhy?.certifications_options.filter((o) => o !== 'None')[0] ?? '',
+    cert_line: publicCertRows[0] ?? '',
     risk_bars:
       normalizationComponents && normalizationComponents.length > 0
         ? buildRiskBars(normalizationComponents, primaryMaterialName, approvedBadge)
@@ -572,10 +581,15 @@ export async function assembleAprPublicRenderInput(
       coatings: shapedWhy?.coatings_finishes_options.filter((o) => o !== 'None').join(', ') || 'None',
       use_conditions: shapedWhy?.use_conditions_options.filter((o) => o !== 'None') ?? [],
       disclosure_quality: approvedBadge,
-      cert_line: shapedWhy?.certifications_options.filter((o) => o !== 'None')[0] ?? '',
+      cert_line: publicCertRows[0] ?? '',
       sections: shapedWhy ? whyThisScoreSections(shapedWhy) : [],
     },
-    badge_summary: approvedBadge ? transparencyBadgeSummary(approvedBadge) : '',
+    badge_summary: approvedBadge
+      ? transparencyBadgeSummary(approvedBadge, {
+          coatingFormulaUndisclosed,
+          hasLabTesting,
+        })
+      : '',
     buy_section_title: publicRetailerSectionTitle(tier),
     retailer_caution_note: publicRetailerCautionNote(tier),
     sources_intro: formatSourcesIntro(sourceGroups),

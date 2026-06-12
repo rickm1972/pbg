@@ -111,8 +111,13 @@ function pickSubstrateCanonicalId(normalized) {
 
   const hasGraphite = /graphite/.test(normalized)
   const hasAluminum = /aluminum|aluminium/.test(normalized)
+  const hasHardAnodized = /hard[_\s-]*anodized|hard[_\s-]*anodised/.test(normalized)
   const hasStainlessBody =
     /stainless[_\s-]*steel[_\s-]*(body|exterior|layer|bonded|clad|ply)|(?:body|exterior|layer).*stainless/.test(
+      normalized,
+    )
+  const hasStainlessInductionOnly =
+    /stainless[_\s-]*steel[_\s-]*(induction|base|plate|disc)|induction[_\s-]*(base|plate|disc)[_\s-]*stainless/.test(
       normalized,
     )
 
@@ -120,6 +125,11 @@ function pickSubstrateCanonicalId(normalized) {
     substrate = 'graphite_structural_core'
     if (hasAluminum) secondary.push('aluminum_core')
     if (hasStainlessBody) secondary.push('stainless_steel_body')
+  } else if (hasHardAnodized) {
+    substrate = 'hard_anodized_aluminum'
+    if (hasStainlessInductionOnly || /magneto|induction[_\s-]*base/.test(normalized)) {
+      secondary.push('stainless_steel_body')
+    }
   } else if (hasAluminum) {
     substrate = 'aluminum_core'
     if (hasStainlessBody) secondary.push('stainless_steel_body')
@@ -169,6 +179,14 @@ export function parseCompoundCookwareMaterial(raw) {
       : 'cast_iron'
   } else if (/carbon_steel/.test(normalized)) {
     out.primaryContactCanonicalId = 'carbon_steel'
+  } else if (
+    (/thermolon|ceramic.*nonstick|nonstick.*ceramic|sol_gel|mineral.*ceramic|diamond.*ceramic|diamond.*infused.*ceramic/.test(
+      normalized,
+    ) ||
+      /\bceramic\b.*\bnonstick\b|\bnonstick\b.*\bceramic\b/.test(normalized.replace(/_/g, ' '))) &&
+    !hasStainlessFoodContactRole(normalized)
+  ) {
+    out.primaryContactCanonicalId = 'ceramic_nonstick_sol_gel_coating'
   }
 
   const { substrate, secondary } = pickSubstrateCanonicalId(normalized)

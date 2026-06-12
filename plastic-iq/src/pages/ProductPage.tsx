@@ -133,6 +133,7 @@ export function ProductPage() {
   const reviewedAt = resolvePublicReviewDate({
     display,
     snapshotPublishedAt: apr?.snapshot_meta?.published_at,
+    scoreRunTimestamp: apr?.review_meta?.reviewed_at,
   })
 
   return (

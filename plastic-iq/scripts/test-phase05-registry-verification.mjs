@@ -61,7 +61,7 @@ const guardSnapshotBefore = snapshotGuardFiles()
 
 const tumblerValidation = validateProductTypeConfig(TUMBLER_TEST_CONFIG)
 assert.equal(tumblerValidation.valid, true, tumblerValidation.errors.join('; '))
-assert.equal(TUMBLER_TEST_CONFIG.scoring_assumption_ref, 'v2.3.4.drinkware')
+assert.equal(TUMBLER_TEST_CONFIG.scoring_assumption_ref, 'v2.3.5.drinkware')
 
 registerProductTypeConfigForTest(TUMBLER_TEST_CONFIG)
 
@@ -73,7 +73,7 @@ const tumblerResolved = resolveProductTypeConfig({
 assert.equal(tumblerResolved.registry_key, 'kitchen.drinkware.tumbler')
 assert.equal(
   resolveMatrixKeyFromRegistry('Drinkware', { category: 'Kitchen', product_type: 'Tumbler' }),
-  'water_bottles_drinkware',
+  'drinkware',
 )
 
 const tumblerCategory = deriveProductCategory(

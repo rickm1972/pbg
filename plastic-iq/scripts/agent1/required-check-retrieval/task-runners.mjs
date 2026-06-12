@@ -1,10 +1,12 @@
 import { runCookwarePfasRegulatoryRetrieval } from './tasks/cookware-pfas-regulatory.mjs'
 import { runCookwarePfoaPfasDistinctionRetrieval } from './tasks/cookware-pfoa-pfas-distinction.mjs'
+import { runCoatedProductLabResultsRetrieval } from './tasks/cookware-lab-results.mjs'
 
 /** check_id → runner (must match retrieval-task-registry.mjs check_id exactly). */
 export const TASK_RUNNERS = {
   'external.regulatory_pfas_minnesota_review': runCookwarePfasRegulatoryRetrieval,
   'external.pfoa_vs_pfas_free_distinction': runCookwarePfoaPfasDistinctionRetrieval,
+  'external.coated_product_lab_results': runCoatedProductLabResultsRetrieval,
 }
 
 /** PTFE / PFAS cookware — both runners must exist before catalog or validation runs. */

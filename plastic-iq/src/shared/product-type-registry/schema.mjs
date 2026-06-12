@@ -52,7 +52,7 @@ export function validateProductTypeConfig(config) {
   } else if (!VALID_SCORING_ASSUMPTION_REFS.includes(config.scoring_assumption_ref)) {
     errors.push(`invalid scoring_assumption_ref: ${config.scoring_assumption_ref}`)
   } else if (!getScoringAssumption(config.scoring_assumption_ref)) {
-    errors.push(`scoring_assumption_ref not found in V2.3.4 contract: ${config.scoring_assumption_ref}`)
+    errors.push(`scoring_assumption_ref not found in V2.3.5 contract: ${config.scoring_assumption_ref}`)
   }
 
   for (const ref of config?.contact_model_refs ?? []) {
