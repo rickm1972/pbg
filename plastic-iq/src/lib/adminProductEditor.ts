@@ -48,6 +48,8 @@ export const ADMIN_PIPELINE_READONLY_FIELDS: ReadonlyArray<{
 export const ADMIN_EDITABLE_PRODUCT_FIELD_KEYS = [
   'product_name',
   'brand',
+  'category_id',
+  'subcategory_id',
   'category',
   'subcategory',
   'description',
@@ -84,6 +86,8 @@ export function buildAdminProductSavePayload(
   const core = {
     product_name: p.product_name,
     brand: p.brand,
+    category_id: p.category_id,
+    subcategory_id: p.subcategory_id,
     category: p.category,
     subcategory: p.subcategory,
     description: p.description,

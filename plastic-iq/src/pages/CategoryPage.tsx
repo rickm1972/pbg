@@ -14,6 +14,11 @@ import type { Product, ProductTier } from '../types'
 import { cn } from '../lib/cn'
 import { fetchProductsByCategory } from '../lib/productsApi'
 import { filterPublicListProducts, hasPublicDisplayScore } from '../lib/publicProductDisplay'
+import {
+  LEGACY_LUMPED_DRINKWARE_SUBCATEGORY,
+  productMatchesPublicSubcategory,
+  sortPublicSubcategoryLabels,
+} from '../lib/publicTaxonomyBrowse'
 import { tierForScore } from '../lib/score'
 import { ScoreMark } from '../components/ScoreMark'
 import { ProductImage } from '../components/ProductImage'
@@ -68,7 +73,7 @@ export function CategoryPage() {
   const scopedProducts = useMemo(() => {
     if (!publicProducts) return null
     if (!subcategory) return publicProducts
-    return publicProducts.filter((p) => (p.subcategory ?? '').trim() === subcategory)
+    return publicProducts.filter((p) => productMatchesPublicSubcategory(p, subcategory))
   }, [publicProducts, subcategory])
 
   const subcategoryCounts = useMemo(() => {
@@ -443,32 +448,12 @@ export function CategoryPage() {
 /** Subcategories hidden from public catalog (materials-science scope only). */
 const EXCLUDED_SUBCATEGORIES = new Set(['Dish Soap'])
 
-const KITCHEN_SUBORDER = [
-  'Food Storage',
-  'Cookware',
-  'Cooking Utensils',
-  'Water Bottles and Drinkware',
-] as const
-
 function isPublicSubcategory(label: string): boolean {
   return label.trim().length > 0 && !EXCLUDED_SUBCATEGORIES.has(label.trim())
 }
 
 function sortSubcategoryLabels(labels: string[], categoryName: string): string[] {
-  const unique = [...new Set(labels)]
-  if (categoryName === 'Kitchen') {
-    return unique.sort((a, b) => {
-      const ia = KITCHEN_SUBORDER.indexOf(a as (typeof KITCHEN_SUBORDER)[number])
-      const ib = KITCHEN_SUBORDER.indexOf(b as (typeof KITCHEN_SUBORDER)[number])
-      if (ia !== -1 || ib !== -1) {
-        if (ia === -1) return 1
-        if (ib === -1) return -1
-        return ia - ib
-      }
-      return a.localeCompare(b)
-    })
-  }
-  return unique.sort((a, b) => a.localeCompare(b))
+  return sortPublicSubcategoryLabels(labels, categoryName)
 }
 
 function FacetSection<T extends string>({

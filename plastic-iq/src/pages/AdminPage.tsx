@@ -9,6 +9,9 @@ import { consumePipelineFocus } from '../lib/adminPipelineNav'
 import { QuizAdminDashboard } from '../components/admin/QuizAdminDashboard'
 import { ChannelDashboard } from '../components/admin/ChannelDashboard'
 import { PersonaDashboard } from '../components/admin/PersonaDashboard'
+import { ProductClaimIntakeFields } from '../components/admin/ProductClaimIntakeFields'
+import { ProductTaxonomyFields } from '../components/admin/ProductTaxonomyFields'
+import { TaxonomyDashboard } from '../components/admin/TaxonomyDashboard'
 import { PublicDescriptionOverridePanel } from '../components/admin/PublicDescriptionOverridePanel'
 import {
   ADMIN_PIPELINE_READONLY_FIELDS,
@@ -22,10 +25,17 @@ import {
   PRODUCT_SELECT_WITH_SCORE,
   type ProductRowWithScoreDetails,
 } from '../lib/retailerLinksSidecar'
+import { KITCHEN_CATEGORY_ID } from '../lib/managedTaxonomy/seedIds'
+import { emptyClaimIntakeMap, type ClaimIntakeMap } from '../lib/productClaimIntake'
+import {
+  buildClaimIntakeFromProduct,
+  loadProductClaimIntake,
+} from '../lib/productClaimIntakeStore'
 import type { Product } from '../types'
 
 type AdminTab =
   | 'products'
+  | 'taxonomy'
   | 'agent1'
   | 'agent2'
   | 'agent3'
@@ -51,6 +61,7 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [pipelineFocusProductId, setPipelineFocusProductId] = useState<string | null>(null)
+  const [editorClaims, setEditorClaims] = useState<ClaimIntakeMap>(emptyClaimIntakeMap())
 
   const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined
 
@@ -176,6 +187,17 @@ export function AdminPage() {
               onClick={() => setTab('products')}
             >
               Products
+            </button>
+            <button
+              type="button"
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                tab === 'taxonomy'
+                  ? 'bg-white text-ink-900 shadow-sm'
+                  : 'text-slate-600 hover:text-ink-900'
+              }`}
+              onClick={() => setTab('taxonomy')}
+            >
+              Taxonomy
             </button>
             <button
               type="button"
@@ -474,6 +496,14 @@ export function AdminPage() {
         />
       ) : null}
 
+      {tab === 'taxonomy' ? (
+        <TaxonomyDashboard
+          authUserEmail={authUserEmail}
+          onNotice={setMessage}
+          onError={setError}
+        />
+      ) : null}
+
       {tab === 'products' ? (
       <div className="mt-6 grid gap-4 md:grid-cols-12">
         <div className="md:col-span-5">
@@ -483,10 +513,14 @@ export function AdminPage() {
               <button
                 className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                 onClick={() => {
+                  const claims = emptyClaimIntakeMap()
+                  setEditorClaims(claims)
                   setSelected({
                     product_id: '',
                     product_name: '',
                     brand: null,
+                    category_id: KITCHEN_CATEGORY_ID,
+                    subcategory_id: null,
                     category: 'Kitchen',
                     subcategory: null,
                     description: null,
@@ -524,7 +558,16 @@ export function AdminPage() {
                     <li key={p.product_id}>
                       <button
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm hover:bg-slate-50"
-                        onClick={() => setSelected(p)}
+                        onClick={() => {
+                          setSelected(p)
+                          if (p.product_id) {
+                            loadProductClaimIntake(p.product_id)
+                              .then(setEditorClaims)
+                              .catch(() => setEditorClaims(buildClaimIntakeFromProduct(p)))
+                          } else {
+                            setEditorClaims(buildClaimIntakeFromProduct(p))
+                          }
+                        }}
                       >
                         <div className="font-semibold text-ink-900">{p.product_name}</div>
                         <div className="text-xs text-slate-600">
@@ -549,6 +592,8 @@ export function AdminPage() {
               <ProductEditor
                 product={selected}
                 onChange={setSelected}
+                claimIntake={editorClaims}
+                onClaimIntakeChange={setEditorClaims}
                 onSave={async (p) => {
                   setLoading(true)
                   setError(null)
@@ -559,9 +604,12 @@ export function AdminPage() {
                       throw new Error('Not signed in. Sign in above to save changes.')
                     }
                     if (!p.product_name.trim()) throw new Error('Product name is required')
-                    if (!p.category) throw new Error('Category is required')
+                    if (!p.category_id) throw new Error('Managed category is required')
+                    if (!p.subcategory_id) throw new Error('Managed subcategory is required')
 
-                    const { product, message: saveMsg } = await saveAdminProduct(p)
+                    const { product, message: saveMsg } = await saveAdminProduct(p, {
+                      claimIntake: editorClaims,
+                    })
                     setSelected(product)
                     setMessage(saveMsg)
                     await loadAll()
@@ -590,16 +638,24 @@ export function AdminPage() {
 function ProductEditor({
   product,
   onChange,
+  claimIntake,
+  onClaimIntakeChange,
   onSave,
   saving,
 }: {
   product: Product
   onChange: (p: Product) => void
+  claimIntake: ClaimIntakeMap
+  onClaimIntakeChange: (claims: ClaimIntakeMap) => void
   onSave: (p: Product) => Promise<void>
   saving: boolean
 }) {
   function set<K extends keyof Product>(key: K, value: Product[K]) {
     onChange({ ...product, [key]: value })
+  }
+
+  function setClaim(claimType: keyof ClaimIntakeMap, value: ClaimIntakeMap[keyof ClaimIntakeMap]) {
+    onClaimIntakeChange({ ...claimIntake, [claimType]: value })
   }
 
   return (
@@ -644,28 +700,9 @@ function ProductEditor({
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
           />
         </Field>
-        <Field label="Category" required>
-          <select
-            value={product.category ?? ''}
-            onChange={(e) => set('category', e.target.value || null)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="Kitchen">Kitchen</option>
-            <option value="Personal Care">Personal Care</option>
-            <option value="Home">Home</option>
-            <option value="Food and Beverage">Food and Beverage</option>
-            <option value="Fitness and Sports">Fitness and Sports</option>
-          </select>
-        </Field>
       </div>
 
-      <Field label="Subcategory">
-        <input
-          value={product.subcategory ?? ''}
-          onChange={(e) => set('subcategory', e.target.value || null)}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-        />
-      </Field>
+      <ProductTaxonomyFields product={product} onChange={(patch) => onChange({ ...product, ...patch })} />
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -687,32 +724,7 @@ function ProductEditor({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field label="BPA free">
-          <select
-            value={product.bpa_free ?? ''}
-            onChange={(e) => set('bpa_free', (e.target.value as Product['bpa_free']) || null)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-            <option value="Unknown">Unknown</option>
-          </select>
-        </Field>
-        <Field label="Phthalate free claim">
-          <select
-            value={product.phthalate_free_claim ?? ''}
-            onChange={(e) =>
-              set('phthalate_free_claim', (e.target.value as Product['phthalate_free_claim']) || null)
-            }
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-            <option value="Unknown">Unknown</option>
-          </select>
-        </Field>
-      </div>
+      <ProductClaimIntakeFields claims={claimIntake} onChange={setClaim} />
 
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Commerce / buy links</p>
       <p className="text-xs leading-relaxed text-slate-600">

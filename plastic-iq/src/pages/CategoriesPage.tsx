@@ -132,7 +132,7 @@ export function CategoriesPage() {
               </p>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
               <SubcategoryCard
                 ariaTitle="Food Storage"
                 title="Food Storage"
@@ -158,17 +158,23 @@ export function CategoriesPage() {
                 to={`/category/${encodeURIComponent('Kitchen')}?subcategory=${encodeURIComponent('Cooking Utensils')}`}
               />
               <SubcategoryCard
-                ariaTitle="Water Bottles and Drinkware"
-                title={
-                  <>
-                    Water Bottles &<br />
-                    Drinkware
-                  </>
-                }
+                ariaTitle="Water Bottles"
+                title="Water Bottles"
                 image={categoryWaterBottles}
                 haloClass="bg-emerald-50"
-                count={countsBySubcategory['Water Bottles and Drinkware'] ?? 0}
-                to={`/category/${encodeURIComponent('Kitchen')}?subcategory=${encodeURIComponent('Water Bottles and Drinkware')}`}
+                count={
+                  (countsBySubcategory['Water Bottles'] ?? 0) +
+                  (countsBySubcategory['Water Bottles and Drinkware'] ?? 0)
+                }
+                to={`/category/${encodeURIComponent('Kitchen')}?subcategory=${encodeURIComponent('Water Bottles')}`}
+              />
+              <SubcategoryCard
+                ariaTitle="Drinkware"
+                title="Drinkware"
+                image={categoryWaterBottles}
+                haloClass="bg-sky-50"
+                count={countsBySubcategory['Drinkware'] ?? 0}
+                to={`/category/${encodeURIComponent('Kitchen')}?subcategory=${encodeURIComponent('Drinkware')}`}
               />
             </div>
           </section>

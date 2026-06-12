@@ -9,7 +9,13 @@ export type Product = {
   product_id: string
   product_name: string
   brand: string | null
+  /** FK to product_categories — source of truth for new intake. */
+  category_id: string | null
+  /** FK to product_subcategories — source of truth for new intake. */
+  subcategory_id: string | null
+  /** Denormalized cache of product_categories.name during FK transition. */
   category: string | null
+  /** Denormalized cache of product_subcategories.name during FK transition. */
   subcategory: string | null
   description: string | null
   pac_safety_score: number | null

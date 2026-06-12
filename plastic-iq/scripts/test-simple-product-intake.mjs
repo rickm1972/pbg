@@ -43,6 +43,8 @@ assert.deepEqual(
   ],
 )
 assert.ok(adminPageSource.includes('SIMPLE_PRODUCT_INTAKE_FIELDS'), 'AdminPage must render intake from SIMPLE_PRODUCT_INTAKE_FIELDS')
+assert.ok(adminPageSource.includes('ProductTaxonomyFields'), 'AdminPage must use managed taxonomy fields')
+assert.ok(adminPageSource.includes('ProductClaimIntakeFields'), 'AdminPage must render claim intake fields')
 assert.ok(adminPageSource.includes('Product intake (before Agent 1)'), 'AdminPage missing intake section heading')
 console.log('✓ product intake UI defines exactly three user-facing fields')
 
@@ -52,6 +54,8 @@ const payload = buildAdminProductSavePayload(
     product_id: 'x',
     product_name: 'HexClad Hybrid Nonstick 10 Inch Frying Pan',
     brand: 'HexClad',
+    category_id: 'a1111111-1111-4111-8111-111111111101',
+    subcategory_id: 'a1111111-1111-4111-8111-111111111201',
     category: 'Kitchen',
     subcategory: 'Cookware',
     description: null,

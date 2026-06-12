@@ -84,14 +84,11 @@ const TIER_STRIP = [
 ] as const
 
 const FEATURED_SUBCATEGORIES = [
-  {
-    label: 'Water Bottles & Drinkware',
-    db: 'Water Bottles and Drinkware',
-    image: categoryWaterBottles,
-  },
   { label: 'Food Storage', db: 'Food Storage', image: categoryFoodStorage },
   { label: 'Cookware', db: 'Cookware', image: categoryCookware },
   { label: 'Cooking Utensils', db: 'Cooking Utensils', image: categoryCookingUtensils },
+  { label: 'Water Bottles', db: 'Water Bottles', image: categoryWaterBottles },
+  { label: 'Drinkware', db: 'Drinkware', image: categoryWaterBottles },
 ] as const
 
 /** Subcategories outside materials-science scope (formulation products). */

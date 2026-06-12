@@ -16,6 +16,8 @@ const sampleProduct = {
   product_id: 'test-id',
   product_name: 'Lodge Cast Iron Skillet',
   brand: 'Lodge',
+  category_id: 'a1111111-1111-4111-8111-111111111101',
+  subcategory_id: 'a1111111-1111-4111-8111-111111111201',
   category: 'Kitchen',
   subcategory: 'Cookware',
   description: 'Legacy listing blurb',
@@ -68,6 +70,8 @@ for (const key of ADMIN_PIPELINE_READONLY_FIELD_KEYS) {
 
 assert.equal(fullPayload.product_name, sampleProduct.product_name)
 assert.equal(fullPayload.brand, sampleProduct.brand)
+assert.equal(fullPayload.category_id, sampleProduct.category_id)
+assert.equal(fullPayload.subcategory_id, sampleProduct.subcategory_id)
 assert.equal(fullPayload.category, sampleProduct.category)
 assert.equal(fullPayload.subcategory, sampleProduct.subcategory)
 assert.equal(fullPayload.description, sampleProduct.description)

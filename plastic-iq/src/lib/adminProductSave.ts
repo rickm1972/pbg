@@ -1,5 +1,8 @@
 import type { Product } from '../types'
 import { supabase, formatSupabaseUnknownError } from './supabaseClient'
+import { claimIntakeValueToLegacy } from './productClaimIntake'
+import { syncProductClaimIntake } from './productClaimIntakeStore'
+import type { ClaimIntakeMap } from './productClaimIntake'
 import {
   buildAdminProductSavePayload,
   type AdminProductSavePayloadMode,
@@ -121,6 +124,10 @@ async function syncRetailLinksSidecarAfterSave(
   }
 }
 
+export type SaveAdminProductOptions = {
+  claimIntake?: ClaimIntakeMap
+}
+
 export type SaveAdminProductResult = {
   product: Product
   message: string | null
@@ -130,14 +137,26 @@ export type SaveAdminProductResult = {
  * Persists a product row, falling back to score_details.data_sources JSON when
  * target_url / walmart_url / other_retailer_* columns are missing on `products`.
  */
-export async function saveAdminProduct(p: Product): Promise<SaveAdminProductResult> {
+export async function saveAdminProduct(
+  p: Product,
+  options: SaveAdminProductOptions = {},
+): Promise<SaveAdminProductResult> {
   const modes: PayloadMode[] = ['full', 'no_other', 'no_retailer_urls']
   let lastErr: unknown = null
   const isUpdate = Boolean(p.product_id)
 
   for (let i = 0; i < modes.length; i++) {
     const mode = modes[i]
-    const payload = buildAdminProductSavePayload(p, mode)
+    const payload = buildAdminProductSavePayload(
+      options.claimIntake
+        ? {
+            ...p,
+            bpa_free: claimIntakeValueToLegacy(options.claimIntake.bpa_free),
+            phthalate_free_claim: claimIntakeValueToLegacy(options.claimIntake.phthalate_free),
+          }
+        : p,
+      mode,
+    )
     const res = !isUpdate
       ? await supabase.from('products').insert(payload).select(PRODUCT_SELECT_WITH_SCORE).single()
       : await supabase
@@ -152,6 +171,10 @@ export async function saveAdminProduct(p: Product): Promise<SaveAdminProductResu
       const productId = row.product_id
 
       await syncRetailLinksSidecarAfterSave(productId, p, !isUpdate, mode)
+
+      if (options.claimIntake) {
+        await syncProductClaimIntake(productId, options.claimIntake)
+      }
 
       const stateAfter = buildRetailSidecarState(p, !isUpdate, mode)
       const patched: ProductRowWithScoreDetails = {
